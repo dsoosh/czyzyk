@@ -28,9 +28,9 @@
 ## 5. Android: czytnik powiadomień
 
 - [ ] 5.1 Parowanie (skan QR / wklejenie linku `czyzyk://pair`), `EncryptedSharedPreferences`, ekran statusu „Połączono z serwerem” / „Urządzenie odłączone”; weryfikacja: test jednostkowy parsera linku i ręczny test na telefonie
-- [ ] 5.2 Parser powiadomień `MessagingStyle` (grupa vs prywatne, pomijanie podsumowań, placeholdery załączników PL/EN, klucz idempotencji UUIDv5); weryfikacja: testy jednostkowe (Robolectric) na przykładowych powiadomieniach
-- [ ] 5.3 Filtr śledzonych grup z cache 15 min i zgłaszanie nowych nazw grup; weryfikacja: test jednostkowy – nieśledzona grupa nie trafia do kolejki, jej nazwa trafia do zgłoszenia
-- [ ] 5.4 Kolejka SQLite + WorkManager z backoffem i obsługą 401/422/429; weryfikacja: test instrumentalny/Robolectric – wiadomość przeżywa restart procesu i jest wysyłana po przywróceniu sieci
+- [x] 5.2 Parser powiadomień `MessagingStyle` (grupa vs prywatne, pomijanie podsumowań, placeholdery załączników PL/EN, klucz idempotencji UUIDv5); weryfikacja: testy jednostkowe (Robolectric) na przykładowych powiadomieniach
+- [x] 5.3 Filtr śledzonych grup z cache 15 min i zgłaszanie nowych nazw grup; weryfikacja: test jednostkowy – nieśledzona grupa nie trafia do kolejki, jej nazwa trafia do zgłoszenia
+- [x] 5.4 Kolejka SQLite + WorkManager z backoffem i obsługą 401/422/429; weryfikacja: test instrumentalny/Robolectric – wiadomość przeżywa restart procesu i jest wysyłana po przywróceniu sieci
 - [ ] 5.5 Ekran ustawień: dostęp do powiadomień, optymalizacja baterii, licznik załączników, rozmiar kolejki, ostatnia wysyłka, instrukcja „cichy dźwięk zamiast wyciszenia”; weryfikacja: ręczny test na telefonie z wyłączonym uprawnieniem
 
 ## 6. PWA: ekrany treści
