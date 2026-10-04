@@ -82,7 +82,7 @@ Pozostałe zmienne (np. `CZYZYK_SERVICE`, `EXTRACTION_MODEL`, limity) ustawia pl
 
 Domeny: dla `pwa` i `api` włącz *Generate Domain* w dashboardzie (lub dopisz je do pliku i zastosuj). **Zawsze czytaj `railway config plan` przed `apply`** – apply jest deklaratywny i usuwa to, czego nie ma w pliku (wymaga wtedy potwierdzenia).
 
-Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`, `npm start`), a `CZYZYK_SERVICE` (`api` / `worker` / `pwa`) wybiera, którą część zbudować i uruchomić (`scripts/service.mjs`). Zmienne `VITE_*` są wkompilowywane w PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`.
+Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`, `npm start`), a `CZYZYK_SERVICE` (`api` / `worker` / `pwa`) wybiera, którą część zbudować i uruchomić (`scripts/service.mjs`). Gdy `CZYZYK_SERVICE` nie jest ustawione, skrypt rozpoznaje usługę po nazwie usługi w Railway (`RAILWAY_SERVICE_NAME`, np. `pwa` albo `czyzyk-pwa`); jeśli nie umie, build kończy się od razu komunikatem, co ustawić. Zmienne `VITE_*` są wkompilowywane w PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`.
 
 ## 7. Sprawdzenie etapu 1
 
