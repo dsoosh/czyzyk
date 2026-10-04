@@ -15,6 +15,7 @@ import { ListsLayout } from "./pages/lists/ListsLayout";
 import { PaymentsPage } from "./pages/lists/PaymentsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NoAccessPage } from "./pages/NoAccessPage";
+import { SettingsPage } from "./pages/settings/SettingsPage";
 import { SourcePage } from "./pages/SourcePage";
 import { TodayPage } from "./pages/TodayPage";
 
@@ -45,6 +46,7 @@ export function App() {
             <Route path="kalendarz" element={<CalendarPage />} />
             <Route path="kalendarz/wydarzenie/:id" element={<EventPage />} />
             <Route path="zrodlo/:kind/:id" element={<SourcePage />} />
+            <Route path="ustawienia" element={<SettingsPage />} />
             <Route path="listy" element={<ListsLayout />}>
               <Route index element={<BringListPage />} />
               <Route path="platnosci" element={<PaymentsPage />} />

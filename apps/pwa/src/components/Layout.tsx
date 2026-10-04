@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useOutletContext } from "react-router";
+import { Link, NavLink, Outlet, useOutletContext } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
 import { fetchReviewCount } from "../lib/review";
 import { useLoader, useOnForeground } from "../lib/useLoader";
@@ -26,6 +26,9 @@ export function Layout() {
       <header className="flex items-center gap-3 px-4 py-3">
         <Logo className="h-8 w-8" />
         <span className="flex-1 text-lg font-bold text-brand-900">Czyżyk</span>
+        <Link to="/ustawienia" className="text-sm text-slate-600 hover:underline">
+          Ustawienia
+        </Link>
         <button type="button" onClick={() => void signOut()} className="text-sm text-slate-600 hover:underline">
           Wyloguj
         </button>

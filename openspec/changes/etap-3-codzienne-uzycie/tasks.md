@@ -14,8 +14,8 @@
 
 ## 3. iCal
 
-- [ ] 3.1 RPC `create_ical_token`/`revoke_ical_token` i endpoint `GET /ical/{token}.ics`; weryfikacja: testy (404 dla nieznanego/unieważnionego/usuniętego użytkownika, brak `needs_review` i `cancelled`, brak treści wiadomości, snapshot pliku z wydarzeniem całodniowym i godzinowym)
-- [ ] 3.2 Ekran „Mój kalendarz” z linkami Google/Apple/Outlook; weryfikacja: test komponentu buduje poprawne URL-e `webcal://` i Google `render?cid=`
+- [x] 3.1 RPC `create_ical_token`/`revoke_ical_token` i endpoint `GET /ical/{token}.ics`; weryfikacja: testy (404 dla nieznanego/unieważnionego/usuniętego użytkownika, brak `needs_review` i `cancelled`, brak treści wiadomości, snapshot pliku z wydarzeniem całodniowym i godzinowym)
+- [x] 3.2 Ekran „Mój kalendarz” z linkami Google/Apple/Outlook; weryfikacja: test komponentu buduje poprawne URL-e `webcal://` i Google `render?cid=`
 
 ## 4. Push
 

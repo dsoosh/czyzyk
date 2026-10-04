@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type pg from "pg";
 import type { DestinationStream } from "pino";
 import type { ApiConfig } from "./config.js";
+import { icalRoutes } from "./ical/routes.js";
 import { ingestRoutes } from "./ingest/routes.js";
 import { RateLimiter } from "./rateLimit.js";
 
@@ -43,6 +44,7 @@ export function buildApp(
     perToken: new RateLimiter(config.INGEST_RATE_LIMIT_PER_TOKEN, deps.now),
   };
   app.register(ingestRoutes, { prefix: "/ingest", db: deps.db, limits });
+  app.register(icalRoutes, { prefix: "/ical", db: deps.db, perIp: new RateLimiter(config.INGEST_RATE_LIMIT_PER_IP, deps.now) });
 
   return app;
 }
