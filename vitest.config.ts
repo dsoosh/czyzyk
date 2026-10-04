@@ -12,7 +12,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "unit",
-          include: ["packages/*/src/**/*.test.ts", "services/*/src/**/*.test.ts"],
+          include: ["packages/*/src/**/*.test.ts", "services/*/src/**/*.test.ts", "services/*/eval/**/*.test.ts"],
           exclude: ["**/*.db.test.ts", "**/node_modules/**"],
           environment: "node",
         },
@@ -21,7 +21,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "db",
-          include: ["supabase/tests/**/*.test.ts", "services/*/src/**/*.db.test.ts"],
+          include: ["supabase/tests/**/*.test.ts", "services/*/src/**/*.db.test.ts", "tests/**/*.db.test.ts"],
           environment: "node",
           // Every db test file creates its own database, but they share one server.
           fileParallelism: false,

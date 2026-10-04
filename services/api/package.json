@@ -13,6 +13,8 @@
   "dependencies": {
     "@czyzyk/shared": "*",
     "fastify": "^5.12.0",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
     "zod": "^4.1.0"
   }
 }

@@ -2,8 +2,8 @@
 
 ## 1. Baza i kontrakty
 
-- [ ] 1.1 Migracja `0004_ingest.sql`: `messages.idempotency_key` (unikalny), `messages.received_at`, indeks `(group_id, dedupe_key)` unikalny, indeks pod debounce, RPC `admin_create_device`, `admin_revoke_device`, `admin_update_group`, `message_context`; weryfikacja: testy bazy (token zwracany raz i zapisany jako hash, `family` nie tworzy urządzenia, `message_context` pusty dla osoby spoza rodziny)
-- [ ] 1.2 `packages/shared`: schematy zod ingestu (D1), `normalizeText`, `dedupeKey` (D3), schemat operacji ekstrakcji; weryfikacja: testy jednostkowe normalizacji (białe znaki, wielkość liter, NFC) i stabilności klucza w obrębie minuty
+- [x] 1.1 Migracja `0004_ingest.sql`: `messages.idempotency_key` (unikalny), `messages.received_at`, indeks `(group_id, dedupe_key)` unikalny, indeks pod debounce, RPC `admin_create_device`, `admin_revoke_device`, `admin_update_group`, `message_context`; weryfikacja: testy bazy (token zwracany raz i zapisany jako hash, `family` nie tworzy urządzenia, `message_context` pusty dla osoby spoza rodziny)
+- [x] 1.2 `packages/shared`: schematy zod ingestu (D1), `normalizeText`, `dedupeKey` (D3), schemat operacji ekstrakcji; weryfikacja: testy jednostkowe normalizacji (białe znaki, wielkość liter, NFC) i stabilności klucza w obrębie minuty
 
 ## 2. API ingestu
 
@@ -13,12 +13,12 @@
 
 ## 3. Ekstrakcja
 
-- [ ] 3.1 Harmonogram debounce w workerze (skan co minutę, `singletonKey`, blokada doradcza); weryfikacja: test z kontrolowanym zegarem – partia przetwarzana dopiero po oknie ciszy, nowa wiadomość przesuwa termin
-- [ ] 3.2 Budowa promptu (stały system z ostrzeżeniem o niezaufanych danych, aliasy `W`/`E`, ~50 wiadomości kontekstu, przyszłe elementy, data w Europe/Warsaw); weryfikacja: test snapshot promptu dla przykładowej grupy
-- [ ] 3.3 Klient modelu z narzędziem `zapisz_operacje`, walidacja zod, mapowanie aliasów i odrzucanie nieznanych, ponowienia z backoffem; weryfikacja: testy z atrapą klienta (poprawna odpowiedź, brak wywołania narzędzia, nieznany alias, błąd 529)
-- [ ] 3.4 Zapis operacji w transakcji (create/update/cancel dla 6 typów, `ref` w obrębie odpowiedzi, próg pewności → `needs_review`, `processed_at`, `sync_log`); weryfikacja: testy na lokalnej bazie dla scenariuszy „zmiana terminu”, „odwołanie”, „rozmowa bez treści”, „niska pewność”
+- [x] 3.1 Harmonogram debounce w workerze (skan co minutę, `singletonKey`, blokada doradcza); weryfikacja: test z kontrolowanym zegarem – partia przetwarzana dopiero po oknie ciszy, nowa wiadomość przesuwa termin
+- [x] 3.2 Budowa promptu (stały system z ostrzeżeniem o niezaufanych danych, aliasy `W`/`E`, ~50 wiadomości kontekstu, przyszłe elementy, data w Europe/Warsaw); weryfikacja: test snapshot promptu dla przykładowej grupy
+- [x] 3.3 Klient modelu z narzędziem `zapisz_operacje`, walidacja zod, mapowanie aliasów i odrzucanie nieznanych, ponowienia z backoffem; weryfikacja: testy z atrapą klienta (poprawna odpowiedź, brak wywołania narzędzia, nieznany alias, błąd 529)
+- [x] 3.4 Zapis operacji w transakcji (create/update/cancel dla 6 typów, `ref` w obrębie odpowiedzi, próg pewności → `needs_review`, `processed_at`, `sync_log`); weryfikacja: testy na lokalnej bazie dla scenariuszy „zmiana terminu”, „odwołanie”, „rozmowa bez treści”, „niska pewność”
 - [ ] 3.5 Zestaw ewaluacyjny 30 wiadomości (`services/worker/eval/`) i skrypt `npm run eval:extraction` z raportem zgodności; weryfikacja: skrypt działa na prawdziwym modelu i drukuje raport (wymaga `ANTHROPIC_API_KEY`), w CI uruchamiany tylko ręcznie
-- [ ] 3.6 Dokumentacja zmiennych `EXTRACTION_*` w `.env.example` i README workera; weryfikacja: worker startuje wyłącznie z wartościami z `.env.example` + kluczem
+- [x] 3.6 Dokumentacja zmiennych `EXTRACTION_*` w `.env.example` i README workera; weryfikacja: worker startuje wyłącznie z wartościami z `.env.example` + kluczem
 
 ## 4. Panel admina: urządzenia i grupy
 
@@ -41,5 +41,5 @@
 
 ## 7. Integracja
 
-- [ ] 7.1 Test end-to-end na lokalnej bazie: `POST /ingest/notification` „W piątek bal, przebrania” → worker z atrapą modelu po skróconym oknie ciszy → wydarzenie i rzecz do przyniesienia widoczne zapytaniem jako członek rodziny; weryfikacja: test przechodzi w `npm test`
+- [x] 7.1 Test end-to-end na lokalnej bazie: `POST /ingest/notification` „W piątek bal, przebrania” → worker z atrapą modelu po skróconym oknie ciszy → wydarzenie i rzecz do przyniesienia widoczne zapytaniem jako członek rodziny; weryfikacja: test przechodzi w `npm test`
 - [ ] 7.2 Weryfikacja kryterium etapu na produkcji: prawdziwa wiadomość w śledzonej grupie pojawia się w PWA w ≤ 35 minut; wynik i czasy odnotowane w PR
