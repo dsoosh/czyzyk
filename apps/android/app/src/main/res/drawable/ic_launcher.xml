@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same bird as the PWA icon (apps/pwa/public/icon.svg). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <path android:fillColor="#3F6212" android:pathData="M112,0h288a112,112 0,0 1,112 112v288a112,112 0,0 1,-112 112h-288a112,112 0,0 1,-112 -112v-288a112,112 0,0 1,112 -112z" />
+    <path android:fillColor="#FACC15" android:pathData="M120,300a150,120 0,1 0,300 0a150,120 0,1 0,-300 0z" />
+    <path android:fillColor="#FACC15" android:pathData="M110,200a90,90 0,1 0,180 0a90,90 0,1 0,-180 0z" />
+    <path android:fillColor="#1A2E05" android:pathData="M164,190a16,16 0,1 0,32 0a16,16 0,1 0,-32 0z" />
+    <path android:fillColor="#F97316" android:pathData="M110,205l-55,18l58,14z" />
+    <path android:fillColor="#1A2E05" android:pathData="M300,270q90,-10 140,60q-80,10 -140,-20z" />
+</vector>

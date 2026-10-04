@@ -35,7 +35,7 @@ Migracja `0001_schema.sql` tworzy wszystkie tabele z `docs/specyfikacja.md` (w t
 - *Alternatywa:* polityki UPDATE ograniczone kolumnami (`grant update (packed_by)`) – trudniejsze do audytu i nie pozwalają ustawić `packed_by = auth.uid()` wymuszenie; RPC daje jedno miejsce walidacji.
 
 ### D4. Usunięcie z listy = utrata dostępu
-`profiles` ma klucz obcy do `allowed_emails(email)` z `on delete cascade`. Usunięcie adresu kasuje profil, więc `is_family()` od razu zwraca `false` także dla aktywnej sesji (scenariusz w `family-access`). Konto w `auth.users` zostaje (nie ma danych), ponowne dodanie adresu odtwarza profil przy następnym logowaniu przez trigger `on auth.users update` lub RPC „przywróć”.
+`profiles` ma klucz obcy do `allowed_emails(email)` z `on delete cascade`. Usunięcie adresu kasuje profil, więc `is_family()` od razu zwraca `false` także dla aktywnej sesji (scenariusz w `family-access`). Konto w `auth.users` zostaje (nie ma danych), ponowne dodanie adresu od razu odtwarza profil (trigger `after insert on allowed_emails`), a zmiana roli na liście zmienia rolę w profilu (trigger `after update of role`).
 - *Alternatywa:* kasowanie użytkownika z `auth.users` – wymaga Admin API z serwera; cascade w bazie działa natychmiast i bez usług.
 
 ### D5. Hook „Before User Created” w Postgresie

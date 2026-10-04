@@ -2,13 +2,31 @@
   "name": "czyzyk",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/pwa"
+  ],
   "scripts": {
+    "build": "npm run build -w @czyzyk/shared && npm run build -w @czyzyk/api -w @czyzyk/worker -w @czyzyk/pwa",
+    "typecheck": "npm run build -w @czyzyk/shared && npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit --project pwa",
+    "test:db": "vitest run --project db",
+    "check:secrets": "node apps/pwa/scripts/check-secrets.mjs",
     "openspec": "openspec",
     "spec:list": "openspec list && openspec list --specs",
     "spec:validate": "openspec validate --all --strict"
   },
   "devDependencies": {
-    "@fission-ai/openspec": "^1.14.0"
+    "@fission-ai/openspec": "^1.14.0",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3"
   },
   "engines": {
     "node": ">=22"

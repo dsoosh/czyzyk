@@ -5,6 +5,47 @@ Prywatna aplikacja rodzinna (PWA), która wyciąga z grup WhatsApp przedszkola w
 - Specyfikacja źródłowa: [`docs/specyfikacja.md`](docs/specyfikacja.md)
 - Wymagania wykonawcze: [`openspec/`](openspec/) (spec-driven development, [OpenSpec](https://github.com/Fission-AI/OpenSpec))
 
+## Struktura
+
+```
+apps/android        aplikacja na telefon (Kotlin, Gradle → APK) – patrz apps/android/README.md
+apps/pwa            aplikacja dla rodziny (React + Vite + Tailwind, Progressive Web App)
+services/api        serwer HTTP (Fastify): ingest, iCal, push, chatbot
+services/worker     przetwarzanie w tle (pg-boss): ekstrakcja LLM, import eksportów
+packages/shared     wspólne schematy (zod), konfiguracja, typy
+supabase/           migracje SQL, config.toml, testy bazy i reguł dostępu
+openspec/           wymagania i plan prac
+docs/               specyfikacja źródłowa, wdrożenie
+```
+
+## Uruchomienie lokalne
+
+Wymagania: Node.js ≥ 22.12, PostgreSQL 16 z rozszerzeniem pgvector (do testów bazy).
+
+```bash
+npm install
+npm run typecheck
+npm test                    # wszystkie testy: unit, baza, PWA
+npm run test:unit           # bez bazy danych
+npm run test:db             # migracje + RLS na lokalnym Postgresie
+npm run build
+```
+
+Testy bazy tworzą dla każdego pliku osobną bazę na serwerze z `TEST_DATABASE_URL`
+(domyślnie `postgres://postgres:postgres@localhost:5432/postgres`) i wczytują
+`supabase/tests/stub_supabase.sql` (minimalny odpowiednik schematu `auth` i ról Supabase).
+Na Debianie/Ubuntu: `apt install postgresql-16 postgresql-16-pgvector`.
+
+PWA lokalnie (potrzebny projekt Supabase albo `npx supabase start`):
+
+```bash
+cp apps/pwa/.env.example apps/pwa/.env.local   # uzupełnij URL i klucz anon
+npm run dev -w @czyzyk/pwa                     # http://localhost:5173
+```
+
+Usługi: `npm run dev -w @czyzyk/api`, `npm run dev -w @czyzyk/worker` (zmienne jak w `.env.example` w ich katalogach).
+Wdrożenie produkcyjne: [`docs/wdrozenie.md`](docs/wdrozenie.md).
+
 ## Praca z OpenSpec
 
 Każda zmiana zachowania systemu przechodzi przez OpenSpec:
