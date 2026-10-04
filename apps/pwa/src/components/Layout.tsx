@@ -56,7 +56,7 @@ export function Layout() {
               {pending > 0 && (
                 <span
                   aria-label={`${pending} do przejrzenia`}
-                  className="absolute -top-2 -right-5 min-w-5 rounded-full bg-red-600 px-1 text-center text-xs leading-5 text-white"
+                  className="absolute -top-2 -right-4 min-w-5 rounded-full bg-red-600 px-1 text-center text-xs leading-5 text-white"
                 >
                   {pending}
                 </span>

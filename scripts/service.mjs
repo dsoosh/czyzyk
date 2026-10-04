@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Builds or starts one deployable service of the monorepo, chosen by CZYZYK_SERVICE
-// (api | worker | pwa). Lets Railway's default Node build (`npm run build`, `npm start`
+// (api | worker | cron | pwa). Lets Railway's default Node build (`npm run build`, `npm start`
 // at the repository root) deploy each service without per-service config files.
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const SERVICES = {
   api: { workspace: "@czyzyk/api", needsShared: true },
   worker: { workspace: "@czyzyk/worker", needsShared: true },
+  cron: { workspace: "@czyzyk/cron", needsShared: true },
   pwa: { workspace: "@czyzyk/pwa", needsShared: false, afterBuild: ["check:secrets"] },
 };
 
@@ -55,7 +56,7 @@ if (isMain) {
     if (command === "build" && !process.env.RAILWAY_SERVICE_NAME) {
       // Local / CI: build everything.
       npm("run", "build", "-w", "@czyzyk/shared");
-      npm("run", "build", "-w", "@czyzyk/api", "-w", "@czyzyk/worker", "-w", "@czyzyk/pwa");
+      npm("run", "build", "-w", "@czyzyk/api", "-w", "@czyzyk/worker", "-w", "@czyzyk/cron", "-w", "@czyzyk/pwa");
       process.exit(0);
     }
     console.error(help(process.env));

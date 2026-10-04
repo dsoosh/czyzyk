@@ -31,7 +31,7 @@ function compare(a: unknown, b: unknown): number {
 /** Minimal stand-in for the supabase-js surface the PWA uses, with real filtering. */
 export function fakeSupabase(options: FakeOptions = {}) {
   const listeners: AuthCallback[] = [];
-  let session = options.userId ? { user: { id: options.userId } } : null;
+  let session = options.userId ? { user: { id: options.userId }, access_token: "test-access-token" } : null;
   const tables: Record<string, Row[]> = { ...(options.tables ?? {}) };
   if (options.profile) tables.profiles = [options.profile as unknown as Row, ...(tables.profiles ?? [])];
   tables.allowed_emails = [...((options.allowedEmails ?? []) as unknown as Row[]), ...(tables.allowed_emails ?? [])];

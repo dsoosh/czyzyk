@@ -11,6 +11,8 @@ export interface ApplySummary {
   cancelled: number;
   needsReview: number;
   rejected: Rejection[];
+  /** Items created or updated as active (ids only); the worker turns some into push alerts. */
+  activeItems: { type: ItemType; id: string }[];
 }
 
 interface Ctx {
@@ -141,7 +143,7 @@ class ApplyRejection extends Error {}
  * savepoint, so one bad operation is rejected without losing the others.
  */
 export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[]): Promise<ApplySummary> {
-  const summary: ApplySummary = { created: 0, updated: 0, cancelled: 0, needsReview: 0, rejected: [] };
+  const summary: ApplySummary = { created: 0, updated: 0, cancelled: 0, needsReview: 0, rejected: [], activeItems: [] };
   const refIds = new Map<string, string>();
 
   // Events first, so bring items created in the same answer can point at them.
@@ -156,6 +158,9 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
       const status = statusFor(op, ctx.threshold);
       const outcome = await applyOne(ctx, op, status, refIds);
       await ctx.client.query("release savepoint op");
+      if (outcome !== "proposed" && status === "active") {
+        summary.activeItems.push({ type: op.type, id: outcome.id });
+      }
       if (outcome === "proposed" || status === "needs_review") summary.needsReview++;
       else if (op.op === "create") summary.created++;
       else if (op.op === "update") summary.updated++;
@@ -197,7 +202,7 @@ async function applyOne(
   op: ResolvedOperation,
   status: Status,
   refIds: Map<string, string>,
-): Promise<"applied" | "proposed"> {
+): Promise<{ id: string } | "proposed"> {
   const { client, groupId } = ctx;
   const table = TABLE[op.type];
   const meta = [op.sourceMessageIds, op.confidence, op.rationale, status] as const;
@@ -220,7 +225,7 @@ async function applyOne(
       [...meta, ...cols.params],
     );
     if (op.ref) refIds.set(op.ref, rows[0]!.id);
-    return "applied";
+    return { id: rows[0]!.id };
   }
 
   const existing = await loadItem(client, op.type, op.targetId);
@@ -244,7 +249,7 @@ async function applyOne(
         where id = $1`,
       [op.targetId, ...meta],
     );
-    return "applied";
+    return { id: op.targetId };
   }
 
   const merged = { ...(existing.data as Record<string, unknown>), ...(op.data as Record<string, unknown>) };
@@ -262,5 +267,5 @@ async function applyOne(
       where id = $1`,
     [op.targetId, ...meta, ...cols.params],
   );
-  return "applied";
+  return { id: op.targetId };
 }

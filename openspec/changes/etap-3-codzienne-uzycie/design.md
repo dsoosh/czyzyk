@@ -28,7 +28,7 @@ Generowanie ręczne (RFC 5545, bez biblioteki – mały podzbiór: `VEVENT`, `DT
 - *Alternatywa:* biblioteka `ical-generator` – wygodna, ale zależność dla ~80 linii kodu; testy snapshot pilnują formatu.
 
 ### D4. Push
-`web-push` z VAPID; subskrypcje zapisywane przez `services/api` (sesja Supabase w nagłówku, weryfikacja JWT). `services/cron` co 5 minut wybiera użytkowników, którym właśnie wypada godzina skrótu, i wysyła skrót z blokadą „wysłano dziś” (`digest_sent_on date`). Alerty natychmiastowe: worker po zapisie operacji wstawia zadanie pg-boss `push-alert` z `singletonKey = kind:item_id`; tabela `push_alerts_sent` gwarantuje jednokrotność.
+`web-push` z VAPID; subskrypcje i ustawienia (`push_settings`) zapisywane przez `services/api` (sesja Supabase w nagłówku, weryfikacja JWT kluczami JWKS projektu, awaryjnie starym sekretem HS256; CORS tylko dla domeny PWA). `services/cron` co 5 minut wybiera użytkowników, którym właśnie wypada godzina skrótu, i wysyła skrót z blokadą „wysłano dziś” (`digest_sent_on date`). Alerty natychmiastowe: worker po zatwierdzeniu transakcji wstawia zadanie pg-boss `push-alert` z `singletonKey = kind:item_id` dla każdego aktywnego dnia wolnego, sprawy i płatności; `cron` sprawdza, czy element nadal się kwalifikuje, a tabela `push_alerts_sent` gwarantuje jednokrotność. Klucz prywatny VAPID zna tylko `cron`; PWA dostaje publiczny (`VITE_VAPID_PUBLIC_KEY`). Obsługa `push` i `notificationclick` w `public/push-handler.js`, dołączonym do service workera przez `workbox.importScripts`.
 - *Alternatywa:* Supabase Edge Functions + pg_cron – rozproszyłoby logikę poza Railway.
 
 ### D5. Onboarding iOS

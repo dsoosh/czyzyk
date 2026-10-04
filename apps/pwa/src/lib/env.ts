@@ -3,6 +3,8 @@ export interface PublicEnv {
   supabaseAnonKey: string;
   /** Public URL of services/api – put into the phone pairing link. */
   apiUrl: string | null;
+  /** Public VAPID key of services/cron – lets the browser subscribe to push. */
+  vapidPublicKey: string | null;
 }
 
 /** Reads the only configuration the PWA may know: the public project URL and anon key. */
@@ -16,5 +18,10 @@ export function readPublicEnv(env: Record<string, string | undefined> = import.m
   if (missing.length > 0) {
     throw new Error(`Brak konfiguracji PWA: ${missing.join(", ")}`);
   }
-  return { supabaseUrl: supabaseUrl!, supabaseAnonKey: supabaseAnonKey!, apiUrl: env.VITE_API_URL || null };
+  return {
+    supabaseUrl: supabaseUrl!,
+    supabaseAnonKey: supabaseAnonKey!,
+    apiUrl: env.VITE_API_URL || null,
+    vapidPublicKey: env.VITE_VAPID_PUBLIC_KEY || null,
+  };
 }

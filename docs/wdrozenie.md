@@ -85,6 +85,7 @@ Sekrety nie są w repozytorium – w pliku mają wartość `preserve()`, czyli R
 | `api` | `DATABASE_URL` – Supabase → Connect → *Session pooler* (port 5432) |
 | `worker` | `DATABASE_URL` (jak wyżej; nie *Transaction pooler* – kolejka zadań trzyma połączenie), `ANTHROPIC_API_KEY` |
 | `pwa` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (tylko publiczne wartości) |
+| `cron` | `DATABASE_URL` (jak w `worker`), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` – patrz sekcja 11 |
 
 ```bash
 railway variables --service api --set "DATABASE_URL=postgres://…"
@@ -94,7 +95,7 @@ Pozostałe zmienne (np. `CZYZYK_SERVICE`, `EXTRACTION_MODEL`, limity) ustawia pl
 
 Domeny: dla `pwa` i `api` włącz *Generate Domain* w dashboardzie (lub dopisz je do pliku i zastosuj). **Zawsze czytaj `railway config plan` przed `apply`** – apply jest deklaratywny i usuwa to, czego nie ma w pliku (wymaga wtedy potwierdzenia).
 
-Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`, `npm start`), a `CZYZYK_SERVICE` (`api` / `worker` / `pwa`) wybiera, którą część zbudować i uruchomić (`scripts/service.mjs`). Gdy `CZYZYK_SERVICE` nie jest ustawione, skrypt rozpoznaje usługę po nazwie usługi w Railway (`RAILWAY_SERVICE_NAME`, np. `pwa` albo `czyzyk-pwa`); jeśli nie umie, build kończy się od razu komunikatem, co ustawić. Zmienne `VITE_*` są wkompilowywane w PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`.
+Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`, `npm start`), a `CZYZYK_SERVICE` (`api` / `worker` / `cron` / `pwa`) wybiera, którą część zbudować i uruchomić (`scripts/service.mjs`). Gdy `CZYZYK_SERVICE` nie jest ustawione, skrypt rozpoznaje usługę po nazwie usługi w Railway (`RAILWAY_SERVICE_NAME`, np. `pwa` albo `czyzyk-pwa`); jeśli nie umie, build kończy się od razu komunikatem, co ustawić. Zmienne `VITE_*` są wkompilowywane w PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`.
 
 ## 7. Sprawdzenie etapu 1
 
@@ -131,3 +132,46 @@ Migracje: stosują się same przy wdrożeniu (`0004_ingest.sql`), patrz sekcja 3
 2. Po 30 minutach ciszy w grupie worker wysyła wiadomość do modelu; w ciągu kolejnych kilku minut na ekranie **Dziś i jutro** i w **Kalendarzu** pojawia się wydarzenie „Bal” w piątek z rzeczą „przebranie”. Link „skąd to wiem” pokazuje wiadomość w kontekście rozmowy.
 3. W **Admin → Urządzenia** przy telefonie widać „ostatni kontakt: przed chwilą”.
 4. Dziennik działania: tabela `sync_log` (rodzaj `extraction`, status `ok`/`partial`/`error`, bez treści wiadomości).
+
+---
+
+# Etap 3 – codzienne użycie
+
+## 11. Powiadomienia push (VAPID) i nowa usługa `cron`
+
+Push działa przez Web Push ze standardowymi kluczami VAPID. Klucz prywatny zna tylko usługa `cron`; publiczny trafia też do PWA.
+
+1. Wygeneruj parę kluczy na swoim komputerze (wystarczy Node.js, nic nie zostaje zainstalowane):
+
+   ```bash
+   npx --yes web-push generate-vapid-keys --json
+   ```
+
+   Nie wklejaj klucza prywatnego do czatu ani do repozytorium.
+2. Zastosuj `.railway/railway.ts` (scalenie do `main` robi to samo, patrz sekcja 6) – powstaje usługa `cron`.
+3. Ustaw zmienne usługi `cron` (dashboard → `cron` → Variables):
+   - `DATABASE_URL` – ten sam *Session pooler* co w `worker`,
+   - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` – z kroku 1,
+   - `VAPID_SUBJECT` – `mailto:` z Twoim adresem (usługi push kontaktują się tam w razie problemów).
+4. Wdróż ponownie `pwa` (Railway → `pwa` → *Redeploy* albo akcja `redeploy` w workflow), bo `VITE_VAPID_PUBLIC_KEY` (referencja do `cron.VAPID_PUBLIC_KEY`) jest wkompilowywany przy budowaniu.
+
+Usługa `api` dostaje z pliku `SUPABASE_URL` (referencja do `pwa.VITE_SUPABASE_URL`) i `PWA_ORIGIN` (domena PWA): na tej podstawie sprawdza sesję użytkownika (klucze JWKS projektu Supabase) i przyjmuje wywołania `/push/*` tylko z PWA. Jeśli projekt Supabase używa jeszcze starego wspólnego sekretu JWT (Settings → JWT Keys → *Legacy JWT secret*), dopisz w `.railway/railway.ts` w usłudze `api` `SUPABASE_JWT_SECRET: preserve()` i ustaw wartość w dashboardzie.
+
+Migracje `0005`–`0008` stosują się same przy wdrożeniu (sekcja 3). Wyłączenie usługi `cron` zatrzymuje powiadomienia bez wpływu na resztę.
+
+## 12. Telefony rodziny
+
+- **Android (Chrome):** PWA → **Ustawienia → Powiadomienia → Włącz powiadomienia** i zezwól.
+- **iPhone (iOS 16.4+):** w Safari **Udostępnij → Do ekranu początkowego**, otwórz Czyżyka z ikony, potem **Ustawienia → Powiadomienia → Włącz powiadomienia**. W samej przeglądarce Safari aplikacja pokazuje tę instrukcję zamiast prośby o zgodę.
+- Godzinę skrótu (domyślnie 19:00) i rodzaje alertów każdy ustawia u siebie; zmiana obowiązuje od następnego skrótu.
+- **Mój kalendarz:** **Ustawienia → Dodaj do mojego kalendarza** → Google / Apple / Outlook. Link widać tylko raz; nowy link unieważnia poprzedni. Google odświeża subskrypcje rzadko (do doby).
+
+## 13. Sprawdzenie etapu 3
+
+1. **Listy → Przynieść:** odhacz rzecz na jutro na jednym telefonie → na drugim po odświeżeniu widać „spakowane: <imię>, <godzina>”.
+2. **Listy → Płatności:** oznacz płatność jako zapłaconą, cofnij → wraca „do zapłaty”.
+3. Element z niską pewnością pojawia się w **Admin → Przegląd**, a zakładka **Admin** pokazuje licznik. Popraw datę i zatwierdź → element jest w kalendarzu.
+4. Subskrypcja kalendarza pokazuje wydarzenia i dni wolne; po unieważnieniu linku plik zwraca 404.
+5. Push: dzień przed wydarzeniem o ustawionej godzinie przychodzi „Jutro: …”; stuknięcie otwiera **Dziś i jutro**. Nowy dzień wolny daje jeden alert, nawet gdy pojawi się w kilku wiadomościach.
+6. Logi usługi `cron` pokazują tylko liczby („push delivered”, „digest skipped”), bez treści powiadomień.
+

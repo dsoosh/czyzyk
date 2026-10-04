@@ -14,6 +14,8 @@ export interface ExtractionDeps {
   now: () => Date;
   confidenceThreshold: number;
   contextMessages: number;
+  /** Called after commit with items that became or stayed active (e.g. to enqueue push alerts). */
+  onActiveItems?: (items: ApplySummary["activeItems"]) => Promise<void>;
 }
 
 export type RunResult =
@@ -78,9 +80,21 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
         });
         await client.query("commit");
         deps.logger.info(
-          { groupId, messages: prompt.newMessageIds.length, ...summary, rejected: summary.rejected.length },
+          {
+            groupId,
+            messages: prompt.newMessageIds.length,
+            ...summary,
+            rejected: summary.rejected.length,
+            activeItems: summary.activeItems.length,
+          },
           "extraction applied",
         );
+        if (summary.activeItems.length && deps.onActiveItems) {
+          // Alerts are best effort: the extraction is committed whatever happens here.
+          await deps.onActiveItems(summary.activeItems).catch((error: unknown) =>
+            deps.logger.warn({ groupId, error: error instanceof Error ? error.name : "Error" }, "alert enqueue failed"),
+          );
+        }
         return { status: "ok", messages: prompt.newMessageIds.length, ...summary };
       } catch (error) {
         await client.query("rollback");

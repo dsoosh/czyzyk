@@ -38,6 +38,8 @@ export default defineConfig({
         // Never cache API or Supabase responses: family data must not linger offline.
         navigateFallbackDenylist: [/^\/auth\//],
         runtimeCaching: [],
+        // Web Push: show notifications and open "Dziś i jutro" on tap (public/push-handler.js).
+        importScripts: ["push-handler.js"],
       },
     }),
   ],

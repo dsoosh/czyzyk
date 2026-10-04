@@ -10,6 +10,7 @@ const FORBIDDEN = [
   /service_role/,
   /ANTHROPIC/i,
   /VOYAGE/i,
+  /VAPID_PRIVATE_KEY/,
   /sk-ant-[A-Za-z0-9_-]{10,}/,
   /pa-[A-Za-z0-9_-]{30,}/, // Voyage API keys
 ];

@@ -6,9 +6,9 @@
  *   railway config plan         # preview the diff against the linked environment
  *   railway config apply        # apply (prompts before destructive changes)
  *
- * Database migrations run as the pre-deploy command of api and worker (Railway runs it
+ * Database migrations run as the pre-deploy command of api, worker and cron (Railway runs it
  * after the build, before the new version takes traffic; a failure stops the deploy).
- * scripts/migrate.mjs is idempotent and takes an advisory lock, so both services may run it.
+ * scripts/migrate.mjs is idempotent and takes an advisory lock, so every service may run it.
  *
  * Secrets are never committed: variables marked preserve() keep the value already
  * stored in Railway (set them once in the dashboard or with `railway variables --set`).
@@ -23,7 +23,7 @@ const REPO = "dsoosh/czyzyk";
 const MIGRATE = "npm run db:migrate";
 
 /** Every service builds from the repository root; CZYZYK_SERVICE picks what to build and start. */
-const fromMonorepo = (name: "api" | "worker" | "pwa", watch: string[]) => ({
+const fromMonorepo = (name: "api" | "worker" | "cron" | "pwa", watch: string[]) => ({
   source: github(REPO, { branch: "main" }),
   build: {
     builder: "RAILPACK" as const,
@@ -52,6 +52,9 @@ export default defineRailway(() => {
       DATABASE_URL: preserve(),
       INGEST_RATE_LIMIT_PER_TOKEN: "120",
       INGEST_RATE_LIMIT_PER_IP: "240",
+      // Push endpoints verify Supabase sessions (JWKS of this project) and accept browser calls from the PWA only.
+      SUPABASE_URL: "${{pwa.VITE_SUPABASE_URL}}",
+      PWA_ORIGIN: "https://${{pwa.RAILWAY_PUBLIC_DOMAIN}}",
     },
   });
 
@@ -74,6 +77,24 @@ export default defineRailway(() => {
     },
   });
 
+  const cronBase = fromMonorepo("cron", ["services/cron/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
+  const cron = service("cron", {
+    ...cronBase,
+    preDeploy: MIGRATE,
+    // No HTTP port: evening digest every 5 minutes and push-alert jobs from the worker.
+    deploy: { restartPolicyType: "ALWAYS" },
+    env: {
+      ...cronBase.env,
+      LOG_LEVEL: "info",
+      DATABASE_URL: preserve(),
+      // VAPID key pair: `npm run vapid:generate -w @czyzyk/cron` (docs/wdrozenie.md).
+      VAPID_PUBLIC_KEY: preserve(),
+      VAPID_PRIVATE_KEY: preserve(),
+      VAPID_SUBJECT: preserve(),
+      DIGEST_WINDOW_MINUTES: "120",
+    },
+  });
+
   const pwaBase = fromMonorepo("pwa", ["apps/pwa/**", "packages/shared/src/extraction.ts"]);
   const pwa = service("pwa", {
     ...pwaBase,
@@ -86,10 +107,12 @@ export default defineRailway(() => {
       VITE_SUPABASE_ANON_KEY: preserve(),
       // Railway reference variable: the API's public domain, resolved at build time.
       VITE_API_URL: "https://${{api.RAILWAY_PUBLIC_DOMAIN}}",
+      // Public half of the VAPID pair, needed by the browser to subscribe.
+      VITE_VAPID_PUBLIC_KEY: "${{cron.VAPID_PUBLIC_KEY}}",
     },
   });
 
   return project("czyzyk", {
-    resources: [group("czyzyk", [api, worker, pwa])],
+    resources: [group("czyzyk", [api, worker, cron, pwa])],
   });
 });

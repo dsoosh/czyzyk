@@ -1,3 +1,4 @@
+import { isAlertItemType, PUSH_ALERT_QUEUE, PUSH_ALERT_QUEUE_OPTIONS, type PushAlertJob } from "@czyzyk/shared";
 import pg from "pg";
 import { PgBoss } from "pg-boss";
 import type { Logger } from "pino";
@@ -49,6 +50,7 @@ export async function startWorker(
     expireInSeconds: 600,
   });
   await boss.createQueue(SCAN_QUEUE, { policy: "short" });
+  await boss.createQueue(PUSH_ALERT_QUEUE, PUSH_ALERT_QUEUE_OPTIONS);
 
   const extractionDeps: ExtractionDeps = {
     db: pool,
@@ -57,6 +59,14 @@ export async function startWorker(
     now,
     confidenceThreshold: config.EXTRACTION_CONFIDENCE_THRESHOLD,
     contextMessages: config.EXTRACTION_CONTEXT_MESSAGES,
+    // services/cron decides whether an item deserves an alert and sends it at most once.
+    onActiveItems: async (items) => {
+      for (const item of items) {
+        if (!isAlertItemType(item.type)) continue;
+        const job: PushAlertJob = { type: item.type, id: item.id };
+        await boss.send(PUSH_ALERT_QUEUE, job, { singletonKey: `${item.type}:${item.id}` });
+      }
+    },
   };
 
   await boss.work<{ groupId: string }>(EXTRACT_QUEUE, async (jobs) => {
