@@ -15,7 +15,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 
-/** Outcome of one upload, mapped from the HTTP status codes of /ingest/*. */
+/** Outcome of one upload, mapped from the HTTP status codes of the ingest endpoints. */
 sealed interface SendResult {
     /** 201 created or 200 duplicate – the server has the message. */
     data object Delivered : SendResult

@@ -62,3 +62,32 @@ Dla `pwa` i `api` włącz *Generate Domain*. Zmienne `VITE_*` są wkompilowywane
 2. Zaloguj się kontem Google spoza listy → ekran „Brak dostępu – ten adres nie jest na liście rodziny”.
 3. Supabase → Authentication → Users: konta spoza listy nie ma na liście użytkowników.
 4. Dodaj w panelu drugiego członka rodziny z rolą *Rodzina* → loguje się, nie widzi zakładki **Admin**.
+
+---
+
+# Etap 2 – pierwszy przepływ danych
+
+## 8. Zmienne usług
+
+| Usługa | Nowe zmienne |
+| --- | --- |
+| `api` | `DATABASE_URL` (Supabase → Connect → *Session pooler*), opcjonalnie `INGEST_RATE_LIMIT_PER_TOKEN`, `INGEST_RATE_LIMIT_PER_IP` |
+| `worker` | `ANTHROPIC_API_KEY`, `EXTRACTION_MODEL` (np. `claude-haiku-4-5`), opcjonalnie `EXTRACTION_DEBOUNCE_MINUTES` (30), `EXTRACTION_CONFIDENCE_THRESHOLD` (0.7), `EXTRACTION_CONTEXT_MESSAGES` (50) |
+| `pwa` | `VITE_API_URL` – publiczny adres usługi `api` (trafia do linku parowania telefonu) |
+
+Migracje: `npx supabase db push` (dochodzi `0004_ingest.sql`).
+
+## 9. Telefon
+
+1. Zbuduj APK (`apps/android/README.md`) albo pobierz artefakt `czyzyk-debug-apk` z GitHub Actions i zainstaluj na telefonie z WhatsAppem (zezwól na instalację z nieznanych źródeł).
+2. W PWA: **Admin → Urządzenia → Dodaj telefon**. Zeskanuj kod QR w aplikacji Czyżyk albo otwórz link na telefonie. Token jest widoczny tylko raz.
+3. W aplikacji włącz **dostęp do powiadomień** i wyłącz **optymalizację baterii** (przyciski na ekranie głównym). Na Xiaomi/Samsungu zezwól dodatkowo na autostart.
+4. W WhatsAppie ustaw grupom przedszkolnym **cichy dźwięk** zamiast wyciszenia.
+5. Gdy w grupie pojawi się pierwsza wiadomość, grupa pokaże się w PWA w **Admin → Grupy**. Zaznacz **Śledź** i nadaj nazwę wyświetlaną (np. „Motylki”). Telefon pobierze listę w ciągu 15 minut.
+
+## 10. Sprawdzenie etapu 2
+
+1. Nauczycielka (lub Ty z drugiego numeru) pisze w śledzonej grupie np. „W piątek bal, przebrania”.
+2. Po 30 minutach ciszy w grupie worker wysyła wiadomość do modelu; w ciągu kolejnych kilku minut na ekranie **Dziś i jutro** i w **Kalendarzu** pojawia się wydarzenie „Bal” w piątek z rzeczą „przebranie”. Link „skąd to wiem” pokazuje wiadomość w kontekście rozmowy.
+3. W **Admin → Urządzenia** przy telefonie widać „ostatni kontakt: przed chwilą”.
+4. Dziennik działania: tabela `sync_log` (rodzaj `extraction`, status `ok`/`partial`/`error`, bez treści wiadomości).
