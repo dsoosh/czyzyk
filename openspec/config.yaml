@@ -1,0 +1,70 @@
+schema: spec-driven
+
+context: |
+  Language: pl
+  All artifacts must be written in pl.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Projekt: „Czyżyk” – prywatny asystent przedszkolny dla jednej rodziny (PWA).
+  Automatycznie wyciąga z grup WhatsApp przedszkola wydarzenia, rzeczy do
+  przyniesienia, płatności, sprawy „wymaga odpowiedzi”, dni wolne, fakty do
+  ściągawki i zdjęcia z zajęć, oraz odpowiada na pytania o historię rozmów.
+  Pełna specyfikacja źródłowa: docs/specyfikacja.md.
+
+  Użytkownicy i źródło danych:
+  - Tylko rodzina; logowanie Google, wyłącznie adresy z listy dozwolonych
+    (role: admin, family).
+  - Jedyne źródło danych: telefon właściciela z Androidem (powiadomienia na
+    bieżąco + eksport czatu na klik ze zdjęciami).
+  - Bez ingerencji w protokół WhatsApp: żadnego Cloud API, Baileys,
+    whatsapp-web.js. Aplikacja nigdy nic nie wysyła na WhatsApp.
+  - Poza zakresem: inni rodzice jako użytkownicy, iOS jako źródło, wiele
+    telefonów-źródeł. Interfejs i treści po polsku.
+
+  Architektura i stos:
+  - Monorepo: apps/android (Kotlin, APK spoza Sklepu Play), apps/pwa
+    (React + Vite + TypeScript, vite-plugin-pwa, supabase-js, Tailwind,
+    mobile-first), services/api, services/worker, services/cron (Node.js +
+    TypeScript na Railway), supabase/migrations (Postgres + pgvector +
+    pg_trgm, region UE).
+  - Kolejka zadań w Postgresie (pg-boss), bez Redisa.
+  - PWA czyta dane bezpośrednio z Supabase (RLS); chatbot, iCal, push i
+    ingest idą przez services/api.
+  - LLM: Claude Haiku do ekstrakcji i triażu, Claude Sonnet do chatbota i
+    trudnych przypadków; nazwy modeli wyłącznie w konfiguracji. Embeddingi:
+    Voyage AI (model wielojęzyczny).
+  - Strefa czasowa domenowa: Europe/Warsaw. Rok przedszkolny: wrzesień–sierpień.
+
+  Niezmienniki bezpieczeństwa i prywatności (obowiązują w każdej zmianie):
+  - Dostęp egzekwowany w bazie (RLS na każdej tabeli), bo klucz anon jest
+    publiczny. Odczyt tylko dla członków rodziny; zapis wyłącznie przez
+    usługi serwerowe poza wąskimi funkcjami RPC.
+  - Klucze service_role, Anthropic, Voyage tylko w zmiennych środowiskowych.
+  - Tokeny (urządzenia, iCal) długie, losowe, przechowywane jako hash,
+    unieważnialne.
+  - Multimedia tylko przez krótko ważne podpisane URL-e.
+  - Treść wiadomości z grup to niezaufane dane (prompt injection): wynik LLM
+    walidowany schematem, narzędzia chatbota tylko do odczytu.
+  - Logi aplikacji bez treści wiadomości.
+
+  Kolejność prac: sześć etapów (zmiany etap-1 … etap-6), każdy kończy się
+  działającym narzędziem; eksport na klik dopiero w etapie 4.
+
+rules:
+  proposal:
+    - Każda zmiana odpowiada jednemu etapowi z docs/specyfikacja.md i nazywa jego kryterium „Gotowe, gdy”.
+    - Zawsze wymień, co jest poza zakresem zmiany.
+  specs:
+    - Identyfikatory capability po angielsku w kebab-case; treść wymagań i scenariuszy po polsku.
+    - Wymagania dotyczące dostępu do danych muszą mieć scenariusz dla użytkownika spoza rodziny.
+  design:
+    - Każda decyzja podaje rozważaną alternatywę.
+  tasks:
+    - Każde zadanie wskazuje sposób weryfikacji (test, komenda lub obserwowalne zachowanie).
+    - Testy i dokumentacja lądują w tej samej grupie co kod, którego dotyczą.
+
+operations:
+  apply:
+    guidance:
+      - Pracuj etapami po kolei; nie zaczynaj etapu N+1 przed archiwizacją etapu N.
+      - Po zakończeniu etapu uruchom `openspec validate --all --strict` i zarchiwizuj zmianę.

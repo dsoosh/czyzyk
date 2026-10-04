@@ -1,0 +1,16 @@
+{
+  "name": "czyzyk",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "openspec": "openspec",
+    "spec:list": "openspec list && openspec list --specs",
+    "spec:validate": "openspec validate --all --strict"
+  },
+  "devDependencies": {
+    "@fission-ai/openspec": "^1.14.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
