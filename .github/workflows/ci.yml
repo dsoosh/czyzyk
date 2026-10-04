@@ -47,11 +47,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
       - name: Unit test summary
-        if: always()
+        # Guards against tests being silently skipped: raise MIN_TESTS when adding tests.
+        env:
+          MIN_TESTS: 24
         run: |
+          total=0; failed=0
           for f in app/build/test-results/testDebugUnitTest/*.xml; do
-            grep -o '<testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$f"
+            t=$(grep -o '<testsuite [^>]*' "$f" | grep -o ' tests="[0-9]*"' | grep -o '[0-9]*')
+            x=$(grep -o '<testsuite [^>]*' "$f" | grep -oE ' (failures|errors|skipped)="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
+            echo "$(basename "$f"): tests=$t failed_or_skipped=$x"
+            total=$((total + t)); failed=$((failed + x))
           done
+          echo "TOTAL tests=$total failed_or_skipped=$failed" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$total" -ge "$MIN_TESTS" && test "$failed" -eq 0
       - uses: actions/upload-artifact@v4
         with:
           name: czyzyk-debug-apk
