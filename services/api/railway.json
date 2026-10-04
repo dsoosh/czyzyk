@@ -2,11 +2,15 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "npm run build -w @czyzyk/shared && npm run build -w @czyzyk/api",
-    "watchPatterns": ["services/api/**", "packages/shared/**", "package-lock.json"]
+    "buildCommand": "npm run build",
+    "watchPatterns": [
+      "services/api/**",
+      "packages/shared/**",
+      "package-lock.json"
+    ]
   },
   "deploy": {
-    "startCommand": "npm run start -w @czyzyk/api",
+    "startCommand": "npm start",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",

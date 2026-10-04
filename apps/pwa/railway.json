@@ -2,11 +2,14 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "npm run build -w @czyzyk/pwa && npm run check:secrets -w @czyzyk/pwa",
-    "watchPatterns": ["apps/pwa/**", "package-lock.json"]
+    "buildCommand": "npm run build",
+    "watchPatterns": [
+      "apps/pwa/**",
+      "package-lock.json"
+    ]
   },
   "deploy": {
-    "startCommand": "npm run start -w @czyzyk/pwa",
+    "startCommand": "npm start",
     "healthcheckPath": "/",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10

@@ -46,15 +46,21 @@ Kolejne osoby dodajesz już w PWA: zakładka **Admin → Lista rodziny**.
 
 ## 6. Railway
 
-Utwórz projekt i trzy usługi z tego repozytorium (*Deploy from GitHub repo*). W każdej usłudze: Settings → **Root Directory** puste (cały monorepo), **Config as code** → ścieżka do pliku:
+Utwórz projekt i trzy usługi z tego samego repozytorium (*Deploy from GitHub repo*, gałąź `main`). **Root Directory zostaw pusty** – każda usługa buduje się z całego monorepo.
 
-| Usługa | Plik konfiguracji | Zmienne |
+Każda usługa wybiera, czym jest, przez zmienną **`CZYZYK_SERVICE`** (`api`, `worker` albo `pwa`). Główny `package.json` ma `build` i `start`, które na jej podstawie budują i uruchamiają właściwą część – domyślny builder Railway (Railpack) nie potrzebuje żadnej dodatkowej konfiguracji.
+
+| Usługa | `CZYZYK_SERVICE` | Pozostałe zmienne |
 | --- | --- | --- |
-| `pwa` | `apps/pwa/railway.json` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (tylko publiczne wartości) |
-| `api` | `services/api/railway.json` | `LOG_LEVEL` (opcjonalnie) |
-| `worker` | `services/worker/railway.json` | `DATABASE_URL` – *Session pooler* (port 5432) z Supabase → Connect; nie *Transaction pooler*, bo kolejka zadań trzyma połączenie |
+| `pwa` | `pwa` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (tylko publiczne wartości) |
+| `api` | `api` | `DATABASE_URL`, opcjonalnie `LOG_LEVEL` |
+| `worker` | `worker` | `DATABASE_URL` – *Session pooler* (port 5432) z Supabase → Connect; nie *Transaction pooler*, bo kolejka zadań trzyma połączenie |
+
+Opcjonalnie w Settings → **Config as code** podaj ścieżkę `services/api/railway.json`, `services/worker/railway.json` lub `apps/pwa/railway.json`. Dają one healthcheck, politykę restartu i `watchPatterns` (usługa przebudowuje się tylko po zmianach w swoim katalogu).
 
 Dla `pwa` i `api` włącz *Generate Domain*. Zmienne `VITE_*` są wkompilowywane w kod PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`, który przerywa wdrożenie, jeśli w paczce znalazłby się klucz serwerowy.
+
+Brak `CZYZYK_SERVICE` kończy start komunikatem „Set CZYZYK_SERVICE to one of: api, worker, pwa”.
 
 ## 7. Sprawdzenie etapu 1
 
@@ -71,7 +77,7 @@ Dla `pwa` i `api` włącz *Generate Domain*. Zmienne `VITE_*` są wkompilowywane
 
 | Usługa | Nowe zmienne |
 | --- | --- |
-| `api` | `DATABASE_URL` (Supabase → Connect → *Session pooler*), opcjonalnie `INGEST_RATE_LIMIT_PER_TOKEN`, `INGEST_RATE_LIMIT_PER_IP` |
+| `api` | (już ustawione `DATABASE_URL`), opcjonalnie `INGEST_RATE_LIMIT_PER_TOKEN`, `INGEST_RATE_LIMIT_PER_IP` |
 | `worker` | `ANTHROPIC_API_KEY`, `EXTRACTION_MODEL` (np. `claude-haiku-4-5`), opcjonalnie `EXTRACTION_DEBOUNCE_MINUTES` (30), `EXTRACTION_CONFIDENCE_THRESHOLD` (0.7), `EXTRACTION_CONTEXT_MESSAGES` (50) |
 | `pwa` | `VITE_API_URL` – publiczny adres usługi `api` (trafia do linku parowania telefonu) |
 
