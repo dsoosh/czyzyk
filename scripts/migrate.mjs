@@ -24,6 +24,15 @@ export function parseMigrationFile(file) {
 
 export async function migrate({ databaseUrl, dir = DEFAULT_DIR, log = console.log } = {}) {
   if (!databaseUrl) throw new Error("DATABASE_URL is not set");
+  let parsed;
+  try {
+    parsed = new URL(databaseUrl);
+  } catch {
+    throw new Error("DATABASE_URL is not a valid URL (expected postgresql://user:password@host:5432/postgres)");
+  }
+  if (!parsed.password) {
+    throw new Error("DATABASE_URL has no password – expected postgresql://user:password@host:5432/postgres (is the ':' between user and password missing?)");
+  }
   const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
   const client = new pg.Client({ connectionString: databaseUrl, application_name: "czyzyk-migrate" });
   await client.connect();

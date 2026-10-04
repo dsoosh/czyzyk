@@ -1,9 +1,9 @@
-import { baseEnvSchema, loadEnv } from "@czyzyk/shared";
+import { baseEnvSchema, databaseUrlSchema, loadEnv } from "@czyzyk/shared";
 import { z } from "zod";
 
 export const workerEnvSchema = baseEnvSchema.extend({
   /** Direct (session) connection string: pg-boss needs a connection it can hold. */
-  DATABASE_URL: z.string().url(),
+  DATABASE_URL: databaseUrlSchema,
   HEALTH_LOG_INTERVAL_SECONDS: z.coerce.number().int().positive().default(300),
 
   ANTHROPIC_API_KEY: z.string().min(1),
