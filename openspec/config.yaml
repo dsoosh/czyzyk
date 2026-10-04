@@ -29,6 +29,8 @@ context: |
     TypeScript na Railway), supabase/migrations (Postgres + pgvector +
     pg_trgm, region UE).
   - Kolejka zadań w Postgresie (pg-boss), bez Redisa.
+  - Infrastruktura Railway wyłącznie w .railway/railway.ts (Railway IaC);
+    zmiany przez railway config plan/apply, sekrety jako preserve().
   - PWA czyta dane bezpośrednio z Supabase (RLS); chatbot, iCal, push i
     ingest idą przez services/api.
   - LLM: Claude Haiku do ekstrakcji i triażu, Claude Sonnet do chatbota i

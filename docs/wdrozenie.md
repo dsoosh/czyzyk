@@ -44,23 +44,36 @@ insert into public.allowed_emails (email, role) values ('twoj.adres@gmail.com', 
 
 Kolejne osoby dodajesz już w PWA: zakładka **Admin → Lista rodziny**.
 
-## 6. Railway
+## 6. Railway (Infrastructure as Code)
 
-Utwórz projekt i trzy usługi z tego samego repozytorium (*Deploy from GitHub repo*, gałąź `main`). **Root Directory zostaw pusty** – każda usługa buduje się z całego monorepo.
+Cała konfiguracja Railway – usługi, komendy, healthchecki, polityki restartu, `watchPatterns` i zmienne – jest w [`.railway/railway.ts`](../.railway/railway.ts) (Railway Infrastructure as Code, pakiet `railway/iac`). Stare pliki `railway.json` (Config as Code) zostały usunięte – Railway przestaje je czytać 2026-12-01.
 
-Każda usługa wybiera, czym jest, przez zmienną **`CZYZYK_SERVICE`** (`api`, `worker` albo `pwa`). Główny `package.json` ma `build` i `start`, które na jej podstawie budują i uruchamiają właściwą część – domyślny builder Railway (Railpack) nie potrzebuje żadnej dodatkowej konfiguracji.
+Wymagany Railway CLI ≥ 5.42.1 (`npm i -g @railway/cli`).
 
-| Usługa | `CZYZYK_SERVICE` | Pozostałe zmienne |
-| --- | --- | --- |
-| `pwa` | `pwa` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (tylko publiczne wartości) |
-| `api` | `api` | `DATABASE_URL`, opcjonalnie `LOG_LEVEL` |
-| `worker` | `worker` | `DATABASE_URL` – *Session pooler* (port 5432) z Supabase → Connect; nie *Transaction pooler*, bo kolejka zadań trzyma połączenie |
+```bash
+railway login
+railway init            # pierwszy raz: utwórz projekt „czyzyk” (albo `railway link` do istniejącego)
+npm run infra:plan      # = railway config plan – podgląd zmian
+npm run infra:apply     # = railway config apply – utworzenie / aktualizacja usług api, worker, pwa
+```
 
-Opcjonalnie w Settings → **Config as code** podaj ścieżkę `services/api/railway.json`, `services/worker/railway.json` lub `apps/pwa/railway.json`. Dają one healthcheck, politykę restartu i `watchPatterns` (usługa przebudowuje się tylko po zmianach w swoim katalogu).
+Sekrety nie są w repozytorium – w pliku mają wartość `preserve()`, czyli Railway zachowuje to, co już ma. Ustaw je raz (dashboard → Variables albo CLI):
 
-Dla `pwa` i `api` włącz *Generate Domain*. Zmienne `VITE_*` są wkompilowywane w kod PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`, który przerywa wdrożenie, jeśli w paczce znalazłby się klucz serwerowy.
+| Usługa | Zmienne do ustawienia ręcznie |
+| --- | --- |
+| `api` | `DATABASE_URL` – Supabase → Connect → *Session pooler* (port 5432) |
+| `worker` | `DATABASE_URL` (jak wyżej; nie *Transaction pooler* – kolejka zadań trzyma połączenie), `ANTHROPIC_API_KEY` |
+| `pwa` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (tylko publiczne wartości) |
 
-Brak `CZYZYK_SERVICE` kończy start komunikatem „Set CZYZYK_SERVICE to one of: api, worker, pwa”.
+```bash
+railway variables --service api --set "DATABASE_URL=postgres://…"
+```
+
+Pozostałe zmienne (np. `CZYZYK_SERVICE`, `EXTRACTION_MODEL`, limity) ustawia plik. `VITE_API_URL` dla PWA jest referencją do publicznej domeny usługi `api` (`https://${{api.RAILWAY_PUBLIC_DOMAIN}}`).
+
+Domeny: dla `pwa` i `api` włącz *Generate Domain* w dashboardzie (lub dopisz je do pliku i zastosuj). **Zawsze czytaj `railway config plan` przed `apply`** – apply jest deklaratywny i usuwa to, czego nie ma w pliku (wymaga wtedy potwierdzenia).
+
+Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`, `npm start`), a `CZYZYK_SERVICE` (`api` / `worker` / `pwa`) wybiera, którą część zbudować i uruchomić (`scripts/service.mjs`). Zmienne `VITE_*` są wkompilowywane w PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`.
 
 ## 7. Sprawdzenie etapu 1
 
@@ -77,9 +90,9 @@ Brak `CZYZYK_SERVICE` kończy start komunikatem „Set CZYZYK_SERVICE to one of:
 
 | Usługa | Nowe zmienne |
 | --- | --- |
-| `api` | (już ustawione `DATABASE_URL`), opcjonalnie `INGEST_RATE_LIMIT_PER_TOKEN`, `INGEST_RATE_LIMIT_PER_IP` |
-| `worker` | `ANTHROPIC_API_KEY`, `EXTRACTION_MODEL` (np. `claude-haiku-4-5`), opcjonalnie `EXTRACTION_DEBOUNCE_MINUTES` (30), `EXTRACTION_CONFIDENCE_THRESHOLD` (0.7), `EXTRACTION_CONTEXT_MESSAGES` (50) |
-| `pwa` | `VITE_API_URL` – publiczny adres usługi `api` (trafia do linku parowania telefonu) |
+| `api` | ustawione w `.railway/railway.ts` (`DATABASE_URL` ręcznie, patrz sekcja 6) |
+| `worker` | `ANTHROPIC_API_KEY` ręcznie; `EXTRACTION_*` w `.railway/railway.ts` |
+| `pwa` | `VITE_API_URL` ustawia `.railway/railway.ts` (referencja do domeny `api`) |
 
 Migracje: `npx supabase db push` (dochodzi `0004_ingest.sql`).
 

@@ -49,8 +49,9 @@ Testy w `supabase/tests` uruchamiają migracje na lokalnym Postgresie 16 (z pgve
 ### D7. PWA – sesja i bramka dostępu
 `supabase-js` z dostawcą Google (`signInWithOAuth`). Po powrocie z OAuth PWA czyta własny profil; brak profilu lub błąd hooka (`error_description` w URL) ⇒ ekran „Brak dostępu” i wylogowanie. Routing: React Router; Tailwind; `vite-plugin-pwa` z manifestem po polsku.
 
-### D8. Railway
-Każda usługa ma `railway.json` (`build`/`start` w kontekście całego monorepo, `watchPatterns` na własny katalog i `packages/shared`). PWA serwowana jako statyczny build (`sirv` z fallbackiem SPA). Konfiguracja wyłącznie przez zmienne środowiskowe; `.env.example` w każdym pakiecie.
+### D8. Railway – Infrastructure as Code
+Cała infrastruktura Railway w jednym pliku `.railway/railway.ts` (pakiet `railway/iac`, `railway config plan` / `apply`): trzy usługi z tego samego repozytorium, budowane z korzenia monorepo (`npm run build`, `npm start`), a zmienna `CZYZYK_SERVICE` wybiera część do zbudowania i uruchomienia (`scripts/service.mjs`). `watchPatterns` na własny katalog, `packages/shared` i lockfile. Sekrety jako `preserve()` – wartości tylko w Railway. PWA serwowana jako statyczny build (`sirv` z fallbackiem SPA). Konfiguracja wyłącznie przez zmienne środowiskowe; `.env.example` w każdym pakiecie.
+- *Alternatywa:* `railway.json` per usługa (Config as Code) – pierwotny wybór; Railway wycofuje go (pliki nie są czytane od 2026-12-01), a każda usługa wymagała ręcznego wskazania ścieżki pliku w panelu.
 
 ## Risks / Trade-offs
 

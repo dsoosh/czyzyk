@@ -32,6 +32,6 @@
 
 ## 6. Wdrożenie i dokumentacja
 
-- [x] 6.1 `railway.json` dla `api`, `worker`, `pwa` oraz `.env.example` w każdym pakiecie; weryfikacja: lokalne `npm run build && npm start` w każdej usłudze startuje z wartościami z `.env.example`
+- [x] 6.1 Infrastruktura Railway (`.railway/railway.ts`: `api`, `worker`, `pwa`) oraz `.env.example` w każdym pakiecie; weryfikacja: lokalne `npm run build && npm start` w każdej usłudze startuje z wartościami z `.env.example`
 - [x] 6.2 `README.md` (struktura, uruchomienie lokalne, testy, workflow OpenSpec) i `docs/wdrozenie.md` (Supabase UE, Google OAuth, hook, pierwszy admin, Railway); weryfikacja: kroki z README wykonane na czystym klonie dają zielone `npm test`
 - [ ] 6.3 Weryfikacja kryterium etapu na projekcie chmurowym: logowanie adresem z listy działa, adres spoza listy dostaje „Brak dostępu” i nie pojawia się w `auth.users`; wynik odnotowany w PR
