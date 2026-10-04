@@ -57,13 +57,25 @@ Kolejne osoby dodajesz już w PWA: zakładka **Admin → Lista rodziny**.
 
 Cała konfiguracja Railway – usługi, komendy, healthchecki, polityki restartu, `watchPatterns` i zmienne – jest w [`.railway/railway.ts`](../.railway/railway.ts) (Railway Infrastructure as Code, pakiet `railway/iac`). Stare pliki `railway.json` (Config as Code) zostały usunięte – Railway przestaje je czytać 2026-12-01.
 
-Wymagany Railway CLI ≥ 5.42.1 (`npm i -g @railway/cli`).
+### Bez instalowania czegokolwiek – GitHub Actions (zalecane)
+
+Workflow [`Railway`](../.github/workflows/railway.yml) uruchamia Railway CLI na serwerach GitHuba:
+
+1. Railway → projekt → **Settings → Tokens** → utwórz *Project Token* dla środowiska `production`.
+2. GitHub → repozytorium → **Settings → Secrets and variables → Actions → New repository secret**: nazwa `RAILWAY_TOKEN`, wartość = token.
+3. GitHub → **Actions → Railway → Run workflow** → akcja `plan` (podgląd), potem `apply`.
+
+Potem działa samo: PR zmieniający `.railway/**` dostaje `plan`, a scalenie do `main` robi `apply` (nigdy nie usuwa zasobów – do tego służy ręczna akcja `apply-destructive`). Z tego samego miejsca: `status`, `logs` i `build-logs` wybranej usługi, `redeploy`.
+
+### Lokalnie (opcjonalnie)
+
+Railway CLI ≥ 5.42.1 (`npm i -g @railway/cli`):
 
 ```bash
 railway login
-railway init            # pierwszy raz: utwórz projekt „czyzyk” (albo `railway link` do istniejącego)
-npm run infra:plan      # = railway config plan – podgląd zmian
-npm run infra:apply     # = railway config apply – utworzenie / aktualizacja usług api, worker, pwa
+railway link            # w katalogu repo, wybierz projekt
+npm run infra:plan      # = railway config plan
+npm run infra:apply     # = railway config apply
 ```
 
 Sekrety nie są w repozytorium – w pliku mają wartość `preserve()`, czyli Railway zachowuje to, co już ma. Ustaw je raz (dashboard → Variables albo CLI):

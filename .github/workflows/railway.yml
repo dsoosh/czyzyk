@@ -1,0 +1,87 @@
+name: Railway
+
+# Runs the Railway CLI on GitHub's runners, so nobody needs it installed locally.
+# Needs the repository secret RAILWAY_TOKEN: a Railway *project token* for the
+# production environment (Railway → project → Settings → Tokens).
+#
+# - pull request touching .railway/**  → railway config plan
+# - push to main touching .railway/**  → plan, then apply (never destructive)
+# - manual run (Actions → Railway → Run workflow): plan, apply, apply-destructive,
+#   status, logs, build-logs, redeploy
+
+on:
+  pull_request:
+    paths: [".railway/**", ".github/workflows/railway.yml"]
+  push:
+    branches: [main]
+    paths: [".railway/**", ".github/workflows/railway.yml"]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: What to do
+        type: choice
+        options: [plan, apply, apply-destructive, status, logs, build-logs, redeploy]
+        default: plan
+      service:
+        description: Service (for logs, build-logs, redeploy)
+        type: choice
+        options: [api, worker, pwa]
+        default: api
+      lines:
+        description: Log lines (for logs, build-logs)
+        type: number
+        default: 200
+
+concurrency:
+  group: railway
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  railway:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      EVENT: ${{ github.event_name }}
+      ACTION: ${{ inputs.action }}
+      SERVICE: ${{ inputs.service }}
+      LINES: ${{ inputs.lines }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check token
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::Repository secret RAILWAY_TOKEN is not set – nothing to do. See docs/wdrozenie.md, section 6."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: env.SKIP != '1'
+        with:
+          node-version: 22
+          cache: npm
+
+      # .railway/railway.ts imports railway/iac from node_modules.
+      - run: npm ci
+        if: env.SKIP != '1'
+
+      - name: Railway CLI
+        if: env.SKIP != '1'
+        run: |
+          set -euo pipefail
+          railway() { npx --yes @railway/cli@5.63.1 "$@"; }
+          if [ "$EVENT" = "pull_request" ]; then ACTION=plan; elif [ "$EVENT" = "push" ]; then ACTION=apply; fi
+          echo "action: $ACTION"
+          case "$ACTION" in
+            plan)              railway config plan ;;
+            apply)             railway config plan && railway config apply --yes ;;
+            apply-destructive) railway config plan && railway config apply --yes --confirm-destructive ;;
+            status)            railway status && for s in api worker pwa; do railway service status --service "$s" || true; done ;;
+            logs)              railway logs --service "$SERVICE" --deployment --lines "${LINES:-200}" ;;
+            build-logs)        railway logs --service "$SERVICE" --build --lines "${LINES:-200}" ;;
+            redeploy)          railway service redeploy --service "$SERVICE" --yes ;;
+            *) echo "unknown action: $ACTION"; exit 2 ;;
+          esac
