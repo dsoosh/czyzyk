@@ -2,14 +2,14 @@
 
 ## Why
 
-Wszystkie kolejne etapy (ingest, ekstrakcja, PWA, chatbot) zakładają, że baza danych zawiera wiadomości innych rodziców i zdjęcia cudzych dzieci, a klucz `anon` jest publiczny w kodzie PWA. Zanim do bazy trafi pierwsza wiadomość, musi istnieć szkielet projektu i dostęp egzekwowany w samej bazie: tylko rodzina może się zalogować i cokolwiek odczytać.
+Wszystkie kolejne etapy (ingest, ekstrakcja, PWA, chatbot) zakładają, że baza danych zawiera wiadomości innych rodziców, ich imiona i informacje o cudzych dzieciach, a klucz `anon` jest publiczny w kodzie PWA. Zanim do bazy trafi pierwsza wiadomość, musi istnieć szkielet projektu i dostęp egzekwowany w samej bazie: tylko rodzina może się zalogować i cokolwiek odczytać.
 
 Etap 1 z `docs/specyfikacja.md` („Fundament”). **Gotowe, gdy:** loguje się tylko e-mail z listy, a pozostałe konta są odrzucane.
 
 ## What Changes
 
 - Monorepo: `apps/android` (pusty projekt Gradle), `apps/pwa`, `services/api`, `services/worker`, `packages/shared`, `supabase/migrations`, wspólne narzędzia (TypeScript, vitest, lint).
-- Migracja bazowa Supabase: rozszerzenia (`vector`, `pg_trgm`, `pgcrypto`), pełny model danych ze specyfikacji (wszystkie tabele, aby kolejne etapy dodawały tylko kolumny/indeksy), RLS na każdej tabeli, funkcje `is_family()` i `is_admin()`.
+- Migracja bazowa Supabase: rozszerzenia (`vector`, `pg_trgm`, `pgcrypto`), pełny model danych ze specyfikacji bez albumów zdjęć (wszystkie tabele, aby kolejne etapy dodawały tylko kolumny/indeksy), RLS na każdej tabeli, funkcje `is_family()` i `is_admin()`.
 - Hook „Before User Created” odrzucający adresy spoza `allowed_emails` oraz automatyczne tworzenie `profiles` z rolą z listy dozwolonych.
 - Funkcje RPC administratora do zarządzania listą dozwolonych e-maili.
 - PWA: logowanie przez Google (Supabase Auth), ekran „brak dostępu”, pusty ekran główny po zalogowaniu, ekran admina z listą dozwolonych e-maili.

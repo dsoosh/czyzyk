@@ -5,6 +5,15 @@ Oct 4, 2026 · @Darek
 > Dokument źródłowy. Wymagania wykonawcze żyją w `openspec/` (zmiany `etap-1` … `etap-6`,
 > po archiwizacji w `openspec/specs/`). Przy rozbieżności obowiązuje OpenSpec.
 
+## Decyzje podjęte po specyfikacji
+
+- **2026-10-04 – zdjęcia tylko na telefonie.** Obrazy z eksportu są analizowane wyłącznie na telefonie.
+  Na serwer trafiają tylko obrazy dokumentów z informacjami organizacyjnymi (plan, jadłospis, plakat,
+  ogłoszenie), na których nie wykryto ludzi. Zdjęcia ludzi i dzieci, filmy i notatki głosowe nigdy nie
+  opuszczają telefonu. Z obrazu, który ma tekst i twarze, wysyłany jest tylko tekst rozpoznany na telefonie.
+  W konsekwencji odpadają: galeria, albumy, album roku i pobieranie do fotoksiążki, tabela `albums`,
+  kategoria `class_photo` i narzędzie chatbota `get_album`. Poniższe sekcje o zdjęciach z zajęć są nieaktualne.
+
 ## Cel i zakres
 
 Prywatna aplikacja rodzinna (PWA), która automatycznie wyciąga z grup WhatsApp przedszkola wydarzenia, rzeczy do przyniesienia, płatności i zdjęcia z zajęć oraz odpowiada na pytania o historię rozmów.

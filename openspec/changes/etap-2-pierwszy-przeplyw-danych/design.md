@@ -35,7 +35,7 @@ Worker co minutę (harmonogram pg-boss) wybiera grupy z nieprzetworzonymi wiadom
 
 ### D5. Wywołanie modelu
 `@anthropic-ai/sdk`, `messages.create` z jednym narzędziem `zapisz_operacje` (schemat JSON generowany z zod przez `z.toJSONSchema`) i `tool_choice: auto` plus instrukcja w prompcie, by zawsze wywołać narzędzie (forced tool choice nie jest dostępny na części nowszych modeli, a model jest konfigurowalny). Brak wywołania narzędzia lub błąd walidacji = błąd próby (ponowienie). Model z `EXTRACTION_MODEL` (domyślnie `claude-haiku-4-5`), `max_tokens` 16000. Prompt systemowy jest stały (cache'owalny), zmienna część w wiadomości użytkownika: dzisiejsza data i dzień tygodnia w Europe/Warsaw, nazwa grupy, ~50 wiadomości kontekstu, nowe wiadomości, aktualne przyszłe elementy. Treść wiadomości otoczona znacznikami `<wiadomosci>` z instrukcją, że to dane.
-- *Alternatywa:* structured outputs (`output_config.format`) – także dobre; tool use zostaje, bo specyfikacja go wymaga i ten sam schemat posłuży triażowi zdjęć w etapie 4.
+- *Alternatywa:* structured outputs (`output_config.format`) – także dobre; tool use zostaje, bo specyfikacja go wymaga i ten sam schemat posłuży ekstrakcji z dokumentów w etapie 4.
 
 ### D6. Krótkie aliasy identyfikatorów w prompcie
 Wiadomości i elementy dostają w prompcie aliasy `W1…Wn` i `E1…En`; model posługuje się aliasami, a serwer mapuje je na UUID. Alias spoza mapy = odrzucenie operacji (wymaganie o nieznanych identyfikatorach). Operacja `create` może nadać lokalne `ref` (np. `nowe1`), aby rzecz do przyniesienia wskazała wydarzenie tworzone w tej samej odpowiedzi.

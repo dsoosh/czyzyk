@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Umożliwia odnalezienie w historii grup wiadomości i zdjęć pasujących do pytania – zarówno po dokładnych słowach, jak i po znaczeniu.
+Umożliwia odnalezienie w historii grup wiadomości i dokumentów pasujących do pytania – zarówno po dokładnych słowach, jak i po znaczeniu.
 
 ## ADDED Requirements
 
 ### Requirement: Indeksowanie treści
-Każda wiadomość z treścią i każdy podpis zdjęcia SHALL zostać zaindeksowany do wyszukiwania semantycznego najpóźniej 10 minut po zapisie; istniejąca historia MUST zostać zaindeksowana wstecznie. Błąd indeksowania MUST być ponawiany bez blokowania pozostałych wiadomości.
+Każda wiadomość z treścią i każdy opis dokumentu SHALL zostać zaindeksowany do wyszukiwania semantycznego najpóźniej 10 minut po zapisie; istniejąca historia MUST zostać zaindeksowana wstecznie. Błąd indeksowania MUST być ponawiany bez blokowania pozostałych wiadomości.
 
 #### Scenario: Nowa wiadomość
 - **WHEN** zapisana zostaje wiadomość „Pasowanie na przedszkolaka 14 listopada o 10:00”

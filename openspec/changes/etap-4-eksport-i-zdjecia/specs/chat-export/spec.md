@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Pozyskuje z telefonu właściciela pełny eksport śledzonych czatów WhatsApp z multimediami – jednym kliknięciem lub ręcznie – i bezpiecznie przekazuje go na serwer, bez ingerencji w protokół WhatsApp.
+Pozyskuje z telefonu właściciela eksport śledzonych czatów WhatsApp – jednym kliknięciem lub ręcznie – i przekazuje na serwer wyłącznie tę jego część, która przeszła kontrolę prywatności na telefonie, bez ingerencji w protokół WhatsApp.
 
 ## ADDED Requirements
 
@@ -32,15 +32,26 @@ Gdy krok automatyzacji nie znajdzie oczekiwanego elementu w limicie czasu, aplik
 - **THEN** admin widzi w dzienniku synchronizacji błąd „krok: eksportuj_czat, WhatsApp 2.26.x”, a aplikacja proponuje eksport ręczny
 
 ### Requirement: Eksport ręczny przez udostępnianie
-Aplikacja SHALL być celem udostępniania plików ZIP, tak aby eksport wykonany ręcznie w WhatsAppie („Eksportuj czat” → Czyżyk) był przetwarzany tak samo jak automatyczny. Eksport grupy nieśledzonej MUST zostać odrzucony na telefonie bez wysyłki.
+Aplikacja SHALL być celem udostępniania plików ZIP, tak aby eksport wykonany ręcznie w WhatsAppie („Eksportuj czat” → Czyżyk) był przetwarzany tak samo jak automatyczny, łącznie z kontrolą obrazów na telefonie. Eksport grupy nieśledzonej MUST zostać odrzucony i usunięty na telefonie bez wysyłki.
 
 #### Scenario: Ręczny eksport
 - **WHEN** właściciel sam eksportuje czat „Motylki” i wybiera Czyżyk w oknie udostępniania
-- **THEN** paczka trafia na serwer i jest przetwarzana
+- **THEN** paczka jest filtrowana na telefonie, a jej przefiltrowana część trafia na serwer
+
+### Requirement: Wysyłka wyłącznie paczki przefiltrowanej
+Aplikacja SHALL wysyłać na serwer wyłącznie paczkę zbudowaną na telefonie z `_chat.txt`, załączników dopuszczonych przez kontrolę obrazów i manifestu decyzji. Oryginalny eksport z WhatsAppa MUST NOT opuszczać telefonu i MUST zostać usunięty z pamięci aplikacji po zbudowaniu paczki przefiltrowanej.
+
+#### Scenario: Eksport ze zdjęciami dzieci
+- **WHEN** eksport grupy zawiera 40 zdjęć z zajęć i 1 zdjęcie planu miesiąca
+- **THEN** na serwer trafia `_chat.txt`, zdjęcie planu i manifest, a żadne z 40 zdjęć z zajęć
+
+#### Scenario: Sprzątanie po eksporcie
+- **WHEN** paczka przefiltrowana została zbudowana
+- **THEN** w pamięci aplikacji Czyżyk nie ma już oryginalnego ZIP-a ani rozpakowanych plików
 
 ### Requirement: Bezpieczna wysyłka paczki
-Aplikacja SHALL wysyłać ZIP bezpośrednio do prywatnego magazynu przez jednorazowy, krótko ważny podpisany URL uzyskany z serwera tokenem urządzenia, a następnie zarejestrować paczkę na serwerze. Przerwana wysyłka MUST być wznawiana z kolejki offline.
+Aplikacja SHALL wysyłać paczkę przefiltrowaną bezpośrednio do prywatnego magazynu przez jednorazowy, krótko ważny podpisany URL uzyskany z serwera tokenem urządzenia, a następnie zarejestrować paczkę na serwerze. Przerwana wysyłka MUST być wznawiana z kolejki offline.
 
 #### Scenario: Utrata sieci w trakcie wysyłki
-- **WHEN** połączenie zrywa się w trakcie wysyłania ZIP-a
+- **WHEN** połączenie zrywa się w trakcie wysyłania paczki
 - **THEN** wysyłka jest ponawiana po odzyskaniu sieci, a paczka jest rejestrowana dokładnie raz

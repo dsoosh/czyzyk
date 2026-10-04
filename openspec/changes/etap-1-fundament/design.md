@@ -22,7 +22,7 @@ Repozytorium jest puste. Motywacja: `proposal.md` – Why. Wymagania: `specs/fam
 - *Alternatywa:* pnpm/Turborepo – szybsze przy dużych repo, ale dodatkowe narzędzie bez zysku przy 4 pakietach; Railway i Node 22 obsługują npm bez konfiguracji.
 
 ### D2. Pełny schemat w migracji bazowej
-Migracja `0001_schema.sql` tworzy wszystkie tabele z `docs/specyfikacja.md` (w tym te używane dopiero w etapach 3–6) wraz z RLS; `0002_auth.sql` – hook i trigger profili; `0003_admin_rpc.sql` – RPC admina. Elementy wyciągane przez LLM mają wspólne kolumny (`source_message_ids`, `confidence`, `rationale`, `status`, `updated_at`) i `group_id` (null = całe przedszkole).
+Migracja `0001_schema.sql` tworzy wszystkie tabele z `docs/specyfikacja.md` (w tym te używane dopiero w etapach 3–6) wraz z RLS; `0002_auth.sql` – hook i trigger profili; `0003_admin_rpc.sql` – RPC admina. Wyjątek: zgodnie z decyzją „zdjęcia tylko na telefonie” (`docs/specyfikacja.md`) nie powstaje tabela `albums` ani kolumna `attachments.album_id`; `attachments` przechowuje wyłącznie dokumenty (kolumny kontroli obrazów dochodzą w etapie 4). Elementy wyciągane przez LLM mają wspólne kolumny (`source_message_ids`, `confidence`, `rationale`, `status`, `updated_at`) i `group_id` (null = całe przedszkole).
 - *Alternatywa:* tabele dodawane per etap – mniej martwych tabel na starcie, ale każdy etap musiałby pamiętać o RLS; jeden przegląd polityk jest bezpieczniejszy.
 
 ### D3. Wzorzec RLS

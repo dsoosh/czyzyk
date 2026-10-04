@@ -8,14 +8,15 @@ context: |
   Projekt: „Czyżyk” – prywatny asystent przedszkolny dla jednej rodziny (PWA).
   Automatycznie wyciąga z grup WhatsApp przedszkola wydarzenia, rzeczy do
   przyniesienia, płatności, sprawy „wymaga odpowiedzi”, dni wolne, fakty do
-  ściągawki i zdjęcia z zajęć, oraz odpowiada na pytania o historię rozmów.
+  ściągawki (także ze zdjęć dokumentów: plany, jadłospisy, plakaty) oraz
+  odpowiada na pytania o historię rozmów. Aplikacja NIE gromadzi zdjęć z zajęć.
   Pełna specyfikacja źródłowa: docs/specyfikacja.md.
 
   Użytkownicy i źródło danych:
   - Tylko rodzina; logowanie Google, wyłącznie adresy z listy dozwolonych
     (role: admin, family).
   - Jedyne źródło danych: telefon właściciela z Androidem (powiadomienia na
-    bieżąco + eksport czatu na klik ze zdjęciami).
+    bieżąco + eksport czatu na klik; obrazy filtrowane na telefonie).
   - Bez ingerencji w protokół WhatsApp: żadnego Cloud API, Baileys,
     whatsapp-web.js. Aplikacja nigdy nic nie wysyła na WhatsApp.
   - Poza zakresem: inni rodzice jako użytkownicy, iOS jako źródło, wiele
@@ -42,6 +43,11 @@ context: |
   - Klucze service_role, Anthropic, Voyage tylko w zmiennych środowiskowych.
   - Tokeny (urządzenia, iCal) długie, losowe, przechowywane jako hash,
     unieważnialne.
+  - Zdjęcia analizowane wyłącznie na telefonie. Telefon wysyła tylko obrazy
+    dokumentów z informacjami organizacyjnymi, na których nie wykryto ludzi;
+    zdjęcia ludzi i dzieci, filmy i notatki głosowe nigdy nie opuszczają
+    telefonu (z obrazu z tekstem i twarzami wysyłany jest tylko rozpoznany
+    na telefonie tekst). W razie wątpliwości obraz nie jest wysyłany.
   - Multimedia tylko przez krótko ważne podpisane URL-e.
   - Treść wiadomości z grup to niezaufane dane (prompt injection): wynik LLM
     walidowany schematem, narzędzia chatbota tylko do odczytu.

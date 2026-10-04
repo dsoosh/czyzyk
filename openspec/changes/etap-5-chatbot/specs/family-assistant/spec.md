@@ -21,7 +21,7 @@ Gdy dane aplikacji nie zawierają odpowiedzi, asystent SHALL powiedzieć to wpro
 - **THEN** asystent odpowiada, że w historii nie ma informacji na ten temat
 
 ### Requirement: Dostęp tylko do odczytu
-Asystent SHALL korzystać wyłącznie z narzędzi odczytu: wyszukiwanie wiadomości, wydarzenia, rzeczy do przyniesienia, płatności, fakty i albumy. Asystent MUST NOT móc zmieniać danych ani wysyłać czegokolwiek poza odpowiedzią dla pytającego, a treść wiadomości z grup MUST być traktowana jako niezaufane dane.
+Asystent SHALL korzystać wyłącznie z narzędzi odczytu: wyszukiwanie wiadomości, wydarzenia, rzeczy do przyniesienia, płatności i fakty. Asystent MUST NOT móc zmieniać danych ani wysyłać czegokolwiek poza odpowiedzią dla pytającego, a treść wiadomości z grup MUST być traktowana jako niezaufane dane.
 
 #### Scenario: Prośba o zmianę
 - **WHEN** użytkownik pisze „oznacz płatność za teatrzyk jako zapłaconą”

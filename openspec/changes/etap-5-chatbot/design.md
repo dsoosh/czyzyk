@@ -2,7 +2,7 @@
 
 ## Context
 
-Stan po etapie 4: kompletna historia wiadomości z podpisami zdjęć. Kolumna `embedding` istnieje od etapu 1, nieużywana. Motywacja: `proposal.md`. Wymagania: `specs/*`.
+Stan po etapie 4: kompletna historia wiadomości z opisami dokumentów. Kolumna `embedding` istnieje od etapu 1, nieużywana. Motywacja: `proposal.md`. Wymagania: `specs/*`.
 
 ## Goals / Non-Goals
 
@@ -20,11 +20,11 @@ Voyage `EMBEDDING_MODEL` (domyślnie model wielojęzyczny 1024-wymiarowy), `inpu
 - *Alternatywa:* embeddingi Postgres-side (pgml) – niedostępne w Supabase.
 
 ### D2. Wyszukiwanie hybrydowe
-Funkcja SQL `search_messages(query_text, query_embedding, limit)` (`security invoker`, więc RLS obowiązuje): dwie listy top-50 (cosinus i `similarity()` z `pg_trgm` na znormalizowanej treści) połączone Reciprocal Rank Fusion (k = 60). Podpisy zdjęć przez połączenie z `attachments.caption`.
+Funkcja SQL `search_messages(query_text, query_embedding, limit)` (`security invoker`, więc RLS obowiązuje): dwie listy top-50 (cosinus i `similarity()` z `pg_trgm` na znormalizowanej treści) połączone Reciprocal Rank Fusion (k = 60). Opisy i tekst dokumentów przez połączenie z `attachments.caption` i `attachments.ocr_text`.
 - *Alternatywa:* pełnotekstowe `tsvector` – słaba obsługa polskiej odmiany bez słownika; trigramy są odporne na odmianę i literówki.
 
 ### D3. Pętla narzędzi
-`services/api` prowadzi ręczną pętlę tool use na `messages.stream` (`CHAT_MODEL`, domyślnie Claude Sonnet) z narzędziami `search_messages`, `list_events`, `list_bring_items`, `list_payments`, `get_facts`, `get_album`; wszystkie wykonywane zapytaniami z uprawnieniami użytkownika (JWT przekazany do klienta Supabase), więc RLS ogranicza także chatbota. Wyniki narzędzi zawierają aliasy wiadomości (`W12`); model cytuje aliasy w znacznikach `[W12]`, które serwer zamienia na odnośniki i zapisuje w `cited_message_ids`. Prompt systemowy stały i cache'owany; treści wiadomości w wynikach narzędzi otoczone znacznikami danych.
+`services/api` prowadzi ręczną pętlę tool use na `messages.stream` (`CHAT_MODEL`, domyślnie Claude Sonnet) z narzędziami `search_messages`, `list_events`, `list_bring_items`, `list_payments`, `get_facts`; wszystkie wykonywane zapytaniami z uprawnieniami użytkownika (JWT przekazany do klienta Supabase), więc RLS ogranicza także chatbota. Wyniki narzędzi zawierają aliasy wiadomości (`W12`); model cytuje aliasy w znacznikach `[W12]`, które serwer zamienia na odnośniki i zapisuje w `cited_message_ids`. Prompt systemowy stały i cache'owany; treści wiadomości w wynikach narzędzi otoczone znacznikami danych.
 - *Alternatywa:* czysty RAG (wyszukaj → wklej) – nie odpowie na „ile mam zapłacić w tym miesiącu”, które wymaga danych strukturalnych.
 
 ### D4. SSE i zapis

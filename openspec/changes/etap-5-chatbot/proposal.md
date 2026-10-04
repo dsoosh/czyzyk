@@ -8,18 +8,18 @@ Etap 5 z `docs/specyfikacja.md` („Chatbot”). **Gotowe, gdy:** pytanie „kie
 
 ## What Changes
 
-- Embeddingi wiadomości i podpisów zdjęć (Voyage AI, model wielojęzyczny) w pgvector, uzupełnianie wsteczne dla istniejącej historii.
+- Embeddingi wiadomości i opisów dokumentów (Voyage AI, model wielojęzyczny) w pgvector, uzupełnianie wsteczne dla istniejącej historii.
 - Wyszukiwanie hybrydowe: wektory + `pg_trgm`, z połączeniem wyników.
 - Zakładka „Zapytaj”: Claude Sonnet z narzędziami tylko do odczytu, odpowiedzi strumieniowane (SSE) z cytatami, wątki per użytkownik, limit zapytań.
 - Ekran „Ściągawka”: fakty z ekstrakcji, edycja ręczna (RPC), ochrona ręcznych zmian przed nadpisaniem.
 
-**Poza zakresem:** odpowiedzi głosowe, chatbot wykonujący akcje (oznaczanie, zmiany danych), wyszukiwanie w treści dokumentów PDF poza podpisem i ekstrakcją.
+**Poza zakresem:** odpowiedzi głosowe, chatbot wykonujący akcje (oznaczanie, zmiany danych), wyszukiwanie w treści dokumentów poza opisem, tekstem rozpoznanym na telefonie i ekstrakcją.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `message-search`: indeks i wyszukiwanie hybrydowe po historii wiadomości i podpisach zdjęć.
+- `message-search`: indeks i wyszukiwanie hybrydowe po historii wiadomości i opisach dokumentów.
 - `family-assistant`: chatbot odpowiadający na pytania o przedszkole na podstawie danych aplikacji, z cytatami.
 - `cheat-sheet`: ściągawka stałych informacji (godziny, osoby, kontakty) – automatyczna i edytowalna.
 

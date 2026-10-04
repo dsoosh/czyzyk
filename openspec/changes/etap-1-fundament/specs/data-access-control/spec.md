@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Gwarantuje, że dane z grup przedszkolnych (wiadomości innych rodziców, zdjęcia dzieci) są dostępne wyłącznie dla rodziny, niezależnie od tego, czy klient korzysta z interfejsu PWA, czy wywołuje bazę bezpośrednio publicznym kluczem.
+Gwarantuje, że dane z grup przedszkolnych (wiadomości innych rodziców, informacje o cudzych dzieciach, obrazy dokumentów) są dostępne wyłącznie dla rodziny, niezależnie od tego, czy klient korzysta z interfejsu PWA, czy wywołuje bazę bezpośrednio publicznym kluczem.
 
 ## ADDED Requirements
 
 ### Requirement: Odczyt danych tylko dla rodziny
-Baza danych SHALL zwracać dane domenowe (wiadomości, wydarzenia, rzeczy do przyniesienia, płatności, sprawy, dni wolne, fakty, albumy, grupy) wyłącznie zalogowanym użytkownikom posiadającym profil rodziny. Reguła MUST być egzekwowana w bazie dla każdej tabeli.
+Baza danych SHALL zwracać dane domenowe (wiadomości, wydarzenia, rzeczy do przyniesienia, płatności, sprawy, dni wolne, fakty, załączniki-dokumenty, grupy) wyłącznie zalogowanym użytkownikom posiadającym profil rodziny. Reguła MUST być egzekwowana w bazie dla każdej tabeli.
 
 #### Scenario: Zapytanie z publicznym kluczem bez logowania
 - **WHEN** ktoś odpytuje dowolną tabelę domenową, używając tylko publicznego klucza `anon`, bez sesji
