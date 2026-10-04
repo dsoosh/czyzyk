@@ -20,7 +20,8 @@
     "spec:validate": "openspec validate --all --strict",
     "start": "node scripts/service.mjs start",
     "infra:plan": "railway config plan",
-    "infra:apply": "railway config apply"
+    "infra:apply": "railway config apply",
+    "db:migrate": "node scripts/migrate.mjs"
   },
   "devDependencies": {
     "@fission-ai/openspec": "^1.14.0",

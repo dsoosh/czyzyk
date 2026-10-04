@@ -21,7 +21,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "db",
-          include: ["supabase/tests/**/*.test.ts", "services/*/src/**/*.db.test.ts", "tests/**/*.db.test.ts"],
+          include: ["supabase/tests/**/*.test.ts", "services/*/src/**/*.db.test.ts", "tests/**/*.db.test.ts", "scripts/**/*.db.test.ts"],
           environment: "node",
           // Every db test file creates its own database, but they share one server.
           fileParallelism: false,

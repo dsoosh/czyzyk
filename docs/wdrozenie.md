@@ -21,12 +21,21 @@ Te same ustawienia opisuje `supabase/config.toml` (dla `supabase start` lokalnie
 
 ## 3. Migracje bazy
 
+Migracje (`supabase/migrations/*.sql`) stosują się **automatycznie przy każdym wdrożeniu** usług `api` i `worker` – to ich *pre-deploy command* w `.railway/railway.ts` (`npm run db:migrate`). Railway uruchamia go po buildzie, a przed przełączeniem ruchu na nową wersję; jeśli migracja się nie powiedzie, wdrożenie zatrzymuje się, a poprzednia wersja działa dalej. Log migracji jest w logach wdrożenia (zakładka *Deploy Logs* → *Pre-deploy*).
+
+Runner (`scripts/migrate.mjs`):
+- stosuje tylko brakujące pliki, każdy w osobnej transakcji, w kolejności nazw;
+- zapisuje je w `supabase_migrations.schema_migrations` – tej samej tabeli co Supabase CLI, więc `supabase db push` i runner widzą ten sam stan;
+- bierze blokadę doradczą, więc równoległe wdrożenie `api` i `worker` jest bezpieczne;
+- nie wypisuje `DATABASE_URL`.
+
+Ręcznie (np. przed pierwszym wdrożeniem albo lokalnie):
+
 ```bash
-npx supabase login
-npx supabase link --project-ref <project-ref>
-npx supabase db push --dry-run   # podgląd
-npx supabase db push
+DATABASE_URL="postgres://…session-pooler…:5432/postgres" npm run db:migrate
 ```
+
+Nowa migracja = nowy plik `NNNN_opis.sql` z kolejnym numerem; nigdy nie edytuj zastosowanych plików.
 
 ## 4. Hook „Before User Created”
 
@@ -94,7 +103,7 @@ Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`,
 | `worker` | `ANTHROPIC_API_KEY` ręcznie; `EXTRACTION_*` w `.railway/railway.ts` |
 | `pwa` | `VITE_API_URL` ustawia `.railway/railway.ts` (referencja do domeny `api`) |
 
-Migracje: `npx supabase db push` (dochodzi `0004_ingest.sql`).
+Migracje: stosują się same przy wdrożeniu (`0004_ingest.sql`), patrz sekcja 3.
 
 ## 9. Telefon
 

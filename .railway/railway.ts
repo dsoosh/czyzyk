@@ -6,6 +6,10 @@
  *   railway config plan         # preview the diff against the linked environment
  *   railway config apply        # apply (prompts before destructive changes)
  *
+ * Database migrations run as the pre-deploy command of api and worker (Railway runs it
+ * after the build, before the new version takes traffic; a failure stops the deploy).
+ * scripts/migrate.mjs is idempotent and takes an advisory lock, so both services may run it.
+ *
  * Secrets are never committed: variables marked preserve() keep the value already
  * stored in Railway (set them once in the dashboard or with `railway variables --set`).
  * Apply is declarative – a variable missing here would be deleted, so every variable
@@ -14,6 +18,9 @@
 import { defineRailway, github, group, preserve, project, service } from "railway/iac";
 
 const REPO = "dsoosh/czyzyk";
+
+/** Applies pending supabase/migrations with DATABASE_URL before the new version starts. */
+const MIGRATE = "npm run db:migrate";
 
 /** Every service builds from the repository root; CZYZYK_SERVICE picks what to build and start. */
 const fromMonorepo = (name: "api" | "worker" | "pwa", watch: string[]) => ({
@@ -31,9 +38,10 @@ const fromMonorepo = (name: "api" | "worker" | "pwa", watch: string[]) => ({
 });
 
 export default defineRailway(() => {
-  const apiBase = fromMonorepo("api", ["services/api/**", "packages/shared/**"]);
+  const apiBase = fromMonorepo("api", ["services/api/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
   const api = service("api", {
     ...apiBase,
+    preDeploy: MIGRATE,
     healthcheck: "/health",
     healthcheckTimeout: 60,
     deploy: { restartPolicyType: "ON_FAILURE", restartPolicyMaxRetries: 10 },
@@ -47,9 +55,10 @@ export default defineRailway(() => {
     },
   });
 
-  const workerBase = fromMonorepo("worker", ["services/worker/**", "packages/shared/**"]);
+  const workerBase = fromMonorepo("worker", ["services/worker/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
   const worker = service("worker", {
     ...workerBase,
+    preDeploy: MIGRATE,
     // No HTTP port: pg-boss worker that must always run.
     deploy: { restartPolicyType: "ALWAYS" },
     env: {

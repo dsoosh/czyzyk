@@ -1,20 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+// @ts-expect-error -- plain ESM script without type declarations
+import { migrate } from "../../scripts/migrate.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(here, "..", "migrations");
 
 export const ADMIN_URL = process.env.TEST_DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/postgres";
-
-export function migrationFiles(): string[] {
-  return readdirSync(migrationsDir)
-    .filter((f) => f.endsWith(".sql"))
-    .sort()
-    .map((f) => join(migrationsDir, f));
-}
 
 export interface TestDb {
   url: string;
@@ -22,8 +17,8 @@ export interface TestDb {
   drop(): Promise<void>;
 }
 
-/** Creates a fresh database with the Supabase stub and every migration applied. */
-export async function createTestDb(): Promise<TestDb> {
+/** Creates a fresh database containing only the Supabase stub (no migrations). */
+export async function createEmptyDb(): Promise<TestDb> {
   const name = `czyzyk_test_${randomUUID().replaceAll("-", "")}`;
   const admin = new pg.Client({ connectionString: ADMIN_URL });
   await admin.connect();
@@ -35,9 +30,6 @@ export async function createTestDb(): Promise<TestDb> {
   const client = new pg.Client({ connectionString: url.toString() });
   await client.connect();
   await client.query(readFileSync(join(here, "stub_supabase.sql"), "utf8"));
-  for (const file of migrationFiles()) {
-    await client.query(readFileSync(file, "utf8"));
-  }
 
   return {
     url: url.toString(),
@@ -50,6 +42,13 @@ export async function createTestDb(): Promise<TestDb> {
       await a.end();
     },
   };
+}
+
+/** Creates a fresh database with the Supabase stub and every migration applied by the deploy runner. */
+export async function createTestDb(): Promise<TestDb> {
+  const db = await createEmptyDb();
+  await migrate({ databaseUrl: db.url, dir: migrationsDir, log: () => {} });
+  return db;
 }
 
 export type Actor =
