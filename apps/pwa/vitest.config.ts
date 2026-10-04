@@ -1,8 +1,10 @@
 import react from "@vitejs/plugin-react";
 import { defineProject } from "vitest/config";
+import { sharedExtraction } from "./vite.config";
 
 export default defineProject({
   plugins: [react()],
+  resolve: { alias: { "@czyzyk/shared/extraction": sharedExtraction } },
   test: {
     name: "pwa",
     root: import.meta.dirname,

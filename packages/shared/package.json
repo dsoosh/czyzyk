@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./extraction": {
+      "types": "./dist/extraction.d.ts",
+      "default": "./dist/extraction.js"
     }
   },
   "scripts": {

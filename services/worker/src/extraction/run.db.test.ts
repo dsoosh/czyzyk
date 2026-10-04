@@ -236,4 +236,42 @@ describe("runGroupExtraction", () => {
     const { rows } = await db.client.query("select description, event_id from bring_items");
     expect(rows[0]).toEqual({ description: "jesienne przebranie", event_id: ev[0].id });
   });
+
+  it("element poprawiony przez admina: zmiana trafia do kolejki zamiast nadpisać decyzję", async () => {
+    const old = await addMessage("Wycieczka do ZOO 16.10", "2026-10-01T08:00:00Z", true);
+    const { rows: ev } = await db.client.query(
+      `insert into events (group_id, title, starts_at, all_day, source_message_ids, confidence, rationale, reviewed_at)
+       values ($1, 'Wycieczka do ZOO', '2026-10-15T22:00:00Z', true, array[$2::uuid], 0.9, 'x', now()) returning id`,
+      [groupId, old],
+    );
+    const now = await addMessage("Wycieczka 17.10", "2026-10-07T10:00:00Z");
+    const { model } = scripted((p) => [
+      op({ op: "update", type: "event", target: "E1", data: { start: "2026-10-17" }, source_messages: [lastAlias(p)] }),
+    ]);
+
+    expect(await runGroupExtraction(deps(model), groupId)).toMatchObject({ status: "ok", updated: 0, needsReview: 1 });
+    const { rows } = await db.client.query("select * from events where id = $1", [ev[0].id]);
+    expect(new Date(rows[0].starts_at).toISOString()).toBe("2026-10-15T22:00:00.000Z");
+    expect(rows[0].status).toBe("active");
+    expect(rows[0].source_message_ids).toEqual([old]);
+    expect(rows[0].pending_patch).toEqual({
+      op: "update",
+      data: { start: "2026-10-17" },
+      confidence: 0.95,
+      rationale: "Uzasadnienie.",
+      source_message_ids: [now],
+    });
+  });
+
+  it("odwołanie elementu zatwierdzonego przez admina też trafia do kolejki", async () => {
+    await db.client.query(
+      "insert into events (group_id, title, starts_at, all_day, reviewed_at) values ($1, 'Teatrzyk', '2026-10-13T22:00:00Z', true, now())",
+      [groupId],
+    );
+    await addMessage("Teatrzyk odwołany", "2026-10-07T10:00:00Z");
+    const { model } = scripted((p) => [op({ op: "cancel", type: "event", target: "E1", source_messages: [lastAlias(p)] })]);
+    expect(await runGroupExtraction(deps(model), groupId)).toMatchObject({ cancelled: 0, needsReview: 1 });
+    const { rows } = await db.client.query("select status, pending_patch->>'op' as proposal from events");
+    expect(rows[0]).toEqual({ status: "active", proposal: "cancel" });
+  });
 });

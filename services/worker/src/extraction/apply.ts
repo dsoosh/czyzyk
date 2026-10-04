@@ -154,9 +154,9 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
     await ctx.client.query("savepoint op");
     try {
       const status = statusFor(op, ctx.threshold);
-      await applyOne(ctx, op, status, refIds);
+      const outcome = await applyOne(ctx, op, status, refIds);
       await ctx.client.query("release savepoint op");
-      if (status === "needs_review") summary.needsReview++;
+      if (outcome === "proposed" || status === "needs_review") summary.needsReview++;
       else if (op.op === "create") summary.created++;
       else if (op.op === "update") summary.updated++;
       else summary.cancelled++;
@@ -172,7 +172,32 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
   return summary;
 }
 
-async function applyOne(ctx: Ctx, op: ResolvedOperation, status: Status, refIds: Map<string, string>) {
+/** Stores the change as pending_patch (same field names as extraction data) for the admin to accept or dismiss. */
+async function queueProposal(client: pg.PoolClient, table: string, op: Extract<ResolvedOperation, { op: "update" | "cancel" }>) {
+  let data: Record<string, unknown> | undefined;
+  if (op.op === "update") {
+    // Validated against the type's schema; the event link is not part of a reviewable patch.
+    const { event: _event, ...rest } = op.data as Record<string, unknown>;
+    const parsed = itemDataSchemas[op.type].partial().safeParse(rest);
+    if (!parsed.success) throw new ApplyRejection("invalid proposal data");
+    data = parsed.data as Record<string, unknown>;
+  }
+  const proposal = {
+    op: op.op,
+    ...(data ? { data } : {}),
+    confidence: op.confidence,
+    rationale: op.rationale,
+    source_message_ids: op.sourceMessageIds,
+  };
+  await client.query(`update ${table} set pending_patch = $2 where id = $1`, [op.targetId, proposal]);
+}
+
+async function applyOne(
+  ctx: Ctx,
+  op: ResolvedOperation,
+  status: Status,
+  refIds: Map<string, string>,
+): Promise<"applied" | "proposed"> {
   const { client, groupId } = ctx;
   const table = TABLE[op.type];
   const meta = [op.sourceMessageIds, op.confidence, op.rationale, status] as const;
@@ -195,11 +220,21 @@ async function applyOne(ctx: Ctx, op: ResolvedOperation, status: Status, refIds:
       [...meta, ...cols.params],
     );
     if (op.ref) refIds.set(op.ref, rows[0]!.id);
-    return;
+    return "applied";
   }
 
   const existing = await loadItem(client, op.type, op.targetId);
   if (!existing) throw new ApplyRejection("target item no longer exists");
+
+  // An admin already decided about this item: never overwrite, queue a proposal instead.
+  const { rows: reviewed } = await client.query<{ reviewed: boolean }>(
+    `select reviewed_at is not null as reviewed from ${table} where id = $1`,
+    [op.targetId],
+  );
+  if (reviewed[0]?.reviewed) {
+    await queueProposal(client, table, op);
+    return "proposed";
+  }
 
   if (op.op === "cancel") {
     await client.query(
@@ -209,7 +244,7 @@ async function applyOne(ctx: Ctx, op: ResolvedOperation, status: Status, refIds:
         where id = $1`,
       [op.targetId, ...meta],
     );
-    return;
+    return "applied";
   }
 
   const merged = { ...(existing.data as Record<string, unknown>), ...(op.data as Record<string, unknown>) };
@@ -227,4 +262,5 @@ async function applyOne(ctx: Ctx, op: ResolvedOperation, status: Status, refIds:
       where id = $1`,
     [op.targetId, ...meta, ...cols.params],
   );
+  return "applied";
 }

@@ -1,11 +1,16 @@
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+// Browser-safe part of the shared package (zod schemas only), compiled from source.
+export const sharedExtraction = fileURLToPath(new URL("../../packages/shared/src/extraction.ts", import.meta.url));
+
 export default defineConfig({
   // Only VITE_* variables reach the bundle; server secrets must never use this prefix.
   envPrefix: "VITE_",
+  resolve: { alias: { "@czyzyk/shared/extraction": sharedExtraction } },
   plugins: [
     react(),
     tailwindcss(),

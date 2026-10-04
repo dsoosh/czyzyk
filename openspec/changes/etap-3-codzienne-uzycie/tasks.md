@@ -8,9 +8,9 @@
 
 ## 2. Przegląd ekstrakcji
 
-- [ ] 2.1 Kolumny `reviewed_by`, `reviewed_at`, `pending_patch`, widok `review_queue`, RPC `review_item` (tylko admin); weryfikacja: testy bazy (zatwierdź, popraw, odrzuć, `family` odrzucony)
-- [ ] 2.2 Worker: ochrona decyzji admina (propozycja do kolejki zamiast nadpisania); weryfikacja: test zapisu operacji na elemencie z `reviewed_at`
-- [ ] 2.3 Ekran kolejki w panelu admina z licznikiem na zakładce i formularzem poprawy (walidacja wspólnym schematem zod); weryfikacja: testy komponentów
+- [x] 2.1 Kolumny `reviewed_by`, `reviewed_at`, `pending_patch`, widok `review_queue`, RPC `review_item` (tylko admin); weryfikacja: testy bazy (zatwierdź, popraw, odrzuć, `family` odrzucony)
+- [x] 2.2 Worker: ochrona decyzji admina (propozycja do kolejki zamiast nadpisania); weryfikacja: test zapisu operacji na elemencie z `reviewed_at`
+- [x] 2.3 Ekran kolejki w panelu admina z licznikiem na zakładce i formularzem poprawy (walidacja wspólnym schematem zod); weryfikacja: testy komponentów
 
 ## 3. iCal
 
