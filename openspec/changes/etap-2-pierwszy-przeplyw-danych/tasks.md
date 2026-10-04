@@ -7,9 +7,9 @@
 
 ## 2. API ingestu
 
-- [ ] 2.1 Middleware tokenu urządzenia (hash, `revoked_at`, `last_seen_at` z ograniczeniem częstotliwości) i limity zapytań na token i IP; weryfikacja: testy 401 bez tokenu, 401 po unieważnieniu, 429 po przekroczeniu limitu
-- [ ] 2.2 `GET /ingest/config` i `POST /ingest/seen-groups` (upsert grup jako nieśledzonych, bez treści); weryfikacja: test, że nowa nazwa pojawia się w `wa_groups` z `tracked = false`
-- [ ] 2.3 `POST /ingest/notification` (201/200/400/422, aktualizacja `last_notification_at`, logi bez treści); weryfikacja: testy dla każdego kodu odpowiedzi, test idempotencji i deduplikacji, test, że log nie zawiera treści i autora
+- [x] 2.1 Middleware tokenu urządzenia (hash, `revoked_at`, `last_seen_at` z ograniczeniem częstotliwości) i limity zapytań na token i IP; weryfikacja: testy 401 bez tokenu, 401 po unieważnieniu, 429 po przekroczeniu limitu
+- [x] 2.2 `GET /ingest/config` i `POST /ingest/seen-groups` (upsert grup jako nieśledzonych, bez treści); weryfikacja: test, że nowa nazwa pojawia się w `wa_groups` z `tracked = false`
+- [x] 2.3 `POST /ingest/notification` (201/200/400/422, aktualizacja `last_notification_at`, logi bez treści); weryfikacja: testy dla każdego kodu odpowiedzi, test idempotencji i deduplikacji, test, że log nie zawiera treści i autora
 
 ## 3. Ekstrakcja
 
