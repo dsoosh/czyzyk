@@ -5,8 +5,8 @@ const DOMAIN_TABLES = [
   "profiles", "wa_groups", "messages", "attachments", "events", "bring_items",
   "payments", "action_required", "closures", "facts",
 ];
-const ADMIN_TABLES = ["allowed_emails", "devices", "sync_log"];
-const PRIVATE_TABLES = ["chat_threads", "chat_messages", "push_subscriptions", "ical_tokens"];
+const ADMIN_TABLES = ["allowed_emails", "devices", "sync_log", "push_alerts_sent"];
+const PRIVATE_TABLES = ["chat_threads", "chat_messages", "push_subscriptions", "ical_tokens", "push_settings"];
 const ALL_TABLES = [...DOMAIN_TABLES, ...ADMIN_TABLES, ...PRIVATE_TABLES];
 
 let db: TestDb;
@@ -50,11 +50,13 @@ beforeAll(async () => {
   await c.query("insert into facts (category, label, value) values ('godziny', 'Otwarcie', '6:30–17:00')");
   await c.query("insert into devices (name, token_hash) values ('Telefon', 'hash')");
   await c.query("insert into sync_log (kind, status) values ('notification', 'ok')");
+  await c.query("insert into push_alerts_sent (kind, item_id) values ('closure', gen_random_uuid())");
   for (const uid of [familyId, otherFamilyId]) {
     const { rows: t } = await c.query("insert into chat_threads (user_id, title) values ($1, 'Wątek') returning id", [uid]);
     await c.query("insert into chat_messages (thread_id, user_id, role, content) values ($1, $2, 'user', 'kiedy bal?')", [t[0].id, uid]);
     await c.query("insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ($1, $2, 'p', 'a')", [uid, `https://push/${uid}`]);
     await c.query("insert into ical_tokens (user_id, token_hash) values ($1, $2)", [uid, `h-${uid}`]);
+    await c.query("insert into push_settings (user_id) values ($1)", [uid]);
   }
 });
 

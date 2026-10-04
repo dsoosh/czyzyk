@@ -4,6 +4,8 @@ import type { DestinationStream } from "pino";
 import type { ApiConfig } from "./config.js";
 import { icalRoutes } from "./ical/routes.js";
 import { ingestRoutes } from "./ingest/routes.js";
+import { pushRoutes } from "./push/routes.js";
+import { createSessionVerifier, type SessionVerifier } from "./push/session.js";
 import { RateLimiter } from "./rateLimit.js";
 
 export interface AppDeps {
@@ -11,6 +13,8 @@ export interface AppDeps {
   /** Overrides the log destination (tests inspect what gets logged). */
   logStream?: DestinationStream;
   now?: () => number;
+  /** Overrides session verification for /push/* (tests verify against a local key set). */
+  verifySession?: SessionVerifier;
 }
 
 /**
@@ -18,7 +22,8 @@ export interface AppDeps {
  * and ids: bodies and credentials are never logged because they hold group messages.
  */
 export function buildApp(
-  config: Pick<ApiConfig, "LOG_LEVEL" | "NODE_ENV" | "INGEST_RATE_LIMIT_PER_IP" | "INGEST_RATE_LIMIT_PER_TOKEN">,
+  config: Pick<ApiConfig, "LOG_LEVEL" | "NODE_ENV" | "INGEST_RATE_LIMIT_PER_IP" | "INGEST_RATE_LIMIT_PER_TOKEN"> &
+    Partial<Pick<ApiConfig, "SUPABASE_URL" | "SUPABASE_JWT_SECRET" | "PWA_ORIGIN">>,
   deps: AppDeps,
 ): FastifyInstance {
   const silent = config.NODE_ENV === "test" && !deps.logStream;
@@ -44,6 +49,18 @@ export function buildApp(
     perToken: new RateLimiter(config.INGEST_RATE_LIMIT_PER_TOKEN, deps.now),
   };
   app.register(ingestRoutes, { prefix: "/ingest", db: deps.db, limits });
+  const verify =
+    deps.verifySession ??
+    (config.SUPABASE_URL
+      ? createSessionVerifier({ supabaseUrl: config.SUPABASE_URL, jwtSecret: config.SUPABASE_JWT_SECRET })
+      : null);
+  app.register(pushRoutes, {
+    prefix: "/push",
+    db: deps.db,
+    verify,
+    origins: config.PWA_ORIGIN ?? [],
+    perIp: new RateLimiter(config.INGEST_RATE_LIMIT_PER_IP, deps.now),
+  });
   app.register(icalRoutes, { prefix: "/ical", db: deps.db, perIp: new RateLimiter(config.INGEST_RATE_LIMIT_PER_IP, deps.now) });
 
   return app;

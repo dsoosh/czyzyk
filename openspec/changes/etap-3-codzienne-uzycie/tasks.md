@@ -19,7 +19,7 @@
 
 ## 4. Push
 
-- [ ] 4.1 `/push/subscribe`, `/push/unsubscribe`, ustawienia godziny i rodzajów alertów; weryfikacja: testy API z prawdziwą weryfikacją JWT na kluczu testowym
+- [x] 4.1 `/push/subscribe`, `/push/unsubscribe`, ustawienia godziny i rodzajów alertów; weryfikacja: testy API z prawdziwą weryfikacją JWT na kluczu testowym
 - [ ] 4.2 Usługa `services/cron` ze skrótem wieczornym (raz dziennie, pomijanie pustych dni, tekst skrótu) i sprzątaniem 404/410; weryfikacja: testy z kontrolowanym zegarem i atrapą `web-push`
 - [ ] 4.3 Alerty natychmiastowe z workera (`push-alert`, jednokrotność); weryfikacja: test, że dwie ekstrakcje tego samego dnia wolnego dają jeden alert
 - [ ] 4.4 Service worker PWA (wyświetlenie, kliknięcie otwiera „Dziś i jutro”) i onboarding iOS; weryfikacja: ręczny test na Androidzie i iPhonie, wynik w PR

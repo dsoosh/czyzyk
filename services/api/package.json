@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@czyzyk/shared": "*",
+    "@fastify/cors": "^11.3.0",
     "fastify": "^5.12.0",
+    "jose": "^6.2.12",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "zod": "^4.1.0"
