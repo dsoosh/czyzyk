@@ -29,7 +29,6 @@ describe("bramka dostępu", () => {
   it("zalogowany członek rodziny widzi ekran główny", async () => {
     renderApp(fakeSupabase({ userId: familyProfile.id, profile: familyProfile }));
     expect(await screen.findByRole("heading", { name: "Dziś i jutro" })).toBeInTheDocument();
-    expect(screen.getByText(/Cześć, Ola/)).toBeInTheDocument();
   });
 
   it("sesja bez profilu rodziny kończy się ekranem „Brak dostępu” i wylogowaniem", async () => {

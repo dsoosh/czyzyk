@@ -27,6 +27,9 @@ export function Layout() {
         <NavLink to="/" end className={tabClass}>
           Dziś
         </NavLink>
+        <NavLink to="/kalendarz" className={tabClass}>
+          Kalendarz
+        </NavLink>
         {profile.role === "admin" && (
           <NavLink to="/admin" className={tabClass}>
             Admin

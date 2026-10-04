@@ -22,8 +22,8 @@
 
 ## 4. Panel admina: urządzenia i grupy
 
-- [ ] 4.1 Ekran „Urządzenia”: lista z ostatnim kontaktem, dodanie (token + kod QR pokazany raz), unieważnienie; weryfikacja: test komponentu – token znika po zamknięciu okna
-- [ ] 4.2 Ekran „Grupy”: lista wykrytych grup, przełącznik śledzenia, nazwa wyświetlana; weryfikacja: test komponentu wywołuje `admin_update_group` z poprawnymi argumentami
+- [x] 4.1 Ekran „Urządzenia”: lista z ostatnim kontaktem, dodanie (token + kod QR pokazany raz), unieważnienie; weryfikacja: test komponentu – token znika po zamknięciu okna
+- [x] 4.2 Ekran „Grupy”: lista wykrytych grup, przełącznik śledzenia, nazwa wyświetlana; weryfikacja: test komponentu wywołuje `admin_update_group` z poprawnymi argumentami
 
 ## 5. Android: czytnik powiadomień
 
@@ -35,9 +35,9 @@
 
 ## 6. PWA: ekrany treści
 
-- [ ] 6.1 Ekran „Dziś i jutro” (sekcje, puste stany, baner dnia wolnego, etykiety grup, odświeżanie przy powrocie); weryfikacja: testy komponentu z ustalonym zegarem (jutro bal, element `needs_review` ukryty, baner dnia wolnego)
-- [ ] 6.2 Kalendarz – widok listy i miesiąca, szczegóły wydarzenia; weryfikacja: testy komponentu (odwołane ukryte, wybór dnia, zmiana miesiąca)
-- [ ] 6.3 Widok źródła „skąd to wiem” (kontekst ±10, wyróżnienie, uzasadnienie, słowna pewność); weryfikacja: test komponentu z danymi z `message_context`
+- [x] 6.1 Ekran „Dziś i jutro” (sekcje, puste stany, baner dnia wolnego, etykiety grup, odświeżanie przy powrocie); weryfikacja: testy komponentu z ustalonym zegarem (jutro bal, element `needs_review` ukryty, baner dnia wolnego)
+- [x] 6.2 Kalendarz – widok listy i miesiąca, szczegóły wydarzenia; weryfikacja: testy komponentu (odwołane ukryte, wybór dnia, zmiana miesiąca)
+- [x] 6.3 Widok źródła „skąd to wiem” (kontekst ±10, wyróżnienie, uzasadnienie, słowna pewność); weryfikacja: test komponentu z danymi z `message_context`
 
 ## 7. Integracja
 

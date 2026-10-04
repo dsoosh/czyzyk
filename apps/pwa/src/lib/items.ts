@@ -1,0 +1,221 @@
+import { addDays, startOfWarsawDay } from "./dates";
+import type { Db } from "./supabase";
+
+export type ItemKind = "event" | "bring_item" | "payment" | "action_required" | "closure" | "fact";
+
+export const ITEM_TABLES: Record<ItemKind, string> = {
+  event: "events",
+  bring_item: "bring_items",
+  payment: "payments",
+  action_required: "action_required",
+  closure: "closures",
+  fact: "facts",
+};
+
+interface Provenance {
+  id: string;
+  group_id: string | null;
+  source_message_ids: string[];
+  confidence: number | null;
+  rationale: string | null;
+  status: "active" | "needs_review" | "cancelled";
+}
+
+export interface EventItem extends Provenance {
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  all_day: boolean;
+  location: string | null;
+}
+export interface BringItem extends Provenance {
+  event_id: string | null;
+  description: string;
+  due_date: string | null;
+  packed_by: string | null;
+  packed_at: string | null;
+}
+export interface Payment extends Provenance {
+  description: string;
+  amount_pln: number | string | null;
+  due_date: string | null;
+  paid_at: string | null;
+}
+export interface ActionRequired extends Provenance {
+  question: string;
+  due_date: string | null;
+  resolved_at: string | null;
+}
+export interface Closure extends Provenance {
+  date_from: string;
+  date_to: string;
+  reason: string | null;
+}
+export interface Group {
+  id: string;
+  wa_name: string;
+  display_name: string | null;
+  tracked: boolean;
+}
+
+const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, status";
+export const EVENT_COLUMNS = `${PROVENANCE}, title, starts_at, ends_at, all_day, location`;
+export const BRING_COLUMNS = `${PROVENANCE}, event_id, description, due_date, packed_by, packed_at`;
+export const PAYMENT_COLUMNS = `${PROVENANCE}, description, amount_pln, due_date, paid_at`;
+export const ACTION_COLUMNS = `${PROVENANCE}, question, due_date, resolved_at`;
+export const CLOSURE_COLUMNS = `${PROVENANCE}, date_from, date_to, reason`;
+
+async function run<T>(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
+/** Display names of groups; items without a group belong to the whole kindergarten. */
+export async function fetchGroupNames(db: Db): Promise<Map<string, string>> {
+  const groups = await run<Group[]>(db.from("wa_groups").select("id, wa_name, display_name, tracked"));
+  return new Map(groups.map((g) => [g.id, g.display_name ?? g.wa_name]));
+}
+
+export function groupLabel(names: Map<string, string>, groupId: string | null): string {
+  return groupId ? (names.get(groupId) ?? "grupa") : "całe przedszkole";
+}
+
+export interface TodayData {
+  bringTomorrow: BringItem[];
+  events: EventItem[];
+  payments: Payment[];
+  actions: ActionRequired[];
+  closures: Closure[];
+  groups: Map<string, string>;
+}
+
+/** Everything the home screen shows; only active items (needs_review stays hidden). */
+export async function fetchToday(db: Db, today: string): Promise<TodayData> {
+  const tomorrow = addDays(today, 1);
+  const [bringTomorrow, events, payments, actions, closures, groups] = await Promise.all([
+    run<BringItem[]>(
+      db.from("bring_items").select(BRING_COLUMNS).eq("status", "active").eq("due_date", tomorrow).order("description"),
+    ),
+    run<EventItem[]>(
+      db
+        .from("events")
+        .select(EVENT_COLUMNS)
+        .eq("status", "active")
+        .gte("starts_at", startOfWarsawDay(today).toISOString())
+        .lt("starts_at", startOfWarsawDay(addDays(today, 8)).toISOString())
+        .order("starts_at"),
+    ),
+    run<Payment[]>(
+      db
+        .from("payments")
+        .select(PAYMENT_COLUMNS)
+        .eq("status", "active")
+        .is("paid_at", null)
+        .not("due_date", "is", null)
+        .lte("due_date", addDays(today, 14))
+        .order("due_date"),
+    ),
+    run<ActionRequired[]>(
+      db.from("action_required").select(ACTION_COLUMNS).eq("status", "active").is("resolved_at", null).order("due_date"),
+    ),
+    run<Closure[]>(
+      db
+        .from("closures")
+        .select(CLOSURE_COLUMNS)
+        .eq("status", "active")
+        .gte("date_to", today)
+        .lte("date_from", addDays(today, 7))
+        .order("date_from"),
+    ),
+    fetchGroupNames(db),
+  ]);
+  return { bringTomorrow, events, payments, actions, closures, groups };
+}
+
+export interface CalendarData {
+  events: EventItem[];
+  closures: Closure[];
+  groups: Map<string, string>;
+}
+
+/** Active events and closures between two days (inclusive). */
+export async function fetchCalendar(db: Db, fromDay: string, toDay: string): Promise<CalendarData> {
+  const [events, closures, groups] = await Promise.all([
+    run<EventItem[]>(
+      db
+        .from("events")
+        .select(EVENT_COLUMNS)
+        .eq("status", "active")
+        .gte("starts_at", startOfWarsawDay(fromDay).toISOString())
+        .lt("starts_at", startOfWarsawDay(addDays(toDay, 1)).toISOString())
+        .order("starts_at")
+        .limit(500),
+    ),
+    run<Closure[]>(
+      db
+        .from("closures")
+        .select(CLOSURE_COLUMNS)
+        .eq("status", "active")
+        .gte("date_to", fromDay)
+        .lte("date_from", toDay)
+        .order("date_from"),
+    ),
+    fetchGroupNames(db),
+  ]);
+  return { events, closures, groups };
+}
+
+export async function fetchEvent(db: Db, id: string) {
+  const [event, bring, groups] = await Promise.all([
+    run<EventItem | null>(db.from("events").select(EVENT_COLUMNS).eq("id", id).maybeSingle()),
+    run<BringItem[]>(db.from("bring_items").select(BRING_COLUMNS).eq("event_id", id).eq("status", "active").order("due_date")),
+    fetchGroupNames(db),
+  ]);
+  return { event, bring, groups };
+}
+
+export interface ContextMessage {
+  id: string;
+  group_id: string;
+  author: string;
+  sent_at: string;
+  text: string;
+  has_attachment: boolean;
+  status: string;
+}
+
+export interface SourceData {
+  item: (Provenance & Record<string, unknown>) | null;
+  messages: ContextMessage[];
+}
+
+/** An item's provenance and its first source message with surrounding conversation. */
+export async function fetchSource(db: Db, kind: ItemKind, id: string, before: number): Promise<SourceData> {
+  const item = await run<(Provenance & Record<string, unknown>) | null>(
+    db.from(ITEM_TABLES[kind]).select("*").eq("id", id).maybeSingle(),
+  );
+  const first = item?.source_message_ids?.[0];
+  if (!item || !first) return { item, messages: [] };
+  const messages = await run<ContextMessage[]>(
+    db.rpc("message_context", { p_message_id: first, p_before: before, p_after: 10 }),
+  );
+  return { item, messages };
+}
+
+export function confidenceLabel(confidence: number | null): string {
+  if (confidence == null) return "nieznana";
+  if (confidence >= 0.85) return "wysoka";
+  if (confidence >= 0.7) return "średnia";
+  return "niska";
+}
+
+export function formatAmount(amount: number | string | null): string {
+  if (amount == null) return "";
+  return `${Number(amount).toLocaleString("pl-PL", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} zł`;
+}
+
+export function itemTitle(kind: ItemKind, item: Record<string, unknown>): string {
+  const field = { event: "title", bring_item: "description", payment: "description", action_required: "question", closure: "reason", fact: "label" }[kind];
+  return String(item[field] ?? (kind === "closure" ? "Dzień wolny" : ""));
+}
