@@ -16,7 +16,7 @@
 
 - [x] 3.1 Migracja `0002_auth.sql`: hook `hook_before_user_created`, trigger tworzący profil z rolą i nazwą z metadanych Google, FK `profiles.email → allowed_emails` z cascade; weryfikacja: testy „obcy e-mail odrzucony z 403”, „e-mail o innej wielkości liter przyjęty”, „profil admina ma rolę admin”, „usunięcie z listy kasuje profil i odbiera odczyt”
 - [x] 3.2 Migracja `0003_admin_rpc.sql`: `admin_upsert_allowed_email(email, role)`, `admin_delete_allowed_email(email)` z blokadą usunięcia/zdegradowania siebie; weryfikacja: testy „admin dodaje”, „admin nie usuwa siebie”, „family dostaje błąd uprawnień”, „osoba spoza rodziny dostaje błąd uprawnień”
-- [ ] 3.3 `supabase/config.toml`: tylko dostawca Google, wyłączone e-mail/hasło i magic link, hook zarejestrowany; weryfikacja: `supabase db lint`/przegląd pliku oraz opis w `docs/wdrozenie.md`
+- [x] 3.3 `supabase/config.toml`: tylko dostawca Google, wyłączone e-mail/hasło i magic link, hook zarejestrowany; weryfikacja: `supabase db lint`/przegląd pliku oraz opis w `docs/wdrozenie.md`
 
 ## 4. Usługi serwerowe
 
@@ -33,5 +33,5 @@
 ## 6. Wdrożenie i dokumentacja
 
 - [x] 6.1 `railway.json` dla `api`, `worker`, `pwa` oraz `.env.example` w każdym pakiecie; weryfikacja: lokalne `npm run build && npm start` w każdej usłudze startuje z wartościami z `.env.example`
-- [ ] 6.2 `README.md` (struktura, uruchomienie lokalne, testy, workflow OpenSpec) i `docs/wdrozenie.md` (Supabase UE, Google OAuth, hook, pierwszy admin, Railway); weryfikacja: kroki z README wykonane na czystym klonie dają zielone `npm test`
+- [x] 6.2 `README.md` (struktura, uruchomienie lokalne, testy, workflow OpenSpec) i `docs/wdrozenie.md` (Supabase UE, Google OAuth, hook, pierwszy admin, Railway); weryfikacja: kroki z README wykonane na czystym klonie dają zielone `npm test`
 - [ ] 6.3 Weryfikacja kryterium etapu na projekcie chmurowym: logowanie adresem z listy działa, adres spoza listy dostaje „Brak dostępu” i nie pojawia się w `auth.users`; wynik odnotowany w PR
