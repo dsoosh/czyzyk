@@ -2,7 +2,17 @@
 
 Źródło danych dla asystenta przedszkolnego: czytnik powiadomień WhatsApp (etap 2) i eksport na klik z kontrolą obrazów na telefonie (etap 4). Instalowana ręcznie z pliku APK, poza Sklepem Play.
 
-Na etapie 1 to pusty szkielet: Kotlin, Jetpack Compose, minSdk 26, jedna aktywność „Czyżyk”.
+Kotlin, Jetpack Compose, minSdk 26.
+
+## Co robi (etap 2)
+
+- **Parowanie** – link `czyzyk://pair?server=…&token=…` z panelu admina PWA (kod QR, stuknięcie linku albo wklejenie). Adres serwera i token trzymane w `EncryptedSharedPreferences`; po odpowiedzi 401 aplikacja pokazuje „Urządzenie odłączone”.
+- **Czytnik powiadomień** (`capture/CaptureService`) – `NotificationListenerService` dla WhatsApp i WhatsApp Business. Z `MessagingStyle` czyta grupę, autora, treść i czas; pomija czaty prywatne i podsumowania. Placeholdery załączników (📷 Zdjęcie, 📄 dokument…) dostają flagę i zwiększają licznik.
+- **Tylko śledzone grupy** – lista pobierana z `GET /ingest/config` (co 15 min). Z innych grup na serwer trafia wyłącznie nazwa grupy (`POST /ingest/seen-groups`), żeby admin mógł ją włączyć.
+- **Kolejka offline** (`queue/MessageQueue`, SQLite) + WorkManager (`work/SendWorker`) – wiadomość jest zapisywana przed wysyłką i usuwana dopiero po odpowiedzi serwera; ponowienia z wykładniczym backoffem. Klucz idempotencji to UUIDv5 z treści powiadomienia, więc ponownie wyświetlone powiadomienie nie tworzy duplikatu.
+- **Ekran statusu** – parowanie, dostęp do powiadomień, optymalizacja baterii (przyciski do ustawień systemu), liczba wiadomości w kolejce, zaległe załączniki, ostatnia wysyłka, wskazówki („cichy dźwięk zamiast wyciszenia”).
+
+Aplikacja nigdy nic nie wysyła do WhatsAppa i nie korzysta z jego protokołu.
 
 ## Budowanie
 
@@ -11,9 +21,11 @@ Wymaga JDK 17 i Android SDK (platforma 36). Najprościej otworzyć katalog `apps
 ```bash
 cd apps/android
 echo "sdk.dir=$HOME/Android/Sdk" > local.properties   # ścieżka do Android SDK
-./gradlew :app:testDebugUnitTest :app:assembleDebug
+./gradlew :app:testDebugUnitTest :app:assembleDebug   # testy JVM/Robolectric + APK
 # APK: app/build/outputs/apk/debug/app-debug.apk
 ```
+
+CI (GitHub Actions) buduje APK przy każdym pushu – artefakt `czyzyk-debug-apk`.
 
 > Środowisko chmurowe Claude Code nie ma Android SDK ani dostępu do repozytorium Google Maven
 > (`dl.google.com`), więc APK budujemy lokalnie. Wersje AGP, Kotlina i Compose w

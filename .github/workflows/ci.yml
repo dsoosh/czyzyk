@@ -46,6 +46,12 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      - name: Unit test summary
+        if: always()
+        run: |
+          for f in app/build/test-results/testDebugUnitTest/*.xml; do
+            grep -o '<testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$f"
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: czyzyk-debug-apk
