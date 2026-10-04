@@ -1,9 +1,11 @@
 import { Link } from "react-router";
-import { useAuth } from "../auth/AuthProvider";
-import { LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
+import { useAuth, useProfile } from "../auth/AuthProvider";
+import { DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
 import { fetchToday, formatAmount, groupLabel, type Closure } from "../lib/items";
+import { doneLabel } from "../lib/tracking";
 import { useLoader, useOnForeground } from "../lib/useLoader";
+import { useMarkDone } from "../lib/useMarkDone";
 import { useState } from "react";
 
 function closureBanner(c: Closure, today: string): string {
@@ -19,8 +21,10 @@ function closureBanner(c: Closure, today: string): string {
 
 export function TodayPage() {
   const { client } = useAuth();
+  const me = useProfile().id;
   const [today, setToday] = useState(() => warsawDay(new Date()));
   const { data, error, loading, reload } = useLoader(() => fetchToday(client, today), [client, today]);
+  const mark = useMarkDone("bring_item", reload);
 
   // Returning to the app (e.g. after midnight) recomputes "today" and refreshes the data.
   useOnForeground(() => {
@@ -46,15 +50,31 @@ export function TodayPage() {
         </div>
       ))}
 
+      {mark.error && (
+        <p role="alert" className="text-red-700">
+          {mark.error}
+        </p>
+      )}
+
       <Section title="Na jutro przynieść" empty="Na jutro nic do przyniesienia">
         {data.bringTomorrow.map((b) => (
           <Row key={b.id}>
-            <span className={b.packed_at ? "text-slate-400 line-through" : "font-medium"}>{b.description}</span>
-            <Meta>
-              <span>{g(b.group_id)}</span>
-              {b.packed_at && <span>spakowane</span>}
-              <SourceLink kind="bring_item" id={b.id} />
-            </Meta>
+            <div className="flex items-start gap-3">
+              <DoneToggle
+                checked={b.packed_at != null}
+                label={b.description}
+                disabled={mark.pending === b.id}
+                onToggle={() => void mark.toggle(b.id, b.packed_at == null)}
+              />
+              <div className="flex flex-1 flex-col gap-1">
+                <span className={b.packed_at ? "text-slate-400 line-through" : "font-medium"}>{b.description}</span>
+                <Meta>
+                  {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
+                  <span>{g(b.group_id)}</span>
+                  <SourceLink kind="bring_item" id={b.id} />
+                </Meta>
+              </div>
+            </div>
           </Row>
         ))}
       </Section>

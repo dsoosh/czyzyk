@@ -2,9 +2,9 @@
 
 ## 1. Oznaczanie wykonania
 
-- [ ] 1.1 Migracja `0005_tracking.sql`: RPC `mark_packed`, `mark_paid`, `mark_resolved`; weryfikacja: testy bazy (zapis wykonawcy i czasu, cofnięcie, odrzucenie dla osoby spoza rodziny, brak zmiany innych pól)
-- [ ] 1.2 Ekrany „Do przyniesienia”, „Płatności”, „Wymaga odpowiedzi”, „Dni wolne” w PWA; weryfikacja: testy komponentów (kto i kiedy, po terminie na górze, załatwione zwinięte)
-- [ ] 1.3 Checklista na ekranie „Dziś i jutro”; weryfikacja: test komponentu wywołuje `mark_packed` i aktualizuje widok
+- [x] 1.1 Migracja `0005_tracking.sql`: RPC `mark_packed`, `mark_paid`, `mark_resolved`; weryfikacja: testy bazy (zapis wykonawcy i czasu, cofnięcie, odrzucenie dla osoby spoza rodziny, brak zmiany innych pól)
+- [x] 1.2 Ekrany „Do przyniesienia”, „Płatności”, „Wymaga odpowiedzi”, „Dni wolne” w PWA; weryfikacja: testy komponentów (kto i kiedy, po terminie na górze, załatwione zwinięte)
+- [x] 1.3 Checklista na ekranie „Dziś i jutro”; weryfikacja: test komponentu wywołuje `mark_packed` i aktualizuje widok
 
 ## 2. Przegląd ekstrakcji
 

@@ -17,6 +17,12 @@ export interface FakeOptions {
   rpcError?: string;
 }
 
+const MARKS: Record<string, { table: string; by: string; at: string }> = {
+  mark_packed: { table: "bring_items", by: "packed_by", at: "packed_at" },
+  mark_paid: { table: "payments", by: "paid_by", at: "paid_at" },
+  mark_resolved: { table: "action_required", by: "resolved_by", at: "resolved_at" },
+};
+
 function compare(a: unknown, b: unknown): number {
   if (typeof a === "number" && typeof b === "number") return a - b;
   return String(a).localeCompare(String(b));
@@ -93,6 +99,14 @@ export function fakeSupabase(options: FakeOptions = {}) {
     if (options.rpcError) return { data: null, error: { message: options.rpcError } };
     const handler = options.rpc?.[name];
     if (handler) return { data: handler(args, tables), error: null };
+    const mark = MARKS[name];
+    if (mark) {
+      const row = (tables[mark.table] ?? []).find((r) => r.id === args.p_id);
+      if (!row) return { data: null, error: { message: "not found" } };
+      row[mark.by] = args.p_done ? options.userId : null;
+      row[mark.at] = args.p_done ? new Date().toISOString() : null;
+      return { data: row, error: null };
+    }
     if (name === "admin_upsert_allowed_email") {
       const list = tables.allowed_emails!;
       const existing = list.find((r) => r.email === args.p_email);

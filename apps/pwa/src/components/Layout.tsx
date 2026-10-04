@@ -27,6 +27,9 @@ export function Layout() {
         <NavLink to="/" end className={tabClass}>
           Dziś
         </NavLink>
+        <NavLink to="/listy" className={tabClass}>
+          Listy
+        </NavLink>
         <NavLink to="/kalendarz" className={tabClass}>
           Kalendarz
         </NavLink>

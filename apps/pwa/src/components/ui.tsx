@@ -45,3 +45,36 @@ export function LoadError({ message, onRetry }: { message: string; onRetry: () =
     </div>
   );
 }
+
+/** A tappable checklist row: marks the item done (or undoes it) for the whole family. */
+export function DoneToggle({
+  checked,
+  label,
+  disabled,
+  onToggle,
+}: {
+  checked: boolean;
+  label: string;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onToggle}
+      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 ${
+        checked ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white"
+      } disabled:opacity-50`}
+    >
+      {checked && (
+        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+          <path d="M7.6 13.2 4.4 10l-1.2 1.2 4.4 4.4 9.2-9.2-1.2-1.2z" />
+        </svg>
+      )}
+    </button>
+  );
+}

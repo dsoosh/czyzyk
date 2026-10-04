@@ -7,6 +7,11 @@ import { DevicesPage } from "./pages/admin/DevicesPage";
 import { GroupsPage } from "./pages/admin/GroupsPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { EventPage } from "./pages/EventPage";
+import { ActionsPage } from "./pages/lists/ActionsPage";
+import { BringListPage } from "./pages/lists/BringListPage";
+import { ClosuresPage } from "./pages/lists/ClosuresPage";
+import { ListsLayout } from "./pages/lists/ListsLayout";
+import { PaymentsPage } from "./pages/lists/PaymentsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NoAccessPage } from "./pages/NoAccessPage";
 import { SourcePage } from "./pages/SourcePage";
@@ -39,6 +44,12 @@ export function App() {
             <Route path="kalendarz" element={<CalendarPage />} />
             <Route path="kalendarz/wydarzenie/:id" element={<EventPage />} />
             <Route path="zrodlo/:kind/:id" element={<SourcePage />} />
+            <Route path="listy" element={<ListsLayout />}>
+              <Route index element={<BringListPage />} />
+              <Route path="platnosci" element={<PaymentsPage />} />
+              <Route path="sprawy" element={<ActionsPage />} />
+              <Route path="dni-wolne" element={<ClosuresPage />} />
+            </Route>
             {state.profile.role === "admin" && (
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<AllowedEmailsPage />} />

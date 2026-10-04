@@ -1,5 +1,6 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { familyProfile } from "../test/fakeSupabase";
 import { fixtures as f, renderAt } from "../test/render";
 
 beforeEach(() => {
@@ -76,5 +77,29 @@ describe("Dziś i jutro", () => {
     expect(await screen.findByText("kalosze")).toBeInTheDocument();
     expect(screen.queryByText("przebranie")).not.toBeInTheDocument();
     expect(from.mock.calls.length).toBeGreaterThan(calls);
+  });
+});
+
+describe("Checklista „Na jutro przynieść”", () => {
+  it("stuknięcie wywołuje mark_packed, przekreśla rzecz i podpisuje „spakowane przez Ciebie”", async () => {
+    const { rpc } = renderAt("/", { tables: { wa_groups: f.groups, bring_items: [f.bring()] } });
+    const box = await screen.findByRole("checkbox", { name: "przebranie" });
+    await act(async () => fireEvent.click(box));
+    expect(rpc).toHaveBeenCalledWith("mark_packed", { p_id: "b1", p_done: true });
+    const list = section("Na jutro przynieść");
+    expect(await within(list).findByText("spakowane przez Ciebie, 16:00")).toBeInTheDocument();
+    expect(within(list).getByText("przebranie")).toHaveClass("line-through");
+  });
+
+  it("drugi rodzic widzi, kto spakował", async () => {
+    renderAt("/", {
+      admin: true,
+      tables: {
+        wa_groups: f.groups,
+        profiles: [{ ...familyProfile }],
+        bring_items: [f.bring({ packed_by: familyProfile.id, packed_at: "2026-10-08T18:15:00Z" })],
+      },
+    });
+    expect(await screen.findByText("spakowane: Ola, 20:15")).toBeInTheDocument();
   });
 });

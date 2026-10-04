@@ -10,8 +10,8 @@ Wspólne dla całej rodziny listy rzeczy do przyniesienia, płatności, spraw do
 PWA SHALL pokazywać aktywne rzeczy do przyniesienia pogrupowane po dniu, z nadchodzącymi na górze, oraz dla spakowanych – kto i kiedy spakował.
 
 #### Scenario: Spakowana rzecz
-- **WHEN** Ola oznaczyła „przebranie” jako spakowane o 20:15
-- **THEN** wszyscy członkowie rodziny widzą przy „przebranie” „spakowała Ola, 20:15”
+- **WHEN** Ola oznacza „przebranie” jako spakowane o 20:15
+- **THEN** wszyscy członkowie rodziny widzą przy „przebranie” „spakowane: Ola, 20:15” (forma bezosobowa, bez zgadywania rodzaju gramatycznego z imienia)
 
 ### Requirement: Oznaczanie wykonania przez wąskie operacje
 Członek rodziny SHALL móc oznaczyć rzecz jako spakowaną, płatność jako zapłaconą i sprawę jako załatwioną, a także cofnąć to oznaczenie. Operacja MUST zapisywać wyłącznie wykonawcę (bieżącego użytkownika) i czas, bez możliwości zmiany innych pól.

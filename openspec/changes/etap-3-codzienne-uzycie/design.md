@@ -34,6 +34,10 @@ Generowanie ręczne (RFC 5545, bez biblioteki – mały podzbiór: `VEVENT`, `DT
 ### D5. Onboarding iOS
 Wykrycie `navigator.standalone === false` i UA iOS; ekran instrukcji z ilustracją. Przycisk zgody tylko w trybie standalone.
 
+### D6. Listy i podpis wykonawcy
+Cztery listy pod jedną zakładką „Listy” (podzakładki jak w panelu admina), zamiast czterech nowych zakładek na dolnym pasku. Podpis wykonawcy w formie bezosobowej: „spakowane: Ola, 20:15”, a dla bieżącego użytkownika „spakowane przez Ciebie”. Po każdym oznaczeniu widok jest odświeżany z bazy.
+- *Alternatywa:* „spakowała Ola” – wymaga znajomości rodzaju gramatycznego, którego nie da się wiarygodnie wywnioskować z imienia; osobne zakładki na dole – za mało miejsca na telefonie.
+
 ## Risks / Trade-offs
 
 - [Kalendarze klientów odświeżają feed rzadko (Google do 24 h)] → komunikat w UI; alerty push pokrywają pilne zmiany.

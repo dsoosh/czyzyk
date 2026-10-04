@@ -39,11 +39,13 @@ export interface Payment extends Provenance {
   description: string;
   amount_pln: number | string | null;
   due_date: string | null;
+  paid_by: string | null;
   paid_at: string | null;
 }
 export interface ActionRequired extends Provenance {
   question: string;
   due_date: string | null;
+  resolved_by: string | null;
   resolved_at: string | null;
 }
 export interface Closure extends Provenance {
@@ -61,11 +63,11 @@ export interface Group {
 const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, status";
 export const EVENT_COLUMNS = `${PROVENANCE}, title, starts_at, ends_at, all_day, location`;
 export const BRING_COLUMNS = `${PROVENANCE}, event_id, description, due_date, packed_by, packed_at`;
-export const PAYMENT_COLUMNS = `${PROVENANCE}, description, amount_pln, due_date, paid_at`;
-export const ACTION_COLUMNS = `${PROVENANCE}, question, due_date, resolved_at`;
+export const PAYMENT_COLUMNS = `${PROVENANCE}, description, amount_pln, due_date, paid_by, paid_at`;
+export const ACTION_COLUMNS = `${PROVENANCE}, question, due_date, resolved_by, resolved_at`;
 export const CLOSURE_COLUMNS = `${PROVENANCE}, date_from, date_to, reason`;
 
-async function run<T>(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
+export async function run<T>(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return data as T;
@@ -75,6 +77,14 @@ async function run<T>(query: PromiseLike<{ data: unknown; error: { message: stri
 export async function fetchGroupNames(db: Db): Promise<Map<string, string>> {
   const groups = await run<Group[]>(db.from("wa_groups").select("id, wa_name, display_name, tracked"));
   return new Map(groups.map((g) => [g.id, g.display_name ?? g.wa_name]));
+}
+
+/** First names of family members by profile id. */
+export async function fetchPeople(db: Db): Promise<Map<string, string>> {
+  const rows = await run<{ id: string; email: string; display_name: string | null }[]>(
+    db.from("profiles").select("id, email, display_name"),
+  );
+  return new Map(rows.map((p) => [p.id, (p.display_name?.trim() || p.email.split("@")[0]!).split(/\s+/)[0]!]));
 }
 
 export function groupLabel(names: Map<string, string>, groupId: string | null): string {
@@ -88,12 +98,13 @@ export interface TodayData {
   actions: ActionRequired[];
   closures: Closure[];
   groups: Map<string, string>;
+  people: Map<string, string>;
 }
 
 /** Everything the home screen shows; only active items (needs_review stays hidden). */
 export async function fetchToday(db: Db, today: string): Promise<TodayData> {
   const tomorrow = addDays(today, 1);
-  const [bringTomorrow, events, payments, actions, closures, groups] = await Promise.all([
+  const [bringTomorrow, events, payments, actions, closures, groups, people] = await Promise.all([
     run<BringItem[]>(
       db.from("bring_items").select(BRING_COLUMNS).eq("status", "active").eq("due_date", tomorrow).order("description"),
     ),
@@ -129,8 +140,9 @@ export async function fetchToday(db: Db, today: string): Promise<TodayData> {
         .order("date_from"),
     ),
     fetchGroupNames(db),
+    fetchPeople(db),
   ]);
-  return { bringTomorrow, events, payments, actions, closures, groups };
+  return { bringTomorrow, events, payments, actions, closures, groups, people };
 }
 
 export interface CalendarData {
