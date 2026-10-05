@@ -67,7 +67,7 @@ Workflow [`Railway`](../.github/workflows/railway.yml) uruchamia Railway CLI na 
 
 **Nazwy usług.** Railway dopasowuje usługi z pliku po nazwie i nie umie zmienić nazwy istniejącej usługi. Dlatego plik używa nazw, które Railway nadał automatycznie przy imporcie monorepo: `@czyzyk/api`, `@czyzyk/worker`, `@czyzyk/pwa` (oraz nowa `@czyzyk/cron`). Plan nie powinien nigdy pokazywać usunięcia tych usług – jeśli pokazuje, nie uruchamiaj `apply-destructive`. Odwołania między usługami (domena API dla PWA, domena PWA i adres Supabase dla API, publiczny klucz VAPID) są strukturalnymi referencjami Railway, a nie napisami `${{…}}`.
 
-Potem działa samo: PR zmieniający `.railway/**` dostaje `plan`, a scalenie do `main` robi `apply` (nigdy nie usuwa zasobów – do tego służy ręczna akcja `apply-destructive`). Z tego samego miejsca: `status`, `logs` i `build-logs` wybranej usługi, `redeploy`.
+Potem działa samo: PR zmieniający `.railway/**` dostaje `plan`, a scalenie do `main` robi `apply` (nigdy nie usuwa zasobów – do tego służy ręczna akcja `apply-destructive`). Z tego samego miejsca: `status`, `logs` i `build-logs` wybranej usługi, `redeploy` i `domain`.
 
 ### Lokalnie (opcjonalnie)
 
@@ -95,7 +95,7 @@ railway variables --service api --set "DATABASE_URL=postgres://…"
 
 Pozostałe zmienne (np. `CZYZYK_SERVICE`, `EXTRACTION_MODEL`, limity) ustawia plik. `VITE_API_URL` dla PWA jest referencją do publicznej domeny usługi `@czyzyk/api` (sama domena; PWA dopisuje `https://`).
 
-Domeny: dla `pwa` i `api` włącz *Generate Domain* w dashboardzie (lub dopisz je do pliku i zastosuj). **Zawsze czytaj `railway config plan` przed `apply`** – apply jest deklaratywny i usuwa to, czego nie ma w pliku (wymaga wtedy potwierdzenia).
+Domeny: `@czyzyk/pwa` i `@czyzyk/api` muszą mieć publiczną domenę – bez domeny API referencja `VITE_API_URL` jest pusta. Najprościej: **Actions → Railway → Run workflow → `domain`** z wybraną usługą (pokazuje domenę albo tworzy domenę Railway), potem `redeploy` dla `pwa`. Można też *Generate Domain* w dashboardzie. **Zawsze czytaj `railway config plan` przed `apply`** – apply jest deklaratywny i usuwa to, czego nie ma w pliku (wymaga wtedy potwierdzenia).
 
 Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`, `npm start`), a `CZYZYK_SERVICE` (`api` / `worker` / `cron` / `pwa`) wybiera, którą część zbudować i uruchomić (`scripts/service.mjs`). Gdy `CZYZYK_SERVICE` nie jest ustawione, skrypt rozpoznaje usługę po nazwie usługi w Railway (`RAILWAY_SERVICE_NAME`, np. `pwa` albo `czyzyk-pwa`); jeśli nie umie, build kończy się od razu komunikatem, co ustawić. Zmienne `VITE_*` są wkompilowywane w PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`.
 
