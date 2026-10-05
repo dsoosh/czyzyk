@@ -21,7 +21,14 @@ export function readPublicEnv(env: Record<string, string | undefined> = import.m
   return {
     supabaseUrl: supabaseUrl!,
     supabaseAnonKey: supabaseAnonKey!,
-    apiUrl: env.VITE_API_URL || null,
+    apiUrl: withScheme(env.VITE_API_URL),
     vapidPublicKey: env.VITE_VAPID_PUBLIC_KEY || null,
   };
+}
+
+/** Railway hands over the API domain without a scheme ("api.up.railway.app"); local URLs keep theirs. */
+export function withScheme(url: string | undefined): string | null {
+  const trimmed = url?.trim().replace(/\/+$/, "");
+  if (!trimmed) return null;
+  return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
 }

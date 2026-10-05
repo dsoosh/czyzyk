@@ -65,7 +65,7 @@ Workflow [`Railway`](../.github/workflows/railway.yml) uruchamia Railway CLI na 
 2. GitHub → repozytorium → **Settings → Secrets and variables → Actions → New repository secret**: nazwa `RAILWAY_TOKEN`, wartość = token.
 3. GitHub → **Actions → Railway → Run workflow** → akcja `plan` (podgląd), potem `apply`.
 
-**Pierwsze `apply` na istniejącym projekcie.** Railway dopasowuje usługi po nazwie. Usługi utworzone wcześniej automatycznie z monorepo nazywają się `@czyzyk/api`, `@czyzyk/worker` i `@czyzyk/pwa`, a plik opisuje `api`, `worker`, `cron` i `pwa` – plan pokazałby wtedy usunięcie starych usług (z ich zmiennymi i domenami) i utworzenie nowych. Zanim uruchomisz `apply`, zmień nazwy w dashboardzie (usługa → **Settings → Service Name**) na `api`, `worker` i `pwa`. Plan powinien wtedy pokazywać tylko dodanie grupy i usługi `cron` oraz zmiany, bez usuwania. Nigdy nie uruchamiaj `apply-destructive`, gdy plan usuwa usługi, których używasz.
+**Nazwy usług.** Railway dopasowuje usługi z pliku po nazwie i nie umie zmienić nazwy istniejącej usługi. Dlatego plik używa nazw, które Railway nadał automatycznie przy imporcie monorepo: `@czyzyk/api`, `@czyzyk/worker`, `@czyzyk/pwa` (oraz nowa `@czyzyk/cron`). Plan nie powinien nigdy pokazywać usunięcia tych usług – jeśli pokazuje, nie uruchamiaj `apply-destructive`. Odwołania między usługami (domena API dla PWA, domena PWA i adres Supabase dla API, publiczny klucz VAPID) są strukturalnymi referencjami Railway, a nie napisami `${{…}}`.
 
 Potem działa samo: PR zmieniający `.railway/**` dostaje `plan`, a scalenie do `main` robi `apply` (nigdy nie usuwa zasobów – do tego służy ręczna akcja `apply-destructive`). Z tego samego miejsca: `status`, `logs` i `build-logs` wybranej usługi, `redeploy`.
 
@@ -93,7 +93,7 @@ Sekrety nie są w repozytorium – w pliku mają wartość `preserve()`, czyli R
 railway variables --service api --set "DATABASE_URL=postgres://…"
 ```
 
-Pozostałe zmienne (np. `CZYZYK_SERVICE`, `EXTRACTION_MODEL`, limity) ustawia plik. `VITE_API_URL` dla PWA jest referencją do publicznej domeny usługi `api` (`https://${{api.RAILWAY_PUBLIC_DOMAIN}}`).
+Pozostałe zmienne (np. `CZYZYK_SERVICE`, `EXTRACTION_MODEL`, limity) ustawia plik. `VITE_API_URL` dla PWA jest referencją do publicznej domeny usługi `@czyzyk/api` (sama domena; PWA dopisuje `https://`).
 
 Domeny: dla `pwa` i `api` włącz *Generate Domain* w dashboardzie (lub dopisz je do pliku i zastosuj). **Zawsze czytaj `railway config plan` przed `apply`** – apply jest deklaratywny i usuwa to, czego nie ma w pliku (wymaga wtedy potwierdzenia).
 
@@ -150,14 +150,14 @@ Push działa przez Web Push ze standardowymi kluczami VAPID. Klucz prywatny zna 
    ```
 
    Nie wklejaj klucza prywatnego do czatu ani do repozytorium.
-2. Zastosuj `.railway/railway.ts` (scalenie do `main` robi to samo, patrz sekcja 6) – powstaje usługa `cron`.
+2. Zastosuj `.railway/railway.ts` (scalenie do `main` robi to samo, patrz sekcja 6) – powstaje usługa `@czyzyk/cron`.
 3. Ustaw zmienne usługi `cron` (dashboard → `cron` → Variables):
    - `DATABASE_URL` – ten sam *Session pooler* co w `worker`,
    - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` – z kroku 1,
    - `VAPID_SUBJECT` – `mailto:` z Twoim adresem (usługi push kontaktują się tam w razie problemów).
-4. Wdróż ponownie `pwa` (Railway → `pwa` → *Redeploy* albo akcja `redeploy` w workflow), bo `VITE_VAPID_PUBLIC_KEY` (referencja do `cron.VAPID_PUBLIC_KEY`) jest wkompilowywany przy budowaniu.
+4. Wdróż ponownie `pwa` (Railway → `pwa` → *Redeploy* albo akcja `redeploy` w workflow), bo `VITE_VAPID_PUBLIC_KEY` (referencja do `VAPID_PUBLIC_KEY` usługi `@czyzyk/cron`) jest wkompilowywany przy budowaniu.
 
-Usługa `api` dostaje z pliku `SUPABASE_URL` (referencja do `pwa.VITE_SUPABASE_URL`) i `PWA_ORIGIN` (domena PWA): na tej podstawie sprawdza sesję użytkownika (klucze JWKS projektu Supabase) i przyjmuje wywołania `/push/*` tylko z PWA. Jeśli projekt Supabase używa jeszcze starego wspólnego sekretu JWT (Settings → JWT Keys → *Legacy JWT secret*), dopisz w `.railway/railway.ts` w usłudze `api` `SUPABASE_JWT_SECRET: preserve()` i ustaw wartość w dashboardzie.
+Usługa `@czyzyk/api` dostaje z pliku `SUPABASE_URL` (referencja do `VITE_SUPABASE_URL` usługi PWA) i `PWA_ORIGIN` (domena PWA): na tej podstawie sprawdza sesję użytkownika (klucze JWKS projektu Supabase) i przyjmuje wywołania `/push/*` tylko z PWA. Jeśli projekt Supabase używa jeszcze starego wspólnego sekretu JWT (Settings → JWT Keys → *Legacy JWT secret*), dopisz w `.railway/railway.ts` w usłudze `api` `SUPABASE_JWT_SECRET: preserve()` i ustaw wartość w dashboardzie.
 
 Migracje `0005`–`0008` stosują się same przy wdrożeniu (sekcja 3). Wyłączenie usługi `cron` zatrzymuje powiadomienia bez wpływu na resztę.
 

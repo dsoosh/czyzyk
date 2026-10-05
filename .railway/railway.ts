@@ -15,15 +15,34 @@
  * Apply is declarative – a variable missing here would be deleted, so every variable
  * a service uses is listed, secret or not.
  */
-import { defineRailway, github, group, preserve, project, service } from "railway/iac";
+import { defineRailway, github, group, preserve, project, resourceAddress, service, type VariableValue } from "railway/iac";
 
 const REPO = "dsoosh/czyzyk";
 
 /** Applies pending supabase/migrations with DATABASE_URL before the new version starts. */
 const MIGRATE = "npm run db:migrate";
 
+type ServiceKey = "api" | "worker" | "cron" | "pwa";
+
+/**
+ * Railway service names. They match the services Railway created from the monorepo
+ * (named after the npm workspaces); Railway matches IaC resources by name and has no
+ * rename, so other names would delete those services with their variables and domains.
+ */
+const NAME = (key: ServiceKey) => `@czyzyk/${key}`;
+
+/**
+ * Reference to another service's variable, resolved by Railway. Structured rather than a
+ * "${{name.VAR}}" string, because the service names contain "@" and "/".
+ */
+const refTo = (key: ServiceKey, output: string): VariableValue => ({
+  type: "reference",
+  resource: resourceAddress("service", NAME(key)),
+  output,
+});
+
 /** Every service builds from the repository root; CZYZYK_SERVICE picks what to build and start. */
-const fromMonorepo = (name: "api" | "worker" | "cron" | "pwa", watch: string[]) => ({
+const fromMonorepo = (name: ServiceKey, watch: string[]) => ({
   source: github(REPO, { branch: "main" }),
   build: {
     builder: "RAILPACK" as const,
@@ -39,7 +58,7 @@ const fromMonorepo = (name: "api" | "worker" | "cron" | "pwa", watch: string[]) 
 
 export default defineRailway(() => {
   const apiBase = fromMonorepo("api", ["services/api/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
-  const api = service("api", {
+  const api = service(NAME("api"), {
     ...apiBase,
     preDeploy: MIGRATE,
     healthcheck: "/health",
@@ -53,13 +72,14 @@ export default defineRailway(() => {
       INGEST_RATE_LIMIT_PER_TOKEN: "120",
       INGEST_RATE_LIMIT_PER_IP: "240",
       // Push endpoints verify Supabase sessions (JWKS of this project) and accept browser calls from the PWA only.
-      SUPABASE_URL: "${{pwa.VITE_SUPABASE_URL}}",
-      PWA_ORIGIN: "https://${{pwa.RAILWAY_PUBLIC_DOMAIN}}",
+      SUPABASE_URL: refTo("pwa", "VITE_SUPABASE_URL"),
+      // A bare domain; the API adds https://.
+      PWA_ORIGIN: refTo("pwa", "RAILWAY_PUBLIC_DOMAIN"),
     },
   });
 
   const workerBase = fromMonorepo("worker", ["services/worker/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
-  const worker = service("worker", {
+  const worker = service(NAME("worker"), {
     ...workerBase,
     preDeploy: MIGRATE,
     // No HTTP port: pg-boss worker that must always run.
@@ -78,7 +98,7 @@ export default defineRailway(() => {
   });
 
   const cronBase = fromMonorepo("cron", ["services/cron/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
-  const cron = service("cron", {
+  const cron = service(NAME("cron"), {
     ...cronBase,
     preDeploy: MIGRATE,
     // No HTTP port: evening digest every 5 minutes and push-alert jobs from the worker.
@@ -96,7 +116,7 @@ export default defineRailway(() => {
   });
 
   const pwaBase = fromMonorepo("pwa", ["apps/pwa/**", "packages/shared/src/extraction.ts"]);
-  const pwa = service("pwa", {
+  const pwa = service(NAME("pwa"), {
     ...pwaBase,
     healthcheck: "/",
     deploy: { restartPolicyType: "ON_FAILURE", restartPolicyMaxRetries: 10 },
@@ -105,10 +125,10 @@ export default defineRailway(() => {
       // Public values only – they are compiled into the browser bundle.
       VITE_SUPABASE_URL: preserve(),
       VITE_SUPABASE_ANON_KEY: preserve(),
-      // Railway reference variable: the API's public domain, resolved at build time.
-      VITE_API_URL: "https://${{api.RAILWAY_PUBLIC_DOMAIN}}",
+      // The API's public domain (bare; the PWA adds https://), resolved at build time.
+      VITE_API_URL: refTo("api", "RAILWAY_PUBLIC_DOMAIN"),
       // Public half of the VAPID pair, needed by the browser to subscribe.
-      VITE_VAPID_PUBLIC_KEY: "${{cron.VAPID_PUBLIC_KEY}}",
+      VITE_VAPID_PUBLIC_KEY: refTo("cron", "VAPID_PUBLIC_KEY"),
     },
   });
 

@@ -10,4 +10,11 @@ describe("loadApiConfig", () => {
     });
     expect(() => loadApiConfig({})).toThrow(/DATABASE_URL: missing/);
   });
+
+  it("PWA_ORIGIN accepts bare domains from Railway references", () => {
+    expect(
+      loadApiConfig({ DATABASE_URL: "postgres://user:pass@localhost/db", PWA_ORIGIN: "pwa.up.railway.app, http://localhost:5173/" })
+        .PWA_ORIGIN,
+    ).toEqual(["https://pwa.up.railway.app", "http://localhost:5173"]);
+  });
 });

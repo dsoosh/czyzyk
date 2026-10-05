@@ -12,11 +12,18 @@ export const apiEnvSchema = baseEnvSchema.extend({
   SUPABASE_URL: z.url().optional(),
   /** Legacy HS256 JWT secret, only for projects without asymmetric signing keys. */
   SUPABASE_JWT_SECRET: z.string().min(32).optional(),
-  /** Comma-separated PWA origins allowed to call /push/* from the browser. */
+  /** Comma-separated PWA origins (or bare domains) allowed to call /push/* from the browser. */
   PWA_ORIGIN: z
     .string()
     .optional()
-    .transform((v) => (v ?? "").split(",").map((o) => o.trim().replace(/\/+$/, "")).filter(Boolean)),
+    .transform((v) =>
+      (v ?? "")
+        .split(",")
+        .map((o) => o.trim().replace(/\/+$/, ""))
+        .filter(Boolean)
+        // Railway references give a bare domain.
+        .map((o) => (/^https?:\/\//.test(o) ? o : `https://${o}`)),
+    ),
 });
 
 export type ApiConfig = z.infer<typeof apiEnvSchema>;
