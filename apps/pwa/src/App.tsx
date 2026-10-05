@@ -5,6 +5,7 @@ import { AdminLayout } from "./pages/admin/AdminLayout";
 import { AllowedEmailsPage } from "./pages/admin/AllowedEmailsPage";
 import { DevicesPage } from "./pages/admin/DevicesPage";
 import { GroupsPage } from "./pages/admin/GroupsPage";
+import { ImportPage } from "./pages/admin/ImportPage";
 import { ReviewPage } from "./pages/admin/ReviewPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { EventPage } from "./pages/EventPage";
@@ -59,6 +60,7 @@ export function App() {
                 <Route path="urzadzenia" element={<DevicesPage />} />
                 <Route path="grupy" element={<GroupsPage />} />
                 <Route path="przeglad" element={<ReviewPage />} />
+                <Route path="import" element={<ImportPage />} />
               </Route>
             )}
             <Route path="*" element={<Navigate to="/" replace />} />

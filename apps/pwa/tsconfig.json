@@ -22,6 +22,9 @@
     "paths": {
       "@czyzyk/shared/extraction": [
         "../../packages/shared/src/extraction.ts"
+      ],
+      "@czyzyk/shared/chat-export": [
+        "../../packages/shared/src/chatExport.ts"
       ]
     }
   },

@@ -6,11 +6,16 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // Browser-safe part of the shared package (zod schemas only), compiled from source.
 export const sharedExtraction = fileURLToPath(new URL("../../packages/shared/src/extraction.ts", import.meta.url));
+export const sharedChatExport = fileURLToPath(new URL("../../packages/shared/src/chatExport.ts", import.meta.url));
+export const sharedAliases = {
+  "@czyzyk/shared/extraction": sharedExtraction,
+  "@czyzyk/shared/chat-export": sharedChatExport,
+};
 
 export default defineConfig({
   // Only VITE_* variables reach the bundle; server secrets must never use this prefix.
   envPrefix: "VITE_",
-  resolve: { alias: { "@czyzyk/shared/extraction": sharedExtraction } },
+  resolve: { alias: sharedAliases },
   plugins: [
     react(),
     tailwindcss(),

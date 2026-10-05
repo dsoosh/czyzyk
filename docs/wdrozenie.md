@@ -177,3 +177,16 @@ Migracje `0005`–`0008` stosują się same przy wdrożeniu (sekcja 3). Wyłącz
 5. Push: dzień przed wydarzeniem o ustawionej godzinie przychodzi „Jutro: …”; stuknięcie otwiera **Dziś i jutro**. Nowy dzień wolny daje jeden alert, nawet gdy pojawi się w kilku wiadomościach.
 6. Logi usługi `cron` pokazują tylko liczby („push delivered”, „digest skipped”), bez treści powiadomień.
 
+
+---
+
+# Import eksportu czatu z PWA
+
+Uzupełnia wiadomości, których nie dostarczyły powiadomienia (np. sprzed sparowania telefonu albo z wyciszonej grupy).
+
+1. W WhatsAppie otwórz grupę → **⋮ → Więcej → Eksportuj czat**. „Bez multimediów” daje plik `.txt`, „Dołącz multimedia” – `.zip`. Oba działają: z ZIP-a PWA czyta w przeglądarce tylko tekst czatu, zdjęcia i filmy nie są nigdzie wysyłane.
+2. Przenieś plik tam, gdzie otwierasz PWA (albo otwórz PWA na tym samym telefonie).
+3. PWA → **Admin → Import** → wybierz plik. Grupa jest podpowiadana z nazwy pliku (musi być śledzona), podgląd pokazuje liczbę wiadomości i zakres dat.
+4. Wybierz, z jakiego okresu nowe wiadomości mają przejść analizę (domyślnie 30 dni; starsze są zapisywane jako historia bez wysyłania do modelu) i stuknij **Importuj**.
+
+Wiadomości znane już z powiadomień albo z wcześniejszego importu są pomijane. Wyniki analizy pojawiają się po kilku minutach (worker sprawdza nowe wiadomości co minutę). Wymaga `SUPABASE_URL` i `PWA_ORIGIN` w usłudze API – ustawia je `.railway/railway.ts`.

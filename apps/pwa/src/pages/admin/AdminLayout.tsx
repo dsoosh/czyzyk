@@ -21,6 +21,9 @@ export function AdminLayout() {
         <NavLink to="/admin/przeglad" className={tab}>
           Przegląd
         </NavLink>
+        <NavLink to="/admin/import" className={tab}>
+          Import
+        </NavLink>
       </nav>
       <Outlet context={context} />
     </div>

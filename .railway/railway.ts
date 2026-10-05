@@ -115,7 +115,7 @@ export default defineRailway(() => {
     },
   });
 
-  const pwaBase = fromMonorepo("pwa", ["apps/pwa/**", "packages/shared/src/extraction.ts"]);
+  const pwaBase = fromMonorepo("pwa", ["apps/pwa/**", "packages/shared/src/extraction.ts", "packages/shared/src/chatExport.ts"]);
   const pwa = service(NAME("pwa"), {
     ...pwaBase,
     healthcheck: "/",

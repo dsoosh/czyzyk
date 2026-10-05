@@ -13,6 +13,10 @@
     "./extraction": {
       "types": "./dist/extraction.d.ts",
       "default": "./dist/extraction.js"
+    },
+    "./chat-export": {
+      "types": "./dist/chatExport.d.ts",
+      "default": "./dist/chatExport.js"
     }
   },
   "scripts": {

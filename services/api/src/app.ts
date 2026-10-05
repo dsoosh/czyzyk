@@ -3,6 +3,7 @@ import type pg from "pg";
 import type { DestinationStream } from "pino";
 import type { ApiConfig } from "./config.js";
 import { icalRoutes } from "./ical/routes.js";
+import { importRoutes } from "./import/routes.js";
 import { ingestRoutes } from "./ingest/routes.js";
 import { pushRoutes } from "./push/routes.js";
 import { createSessionVerifier, type SessionVerifier } from "./push/session.js";
@@ -60,6 +61,14 @@ export function buildApp(
     verify,
     origins: config.PWA_ORIGIN ?? [],
     perIp: new RateLimiter(config.INGEST_RATE_LIMIT_PER_IP, deps.now),
+  });
+  app.register(importRoutes, {
+    prefix: "/import",
+    db: deps.db,
+    verify,
+    origins: config.PWA_ORIGIN ?? [],
+    perIp: new RateLimiter(30, deps.now),
+    now: deps.now,
   });
   app.register(icalRoutes, { prefix: "/ical", db: deps.db, perIp: new RateLimiter(config.INGEST_RATE_LIMIT_PER_IP, deps.now) });
 
