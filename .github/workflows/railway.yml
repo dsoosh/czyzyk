@@ -7,7 +7,7 @@ name: Railway
 # - pull request touching .railway/**  → railway config plan
 # - push to main touching .railway/**  → plan, then apply (never destructive)
 # - manual run (Actions → Railway → Run workflow): plan, apply, apply-destructive,
-#   status, logs, build-logs, redeploy
+#   status, logs, build-logs, redeploy, domain (show the service domain; generates a Railway domain if it has none)
 
 on:
   pull_request:
@@ -20,12 +20,12 @@ on:
       action:
         description: What to do
         type: choice
-        options: [plan, apply, apply-destructive, status, logs, build-logs, redeploy]
+        options: [plan, apply, apply-destructive, status, logs, build-logs, redeploy, domain]
         default: plan
       service:
-        description: Service (for logs, build-logs, redeploy)
+        description: Service (for logs, build-logs, redeploy, domain)
         type: choice
-        options: [api, worker, pwa]
+        options: [api, worker, cron, pwa]
         default: api
       lines:
         description: Log lines (for logs, build-logs)
@@ -74,14 +74,17 @@ jobs:
           set -euo pipefail
           railway() { npx --yes @railway/cli@5.63.1 "$@"; }
           if [ "$EVENT" = "pull_request" ]; then ACTION=plan; elif [ "$EVENT" = "push" ]; then ACTION=apply; fi
+          # Railway service names follow the npm workspaces (.railway/railway.ts).
+          SVC="@czyzyk/${SERVICE:-api}"
           echo "action: $ACTION"
           case "$ACTION" in
             plan)              railway config plan ;;
             apply)             railway config plan && railway config apply --yes ;;
             apply-destructive) railway config plan && railway config apply --yes --confirm-destructive ;;
-            status)            railway status && for s in api worker pwa; do railway service status --service "$s" || true; done ;;
-            logs)              railway logs --service "$SERVICE" --deployment --lines "${LINES:-200}" ;;
-            build-logs)        railway logs --service "$SERVICE" --build --lines "${LINES:-200}" ;;
-            redeploy)          railway service redeploy --service "$SERVICE" --yes ;;
+            status)            railway status && for s in api worker cron pwa; do railway service status --service "@czyzyk/$s" || true; done ;;
+            logs)              railway logs --service "$SVC" --deployment --lines "${LINES:-200}" ;;
+            build-logs)        railway logs --service "$SVC" --build --lines "${LINES:-200}" ;;
+            redeploy)          railway service redeploy --service "$SVC" --yes ;;
+            domain)            railway domain --service "$SVC" ;;
             *) echo "unknown action: $ACTION"; exit 2 ;;
           esac
