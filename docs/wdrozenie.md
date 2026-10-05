@@ -65,6 +65,8 @@ Workflow [`Railway`](../.github/workflows/railway.yml) uruchamia Railway CLI na 
 2. GitHub → repozytorium → **Settings → Secrets and variables → Actions → New repository secret**: nazwa `RAILWAY_TOKEN`, wartość = token.
 3. GitHub → **Actions → Railway → Run workflow** → akcja `plan` (podgląd), potem `apply`.
 
+**Pierwsze `apply` na istniejącym projekcie.** Railway dopasowuje usługi po nazwie. Usługi utworzone wcześniej automatycznie z monorepo nazywają się `@czyzyk/api`, `@czyzyk/worker` i `@czyzyk/pwa`, a plik opisuje `api`, `worker`, `cron` i `pwa` – plan pokazałby wtedy usunięcie starych usług (z ich zmiennymi i domenami) i utworzenie nowych. Zanim uruchomisz `apply`, zmień nazwy w dashboardzie (usługa → **Settings → Service Name**) na `api`, `worker` i `pwa`. Plan powinien wtedy pokazywać tylko dodanie grupy i usługi `cron` oraz zmiany, bez usuwania. Nigdy nie uruchamiaj `apply-destructive`, gdy plan usuwa usługi, których używasz.
+
 Potem działa samo: PR zmieniający `.railway/**` dostaje `plan`, a scalenie do `main` robi `apply` (nigdy nie usuwa zasobów – do tego służy ręczna akcja `apply-destructive`). Z tego samego miejsca: `status`, `logs` i `build-logs` wybranej usługi, `redeploy`.
 
 ### Lokalnie (opcjonalnie)
