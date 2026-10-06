@@ -32,7 +32,11 @@ jobs:
             echo "ok=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          # Tolerates wrapped output (macOS base64, certutil -encode headers) and stray whitespace/CRs.
+          if ! printf '%s' "$KEYSTORE_BASE64" | grep -v -- '-----' | tr -d ' \t\r\n' | base64 -d > "$RUNNER_TEMP/release.jks"; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not valid base64 – paste the output of: base64 -w0 czyzyk-release.jks (macOS: base64 -i czyzyk-release.jks)."
+            exit 1
+          fi
           echo "ok=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         if: steps.key.outputs.ok == 'true'

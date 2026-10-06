@@ -40,7 +40,11 @@ export function PushSettingsSection() {
 
   useEffect(() => {
     let alive = true;
-    void currentSubscription().then((s) => alive && setSubscribed(s != null), () => alive && setSubscribed(false));
+    // A late answer must not undo enabling/disabling the user already did (prev is then set).
+    void currentSubscription().then(
+      (s) => alive && setSubscribed((prev) => prev ?? s != null),
+      () => alive && setSubscribed((prev) => prev ?? false),
+    );
     void client
       .from("push_settings")
       .select("digest_enabled, digest_time, alert_closures, alert_actions, alert_payments")
