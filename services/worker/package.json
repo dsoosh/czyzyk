@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "eval:extraction": "tsx eval/run.ts"
+    "eval:extraction": "tsx eval/run.ts",
+    "vapid:generate": "web-push generate-vapid-keys --json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
@@ -17,6 +18,10 @@
     "pg": "^8.13.1",
     "pg-boss": "^12.0.0",
     "pino": "^9.14.0",
-    "zod": "^4.1.0"
+    "zod": "^4.1.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/web-push": "^3.6.4"
   }
 }

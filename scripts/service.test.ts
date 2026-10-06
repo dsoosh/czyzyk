@@ -8,7 +8,7 @@ describe("resolveService", () => {
   });
 
   it("derives the service from the Railway service name", () => {
-    for (const [railway, name] of [["pwa", "pwa"], ["czyzyk-pwa", "pwa"], ["Czyżyk API", "api"], ["worker_prod", "worker"], ["czyzyk-cron", "cron"]]) {
+    for (const [railway, name] of [["pwa", "pwa"], ["czyzyk-pwa", "pwa"], ["Czyżyk API", "api"], ["worker_prod", "worker"]]) {
       expect(resolveService({ RAILWAY_SERVICE_NAME: railway })?.name).toBe(name);
     }
   });

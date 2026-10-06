@@ -3,7 +3,7 @@ export interface PublicEnv {
   supabaseAnonKey: string;
   /** Public URL of services/api – put into the phone pairing link. */
   apiUrl: string | null;
-  /** Public VAPID key of services/cron – lets the browser subscribe to push. */
+  /** Public VAPID key of the worker (Web Push) – lets the browser subscribe to push. */
   vapidPublicKey: string | null;
 }
 

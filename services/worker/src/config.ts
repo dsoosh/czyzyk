@@ -1,5 +1,6 @@
 import { baseEnvSchema, databaseUrlSchema, loadEnv } from "@czyzyk/shared";
 import { z } from "zod";
+import { pushEnvShape } from "./push/config.js";
 
 export const workerEnvSchema = baseEnvSchema.extend({
   /** Direct (session) connection string: pg-boss needs a connection it can hold. */
@@ -15,6 +16,7 @@ export const workerEnvSchema = baseEnvSchema.extend({
   EXTRACTION_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.7),
   /** Already processed messages of the group given to the model as context. */
   EXTRACTION_CONTEXT_MESSAGES: z.coerce.number().int().min(0).max(200).default(50),
+  ...pushEnvShape,
 });
 
 export type WorkerConfig = z.infer<typeof workerEnvSchema>;
