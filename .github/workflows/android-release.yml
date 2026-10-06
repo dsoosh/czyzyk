@@ -56,8 +56,16 @@ jobs:
         run: |
           ks="$RUNNER_TEMP/release.jks"
           echo "Keystore: $(stat -c%s "$ks") bytes, $(file -b "$ks")"
-          if ! keytool -list -keystore "$ks" -storepass "$STOREPASS" -alias "$ALIAS" > /dev/null 2> "$RUNNER_TEMP/keytool.err"; then
-            echo "::error::ANDROID_KEYSTORE_BASE64 + ANDROID_KEYSTORE_PASSWORD + ANDROID_KEY_ALIAS do not open the key: $(tr '\n' ' ' < "$RUNNER_TEMP/keytool.err" | head -c 300)"
+          # keytool prints errors on stdout; the listing (type, entries, public fingerprints) is not secret.
+          if ! keytool -list -keystore "$ks" -storepass "$STOREPASS" > "$RUNNER_TEMP/keytool.out" 2>&1; then
+            cat "$RUNNER_TEMP/keytool.out"
+            echo "::error::ANDROID_KEYSTORE_PASSWORD does not open the keystore from ANDROID_KEYSTORE_BASE64: $(grep -m1 'keytool error' "$RUNNER_TEMP/keytool.out")"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/keytool.out"
+          if ! keytool -list -keystore "$ks" -storepass "$STOREPASS" -alias "$ALIAS" > "$RUNNER_TEMP/keytool.out" 2>&1; then
+            cat "$RUNNER_TEMP/keytool.out"
+            echo "::error::No key with alias ANDROID_KEY_ALIAS in the keystore (aliases are listed above)."
             exit 1
           fi
       - name: Version
