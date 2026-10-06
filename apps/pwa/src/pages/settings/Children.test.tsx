@@ -108,3 +108,22 @@ describe("imię dziecka przy elementach", () => {
     expect(within(bring).getByLabelText("Dziecko: Zosia")).toBeInTheDocument();
   });
 });
+
+describe("Ustawienia telefonu (aplikacja Android)", () => {
+  it("przycisk jest tylko w aplikacji i otwiera natywny ekran", async () => {
+    const { unmount } = renderAt("/ustawienia", { tables: { wa_groups: [], children: [] } });
+    await screen.findByRole("heading", { name: "Ustawienia" });
+    expect(screen.queryByRole("button", { name: "Ustawienia telefonu" })).not.toBeInTheDocument();
+    unmount();
+
+    const openPhoneSettings = vi.fn();
+    (window as { CzyzykAndroid?: unknown }).CzyzykAndroid = { openPhoneSettings };
+    try {
+      renderAt("/ustawienia", { tables: { wa_groups: [], children: [] } });
+      await userEvent.click(await screen.findByRole("button", { name: "Ustawienia telefonu" }));
+      expect(openPhoneSettings).toHaveBeenCalledOnce();
+    } finally {
+      delete (window as { CzyzykAndroid?: unknown }).CzyzykAndroid;
+    }
+  });
+});

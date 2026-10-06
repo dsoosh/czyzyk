@@ -29,7 +29,7 @@ describe("Admin → Urządzenia", () => {
     expect(await within(dialog).findByAltText("Kod QR parowania")).toHaveAttribute("src", expect.stringMatching(/^data:image\/png/));
     expect(within(dialog).getByRole("link", { name: /Otwórz w aplikacji/ })).toHaveAttribute(
       "href",
-      `czyzyk://pair?server=https%3A%2F%2Fapi.czyzyk.example&token=${token}`,
+      `czyzyk://pair?server=https%3A%2F%2Fapi.czyzyk.example&token=${token}&app=${encodeURIComponent(window.location.origin)}`,
     );
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Zamknij" }));
@@ -51,6 +51,7 @@ describe("Admin → Urządzenia", () => {
 
   it("buduje link parowania", () => {
     expect(pairingLink("https://a.b/c", "t")).toBe("czyzyk://pair?server=https%3A%2F%2Fa.b%2Fc&token=t");
+    expect(pairingLink("https://a.b/c", "t", "https://pwa.b")).toBe("czyzyk://pair?server=https%3A%2F%2Fa.b%2Fc&token=t&app=https%3A%2F%2Fpwa.b");
   });
 });
 

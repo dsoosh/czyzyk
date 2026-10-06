@@ -195,3 +195,7 @@ Wiadomości znane już z powiadomień albo z wcześniejszego importu są pomijan
 
 - **Czaty** (zakładka w dolnym menu) pokazują historię każdej śledzonej grupy z wyszukiwaniem. Nie wymagają konfiguracji – dane czytane są z Supabase jak reszta PWA.
 - **Zapytaj** (przycisk na ekranach rodziny) wysyła pytanie do `services/api` (`POST /assistant/ask`), które pobiera dane bieżącego ekranu i pyta model Claude. W usłudze `api` ustaw ręcznie `ANTHROPIC_API_KEY` (ten sam klucz co w workerze albo osobny); `CHAT_MODEL` i `ASSISTANT_DAILY_LIMIT` są w `.railway/railway.ts`. Bez klucza przycisk pokazuje, że asystent nie jest skonfigurowany, a reszta API działa normalnie.
+
+# Aplikacja Czyżyk w aplikacji Android
+
+Aplikacja Android pokazuje PWA jako główny widok (WebView). Żeby działało w niej logowanie Google, w Supabase dodaj adres przekierowania: **Authentication → URL Configuration → Redirect URLs → `czyzyk://auth/callback`**. Adres PWA telefon dostaje z linku parowania (Admin → Urządzenia → Dodaj telefon); już sparowany telefon może go wpisać ręcznie w „Ustawieniach telefonu” albo sparować się ponownie.

@@ -14,14 +14,16 @@ interface Device {
   revoked_at: string | null;
 }
 
-export function pairingLink(apiUrl: string, token: string): string {
-  return `czyzyk://pair?server=${encodeURIComponent(apiUrl)}&token=${token}`;
+/** `app` is the PWA's own address: the Android app opens it as its main view. */
+export function pairingLink(apiUrl: string, token: string, appUrl?: string): string {
+  const app = appUrl ? `&app=${encodeURIComponent(appUrl)}` : "";
+  return `czyzyk://pair?server=${encodeURIComponent(apiUrl)}&token=${token}${app}`;
 }
 
 /** Shows a freshly created token exactly once; closing the dialog forgets it. */
 function TokenDialog({ name, token, onClose }: { name: string; token: string; onClose: () => void }) {
   const apiUrl = readPublicEnv().apiUrl;
-  const link = apiUrl ? pairingLink(apiUrl, token) : null;
+  const link = apiUrl ? pairingLink(apiUrl, token, window.location.origin) : null;
   const [qr, setQr] = useState<string | null>(null);
 
   useEffect(() => {
