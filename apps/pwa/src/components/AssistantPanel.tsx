@@ -25,7 +25,11 @@ export function AssistantPanel() {
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => endRef.current?.scrollIntoView?.({ block: "end" }), [turns, busy]);
+  // Block body on purpose: newer browsers return a Promise from scrollIntoView, and an
+  // effect must return nothing or a cleanup function (React calls it on the next run).
+  useEffect(() => {
+    void endRef.current?.scrollIntoView?.({ block: "end" });
+  }, [turns, busy]);
 
   if (!view || !apiUrl) return null;
 
