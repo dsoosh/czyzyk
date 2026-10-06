@@ -25,6 +25,9 @@
       ],
       "@czyzyk/shared/chat-export": [
         "../../packages/shared/src/chatExport.ts"
+      ],
+      "@czyzyk/shared/assistant": [
+        "../../packages/shared/src/assistant.ts"
       ]
     }
   },
