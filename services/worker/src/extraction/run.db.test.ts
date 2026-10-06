@@ -295,6 +295,8 @@ describe("runGroupExtraction", () => {
     ]);
     await runGroupExtraction(deps(first.model), groupId);
     expect(first.prompts[0]!.user).toContain('"Zosia" – grupa "Motylki"');
+    // Starting kindergarten description from migration 0011.
+    expect(first.prompts[0]!.user).toMatch(/<przedszkole>\n[^]*Golędzinów, Kolonia 39[^]*<\/przedszkole>/);
     const { rows: created } = await db.client.query("select id, child_ids from bring_items");
     expect(created).toEqual([{ id: expect.any(String), child_ids: [zosia] }]);
 

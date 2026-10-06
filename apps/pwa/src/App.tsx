@@ -6,6 +6,7 @@ import { AllowedEmailsPage } from "./pages/admin/AllowedEmailsPage";
 import { DevicesPage } from "./pages/admin/DevicesPage";
 import { GroupsPage } from "./pages/admin/GroupsPage";
 import { ImportPage } from "./pages/admin/ImportPage";
+import { KindergartenPage } from "./pages/admin/KindergartenPage";
 import { ReviewPage } from "./pages/admin/ReviewPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { ChatsPage } from "./pages/chats/ChatsPage";
@@ -65,6 +66,7 @@ export function App() {
                 <Route path="grupy" element={<GroupsPage />} />
                 <Route path="przeglad" element={<ReviewPage />} />
                 <Route path="import" element={<ImportPage />} />
+                <Route path="przedszkole" element={<KindergartenPage />} />
               </Route>
             )}
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -272,11 +272,19 @@ const MONTHS = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "l
  * only active items (no needs_review or cancelled), group history only for tracked groups.
  */
 export async function loadViewContext(db: Db, view: AssistantView, now: Date): Promise<ViewContext> {
-  const names = await loadNames(db);
+  const [names, profile] = await Promise.all([
+    loadNames(db),
+    db.query<{ content: string }>("select content from public.kindergarten_profile"),
+  ]);
   const context = await viewContext(db, view, now, names);
-  if (names.children.length === 0) return context;
-  const kids = names.children.map((c) => `- ${c.name}${c.group_id ? ` (grupa ${names.groups.get(c.group_id) ?? "?"})` : ""}`);
-  return { ...context, data: `${section("Dzieci rodziny", kids)}\n\n${context.data}` };
+  const parts: string[] = [];
+  // Written by the family admin (kindergarten-profile): background for every view.
+  const about = profile.rows[0]?.content.trim();
+  if (about) parts.push(`## O przedszkolu\n${about}`);
+  if (names.children.length) {
+    parts.push(section("Dzieci rodziny", names.children.map((c) => `- ${c.name}${c.group_id ? ` (grupa ${names.groups.get(c.group_id) ?? "?"})` : ""}`)));
+  }
+  return parts.length ? { ...context, data: `${parts.join("\n\n")}\n\n${context.data}` } : context;
 }
 
 async function viewContext(db: Db, view: AssistantView, now: Date, names: Names): Promise<ViewContext> {
