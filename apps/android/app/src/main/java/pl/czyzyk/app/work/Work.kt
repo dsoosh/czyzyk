@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import pl.czyzyk.app.update.UpdateWorker
 import java.util.concurrent.TimeUnit
 
 object Work {
@@ -40,5 +41,16 @@ object Work {
             .enqueueUniquePeriodicWork(PERIODIC_SYNC, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
+    /** Daily look for a newer release (app-updates); KEEP leaves an existing schedule alone. */
+    fun scheduleUpdateCheck(context: Context) {
+        val request = PeriodicWorkRequestBuilder<UpdateWorker>(24, TimeUnit.HOURS)
+            .setConstraints(network)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniquePeriodicWork(PERIODIC_UPDATE, ExistingPeriodicWorkPolicy.KEEP, request)
+    }
+
     const val PERIODIC_SYNC = "sync-periodic"
+    const val PERIODIC_UPDATE = "update-periodic"
 }

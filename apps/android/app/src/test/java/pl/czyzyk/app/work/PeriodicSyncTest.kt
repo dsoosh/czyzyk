@@ -54,4 +54,13 @@ class PeriodicSyncTest {
         Work.schedulePeriodicSync(context)
         assertEquals(listOf(3 * 60 * 60_000L), scheduledIntervals())
     }
+
+    @Test
+    fun updateCheckRunsDailyAndKeepsAnExistingSchedule() {
+        Work.scheduleUpdateCheck(context)
+        Work.scheduleUpdateCheck(context)
+        val infos = WorkManager.getInstance(context).getWorkInfosForUniqueWork(Work.PERIODIC_UPDATE).get()
+            .filterNot { it.state.isFinished }
+        assertEquals(listOf(24 * 60 * 60_000L), infos.map { it.periodicityInfo!!.repeatIntervalMillis })
+    }
 }

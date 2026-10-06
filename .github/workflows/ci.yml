@@ -45,7 +45,8 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
+      # assembleRelease (R8, unsigned here) catches release-only breakage before android-release.yml.
+      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --stacktrace
       - name: Unit test summary
         # Guards against tests being silently skipped: raise MIN_TESTS when adding tests.
         env:

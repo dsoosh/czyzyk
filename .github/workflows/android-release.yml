@@ -1,0 +1,83 @@
+name: Android release
+
+# Publishes a signed APK as a GitHub release; installed apps update themselves from
+# releases/latest/download/version.json (openspec: android-app-updates).
+# Needs repository secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD (see apps/android/README.md). Without them it only warns.
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/android/**", ".github/workflows/android-release.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Signing key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret – skipping the release (see apps/android/README.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.key.outputs.ok == 'true'
+      - uses: actions/setup-java@v4
+        if: steps.key.outputs.ok == 'true'
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.key.outputs.ok == 'true'
+      - name: Version
+        if: steps.key.outputs.ok == 'true'
+        # Grows with every run; a re-run (attempt 2, 3…) gets its own number and tag.
+        run: |
+          echo "CZYZYK_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT))" >> "$GITHUB_ENV"
+          echo "CZYZYK_VERSION_NAME=1.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+      - name: Build signed APK
+        if: steps.key.outputs.ok == 'true'
+        working-directory: apps/android
+        env:
+          CZYZYK_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          CZYZYK_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          CZYZYK_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          CZYZYK_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease --stacktrace
+      - name: Publish release
+        if: steps.key.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          out="$RUNNER_TEMP/release"
+          mkdir -p "$out"
+          # Fails when the build was not signed (the file would be app-release-unsigned.apk).
+          cp apps/android/app/build/outputs/apk/release/app-release.apk "$out/czyzyk.apk"
+          tag="android-v$CZYZYK_VERSION_CODE"
+          sha=$(sha256sum "$out/czyzyk.apk" | cut -d' ' -f1)
+          size=$(stat -c%s "$out/czyzyk.apk")
+          printf '{"versionCode":%d,"versionName":"%s","tag":"%s","sha256":"%s","size":%d}\n' \
+            "$CZYZYK_VERSION_CODE" "$CZYZYK_VERSION_NAME" "$tag" "$sha" "$size" > "$out/version.json"
+          cat "$out/version.json"
+          gh release create "$tag" "$out/czyzyk.apk" "$out/version.json" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest \
+            --title "Czyżyk Android $CZYZYK_VERSION_NAME" \
+            --notes "Aplikacja Android Czyżyk $CZYZYK_VERSION_NAME (kod $CZYZYK_VERSION_CODE). Zainstalowana aplikacja zaktualizuje się sama."
+          echo "Published $tag" >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

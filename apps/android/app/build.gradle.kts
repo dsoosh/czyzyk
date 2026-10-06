@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+/** Release signing and version come from CI (android-release.yml); local and PR builds run without them. */
+fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "pl.czyzyk.app"
     compileSdk = 36
@@ -12,14 +15,33 @@ android {
         applicationId = "pl.czyzyk.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = env("CZYZYK_VERSION_CODE")?.toInt() ?: 1
+        versionName = env("CZYZYK_VERSION_NAME") ?: "0.1.0-dev"
+        // GitHub repository whose releases the app updates itself from.
+        buildConfigField("String", "UPDATE_REPO", "\"${providers.gradleProperty("czyzyk.updateRepo").getOrElse("dsoosh/czyzyk")}\"")
+    }
+
+    signingConfigs {
+        env("CZYZYK_KEYSTORE_FILE")?.let { keystore ->
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = env("CZYZYK_KEYSTORE_PASSWORD")
+                keyAlias = env("CZYZYK_KEY_ALIAS")
+                keyPassword = env("CZYZYK_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            // Debug builds are signed with a per-machine key, so they cannot update in place.
+            buildConfigField("boolean", "UPDATES_ENABLED", "false")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
+            buildConfigField("boolean", "UPDATES_ENABLED", "true")
         }
     }
 
@@ -30,6 +52,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     testOptions {
@@ -44,6 +67,8 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    // The code scanner pulls an old fragment; ActivityResult APIs need fragment >= 1.3 (lintVitalRelease).
+    implementation(libs.androidx.fragment)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.security.crypto)

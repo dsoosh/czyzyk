@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import pl.czyzyk.app.work.SyncInterval
 
+data class ReadyUpdate(val versionCode: Long, val versionName: String, val sha256: String)
+
 /** Non-secret local state: tracked-group cache, sync interval, group reports, counters for the status screen. */
 class AppState(private val prefs: SharedPreferences) {
 
@@ -51,6 +53,24 @@ class AppState(private val prefs: SharedPreferences) {
         get() = prefs.getString(KEY_APP_URL, null)
         set(v) = prefs.edit().putString(KEY_APP_URL, v).apply()
 
+    /** When the app last read the latest release description (app-updates). */
+    var lastUpdateCheckAt: Long
+        get() = prefs.getLong(KEY_UPDATE_CHECKED, 0)
+        set(v) = prefs.edit().putLong(KEY_UPDATE_CHECKED, v).apply()
+
+    /** A downloaded and verified update waiting to be installed, or null. */
+    var readyUpdate: ReadyUpdate?
+        get() {
+            val code = prefs.getLong(KEY_UPDATE_CODE, 0)
+            val name = prefs.getString(KEY_UPDATE_NAME, null)
+            val sha = prefs.getString(KEY_UPDATE_SHA, null)
+            return if (code > 0 && name != null && sha != null) ReadyUpdate(code, name, sha) else null
+        }
+        set(v) = prefs.edit().apply {
+            if (v == null) remove(KEY_UPDATE_CODE).remove(KEY_UPDATE_NAME).remove(KEY_UPDATE_SHA)
+            else putLong(KEY_UPDATE_CODE, v.versionCode).putString(KEY_UPDATE_NAME, v.versionName).putString(KEY_UPDATE_SHA, v.sha256)
+        }.apply()
+
     var lastDeliveredAt: Long
         get() = prefs.getLong(KEY_LAST_DELIVERED, 0)
         set(v) = prefs.edit().putLong(KEY_LAST_DELIVERED, v).apply()
@@ -66,6 +86,10 @@ class AppState(private val prefs: SharedPreferences) {
         private const val KEY_ATTACHMENTS = "pending_attachments"
         private const val KEY_LAST_DELIVERED = "last_delivered_at"
         private const val KEY_APP_URL = "app_url"
+        private const val KEY_UPDATE_CHECKED = "update_checked_at"
+        private const val KEY_UPDATE_CODE = "update_ready_code"
+        private const val KEY_UPDATE_NAME = "update_ready_name"
+        private const val KEY_UPDATE_SHA = "update_ready_sha256"
 
         @Volatile private var instance: AppState? = null
 

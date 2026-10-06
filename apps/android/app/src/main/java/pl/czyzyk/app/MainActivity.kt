@@ -31,6 +31,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,6 +60,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
+import pl.czyzyk.app.update.ApkInstaller
+import pl.czyzyk.app.update.Updates
 import pl.czyzyk.app.web.PwaWebView
 import pl.czyzyk.app.web.SharedChat
 import pl.czyzyk.app.web.SharedChatException
@@ -84,6 +88,9 @@ class MainActivity : ComponentActivity() {
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     // Read by the JS bridge on a binder thread.
     private val sharedChat = AtomicReference<SharedChat?>(null)
+    private var update by mutableStateOf<Updates.Outcome.Ready?>(null)
+    private var updateDialogDismissed by mutableStateOf(false)
+    private var checkingUpdate by mutableStateOf(false)
 
     // <input type="file"> in the PWA (e.g. Admin → Import of a chat export).
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -114,7 +121,65 @@ class MainActivity : ComponentActivity() {
             },
         )
         handleIntent(intent)
+        if (Deps.updatesEnabled()) Work.scheduleUpdateCheck(this)
         setContent { Root() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!Deps.updatesEnabled()) return
+        update = Updates.ready(Deps.state(this), Updates.dir(this), Deps.versionCode())
+        if (Updates.shouldCheckOnOpen(Deps.state(this))) checkForUpdate(manual = false)
+    }
+
+    /** Reads the latest release and downloads a newer APK off the main thread. */
+    private fun checkForUpdate(manual: Boolean) {
+        if (checkingUpdate) return
+        checkingUpdate = true
+        val state = Deps.state(this)
+        val dir = Updates.dir(this)
+        thread(name = "update-check") {
+            val outcome = Updates.prepare(state, Deps.updater(), dir, Deps.versionCode())
+            runOnUiThread {
+                checkingUpdate = false
+                refreshTick++
+                update = outcome as? Updates.Outcome.Ready ?: Updates.ready(state, dir, Deps.versionCode())
+                if (outcome is Updates.Outcome.Ready && manual) updateDialogDismissed = false
+                if (manual) {
+                    val message = when (outcome) {
+                        Updates.Outcome.UpToDate -> "Masz najnowszą wersję."
+                        Updates.Outcome.Unavailable -> "Nie udało się sprawdzić aktualizacji."
+                        is Updates.Outcome.Failed -> "Nie udało się pobrać aktualizacji."
+                        is Updates.Outcome.Ready -> null
+                    }
+                    message?.let { Toast.makeText(this, it, Toast.LENGTH_SHORT).show() }
+                }
+            }
+        }
+    }
+
+    private fun installUpdate() {
+        val ready = update ?: return
+        if (!ApkInstaller.allowed(this)) {
+            Toast.makeText(this, "Zezwól Czyżykowi na instalowanie aplikacji, potem wróć i stuknij „Zainstaluj”.", Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            return
+        }
+        val state = Deps.state(this)
+        val dir = Updates.dir(this)
+        thread(name = "update-install") {
+            val started = runCatching {
+                if (!Updates.verify(ready, state, dir)) return@runCatching false
+                Deps.install(this, ready.apk, true)
+                true
+            }.getOrDefault(false)
+            runOnUiThread {
+                if (!started) {
+                    update = null
+                    Toast.makeText(this, "Nie udało się zainstalować aktualizacji. Spróbuj ponownie później.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -129,6 +194,16 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Root() {
+        update?.takeUnless { updateDialogDismissed }?.let { ready ->
+            UpdateDialog(
+                versionName = ready.update.versionName,
+                onInstall = {
+                    updateDialogDismissed = true
+                    installUpdate()
+                },
+                onLater = { updateDialogDismissed = true },
+            )
+        }
         when (screen) {
             Screen.Web -> {
                 BackHandler {
@@ -144,6 +219,11 @@ class MainActivity : ComponentActivity() {
                     appUrl = appUrl,
                     onSaveAppUrl = ::saveAppUrl,
                     onOpenApp = { screen = Screen.Web },
+                    updates = if (Deps.updatesEnabled()) {
+                        UpdatesUi(update?.update?.versionName, checkingUpdate, { checkForUpdate(manual = true) }, ::installUpdate)
+                    } else {
+                        null
+                    },
                 )
             }
         }
@@ -247,6 +327,27 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Composable
+private fun UpdateDialog(versionName: String, onInstall: () -> Unit, onLater: () -> Unit) {
+    MaterialTheme {
+        AlertDialog(
+            onDismissRequest = onLater,
+            title = { Text("Nowa wersja Czyżyka") },
+            text = { Text("Wersja $versionName jest pobrana i gotowa do instalacji. Aplikacja na chwilę się zamknie.") },
+            confirmButton = { Button(onClick = onInstall) { Text("Zainstaluj") } },
+            dismissButton = { TextButton(onClick = onLater) { Text("Później") } },
+        )
+    }
+}
+
+/** Update state for the phone screen; null when this build does not update itself (debug). */
+class UpdatesUi(
+    val readyVersion: String?,
+    val checking: Boolean,
+    val onCheck: () -> Unit,
+    val onInstall: () -> Unit,
+)
+
 /** The hosted PWA, with a fallback when it cannot be loaded (offline, wrong address). */
 @Composable
 private fun WebScreen(web: PwaWebView, loadError: Boolean, onPhoneSettings: () -> Unit) {
@@ -289,6 +390,8 @@ private data class Status(
     val trackedGroups: Int,
     val syncInterval: SyncInterval,
     val trackedFetchedAt: Long,
+    val installAllowed: Boolean,
+    val lastUpdateCheckAt: Long,
 )
 
 private fun readStatus(context: Context): Status {
@@ -306,6 +409,8 @@ private fun readStatus(context: Context): Status {
         trackedGroups = state.trackedGroups.size,
         syncInterval = state.syncInterval,
         trackedFetchedAt = state.trackedFetchedAt,
+        installAllowed = ApkInstaller.allowed(context),
+        lastUpdateCheckAt = state.lastUpdateCheckAt,
     )
 }
 
@@ -319,6 +424,7 @@ fun CzyzykApp(
     appUrl: String?,
     onSaveAppUrl: (String) -> Boolean,
     onOpenApp: () -> Unit,
+    updates: UpdatesUi? = null,
 ) {
     val context = LocalContext.current
     var status by remember { mutableStateOf(readStatus(context)) }
@@ -340,6 +446,7 @@ fun CzyzykApp(
                 PermissionsCard(status)
                 QueueCard(status)
                 SyncCard(status) { status = readStatus(context) }
+                UpdatesCard(status, updates)
                 TipsCard()
             }
         }
@@ -495,6 +602,44 @@ private fun SyncCard(status: Status, onChanged: () -> Unit) {
 private fun formatTime(millis: Long): String =
     if (millis == 0L) "jeszcze nie było"
     else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(millis))
+
+@Composable
+private fun UpdatesCard(status: Status, updates: UpdatesUi?) {
+    val context = LocalContext.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Aktualizacje", style = MaterialTheme.typography.titleMedium)
+            Text("Zainstalowana wersja: ${BuildConfig.VERSION_NAME}")
+            if (updates == null) {
+                Text(
+                    "Ta wersja (debug) nie aktualizuje się sama. Zainstaluj wydanie z GitHuba, żeby dostawać aktualizacje automatycznie.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                return@Column
+            }
+            Text(
+                "Czyżyk raz dziennie sprawdza nowe wydanie na GitHubie, pobiera je i instaluje – bez pytania, gdy Android na to pozwala.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text("Ostatnie sprawdzenie: " + formatTime(status.lastUpdateCheckAt))
+            if (!status.installAllowed) {
+                StatusLine(false, "Brak zgody na instalowanie aktualizacji")
+                Button(onClick = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")),
+                    )
+                }) { Text("Zezwól na instalowanie") }
+            }
+            updates.readyVersion?.let { version ->
+                StatusLine(true, "Gotowa do instalacji: $version")
+                Button(onClick = updates.onInstall) { Text("Zainstaluj") }
+            }
+            OutlinedButton(onClick = updates.onCheck, enabled = !updates.checking) {
+                Text(if (updates.checking) "Sprawdzam…" else "Sprawdź teraz")
+            }
+        }
+    }
+}
 
 @Composable
 private fun TipsCard() {
