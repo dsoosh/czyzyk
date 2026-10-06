@@ -60,92 +60,95 @@ export function TodayPage() {
         </p>
       )}
 
-      <Section title="Na jutro przynieść" empty="Na jutro nic do przyniesienia" stripe="earth">
-        {data.bringTomorrow.map((b) => (
-          <Row key={b.id}>
-            <div className="flex items-start gap-3">
-              <DoneToggle
-                checked={b.packed_at != null}
-                label={b.description}
-                disabled={mark.pending === b.id}
-                onToggle={() => void mark.toggle(b.id, b.packed_at == null)}
-              />
-              <div className="flex flex-1 flex-col gap-1">
-                <span className={b.packed_at ? "text-muted line-through" : "font-semibold"}>{b.description}</span>
-                <Meta>
-                  {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
-                  <ChildTag names={childNames(data.children, b)} />
-                  <span>{g(b.group_id)}</span>
-                  <SourceLink kind="bring_item" id={b.id} />
-                </Meta>
-              </div>
-            </div>
-          </Row>
-        ))}
-      </Section>
-
-      <Section title="Wydarzenia" empty="Brak wydarzeń w najbliższym tygodniu" stripe="sun">
-        {data.events.map((e) => {
-          const day = warsawDay(e.starts_at);
-          return (
-            <Row key={e.id}>
-              <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-semibold hover:underline">
-                {e.title}
-              </Link>
-              <Meta>
-                <span className="font-semibold text-ink">{dayLabel(day, today)}</span>
-                <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
-                <ChildTag names={childNames(data.children, e)} />
-                <span>{g(e.group_id)}</span>
-                <SourceLink kind="event" id={e.id} />
-              </Meta>
-            </Row>
-          );
-        })}
-      </Section>
-
-      <Section title="Płatności" empty="Brak płatności z bliskim terminem" stripe="water">
-        {data.payments.map((p) => {
-          const overdue = p.due_date! < today;
-          return (
-            <Row key={p.id}>
-              <div className="flex items-center gap-3">
+      {/* Phone: one column; desktop: the four sections in a 2×2 grid. */}
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8 lg:gap-y-8 lg:space-y-0">
+        <Section title="Na jutro przynieść" empty="Na jutro nic do przyniesienia" stripe="earth">
+          {data.bringTomorrow.map((b) => (
+            <Row key={b.id}>
+              <div className="flex items-start gap-3">
+                <DoneToggle
+                  checked={b.packed_at != null}
+                  label={b.description}
+                  disabled={mark.pending === b.id}
+                  onToggle={() => void mark.toggle(b.id, b.packed_at == null)}
+                />
                 <div className="flex flex-1 flex-col gap-1">
-                  <span className="font-semibold">{p.description}</span>
+                  <span className={b.packed_at ? "text-muted line-through" : "font-semibold"}>{b.description}</span>
                   <Meta>
-                    <span className={overdue ? "font-semibold text-red-700" : ""}>
-                      {overdue ? "po terminie: " : "do "}
-                      {dayLabel(p.due_date!, today)}
-                    </span>
-                    <ChildTag names={childNames(data.children, p)} />
-                    <span>{g(p.group_id)}</span>
-                    <SourceLink kind="payment" id={p.id} />
+                    {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
+                    <ChildTag names={childNames(data.children, b)} />
+                    <span>{g(b.group_id)}</span>
+                    <SourceLink kind="bring_item" id={b.id} />
                   </Meta>
                 </div>
-                {p.amount_pln != null && <span className="text-[17px] font-bold whitespace-nowrap">{formatAmount(p.amount_pln)}</span>}
               </div>
             </Row>
-          );
-        })}
-      </Section>
+          ))}
+        </Section>
 
-      <Section title="Wymaga odpowiedzi" empty="Nic nie czeka na odpowiedź" stripe="air">
-        {data.actions.map((a) => (
-          <Row key={a.id}>
-            <span className="font-semibold">{a.question}</span>
-            <Meta>
-              {a.due_date && (
-                <span className={a.due_date < addDays(today, 2) ? "font-semibold text-red-700" : ""}>
-                  do {dayLabel(a.due_date, today)}
-                </span>
-              )}
-              <ChildTag names={childNames(data.children, a)} />
-              <span>{g(a.group_id)}</span>
-              <SourceLink kind="action_required" id={a.id} />
-            </Meta>
-          </Row>
-        ))}
-      </Section>
+        <Section title="Wydarzenia" empty="Brak wydarzeń w najbliższym tygodniu" stripe="sun">
+          {data.events.map((e) => {
+            const day = warsawDay(e.starts_at);
+            return (
+              <Row key={e.id}>
+                <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-semibold hover:underline">
+                  {e.title}
+                </Link>
+                <Meta>
+                  <span className="font-semibold text-ink">{dayLabel(day, today)}</span>
+                  <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
+                  <ChildTag names={childNames(data.children, e)} />
+                  <span>{g(e.group_id)}</span>
+                  <SourceLink kind="event" id={e.id} />
+                </Meta>
+              </Row>
+            );
+          })}
+        </Section>
+
+        <Section title="Płatności" empty="Brak płatności z bliskim terminem" stripe="water">
+          {data.payments.map((p) => {
+            const overdue = p.due_date! < today;
+            return (
+              <Row key={p.id}>
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-1 flex-col gap-1">
+                    <span className="font-semibold">{p.description}</span>
+                    <Meta>
+                      <span className={overdue ? "font-semibold text-red-700" : ""}>
+                        {overdue ? "po terminie: " : "do "}
+                        {dayLabel(p.due_date!, today)}
+                      </span>
+                      <ChildTag names={childNames(data.children, p)} />
+                      <span>{g(p.group_id)}</span>
+                      <SourceLink kind="payment" id={p.id} />
+                    </Meta>
+                  </div>
+                  {p.amount_pln != null && <span className="text-[17px] font-bold whitespace-nowrap">{formatAmount(p.amount_pln)}</span>}
+                </div>
+              </Row>
+            );
+          })}
+        </Section>
+
+        <Section title="Wymaga odpowiedzi" empty="Nic nie czeka na odpowiedź" stripe="air">
+          {data.actions.map((a) => (
+            <Row key={a.id}>
+              <span className="font-semibold">{a.question}</span>
+              <Meta>
+                {a.due_date && (
+                  <span className={a.due_date < addDays(today, 2) ? "font-semibold text-red-700" : ""}>
+                    do {dayLabel(a.due_date, today)}
+                  </span>
+                )}
+                <ChildTag names={childNames(data.children, a)} />
+                <span>{g(a.group_id)}</span>
+                <SourceLink kind="action_required" id={a.id} />
+              </Meta>
+            </Row>
+          ))}
+        </Section>
+      </div>
     </div>
   );
 }

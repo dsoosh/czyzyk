@@ -57,7 +57,7 @@ export function AssistantPanel() {
         type="button"
         onClick={() => setOpen(true)}
         // Sits above the floating tab bar (16px from the bottom, about 68px tall).
-        className="fixed right-5 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-20 rounded-full bg-sun px-5 py-1.5 font-display text-[28px] leading-tight font-bold text-ink shadow-lg hover:brightness-95"
+        className="fixed right-5 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-20 lg:right-8 lg:bottom-8 rounded-full bg-sun px-5 py-1.5 font-display text-[28px] leading-tight font-bold text-ink shadow-lg hover:brightness-95"
       >
         Zapytaj
       </button>
@@ -68,7 +68,7 @@ export function AssistantPanel() {
     <section
       role="dialog"
       aria-label="Zapytaj asystenta"
-      className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-h-[80vh] max-w-lg flex-col rounded-t-[28px] bg-card shadow-2xl"
+      className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-h-[80vh] max-w-lg flex-col rounded-t-[28px] bg-card shadow-2xl lg:inset-x-auto lg:right-8 lg:bottom-8 lg:max-h-[75vh] lg:w-[420px] lg:rounded-[28px]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <header className="flex items-start gap-2 px-5 pt-4">
