@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { LoadError, Loading, Meta, SourceLink } from "../components/ui";
 import {
@@ -94,9 +94,16 @@ function ListView({ today }: { today: string }) {
   );
 }
 
+/** The month view keeps its month in the URL (?miesiac=YYYY-MM), so the assistant knows what is on screen. */
+export const MONTH_PARAM = "miesiac";
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 function MonthView({ today }: { today: string }) {
   const { client } = useAuth();
-  const [month, setMonth] = useState(today.slice(0, 7));
+  const [params, setParams] = useSearchParams();
+  const param = params.get(MONTH_PARAM) ?? "";
+  const month = MONTH_RE.test(param) ? param : today.slice(0, 7);
+  const setMonth = (m: string) => setParams({ [MONTH_PARAM]: m }, { replace: true });
   const [selected, setSelected] = useState<string | null>(today);
   const grid = useMemo(() => monthGrid(month), [month]);
   const from = `${month}-01`;
@@ -172,8 +179,10 @@ function MonthView({ today }: { today: string }) {
 }
 
 export function CalendarPage() {
-  const [view, setView] = useState<View>("list");
+  const [params, setParams] = useSearchParams();
+  const view: View = params.has(MONTH_PARAM) ? "month" : "list";
   const today = warsawDay(new Date());
+  const setView = (v: View) => setParams(v === "month" ? { [MONTH_PARAM]: today.slice(0, 7) } : {}, { replace: true });
   const tab = (v: View, label: string) => (
     <button
       type="button"

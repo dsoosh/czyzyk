@@ -7,7 +7,9 @@ describe("loadApiConfig", () => {
       PORT: 3000,
       HOST: "0.0.0.0",
       INGEST_RATE_LIMIT_PER_TOKEN: 120,
+      ASSISTANT_DAILY_LIMIT: 100,
     });
+    expect(loadApiConfig({ DATABASE_URL: "postgres://user:pass@localhost/db" }).CHAT_MODEL).toBeUndefined();
     expect(() => loadApiConfig({})).toThrow(/DATABASE_URL: missing/);
   });
 

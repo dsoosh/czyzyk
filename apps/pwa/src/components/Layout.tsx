@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useOutletContext } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
 import { fetchReviewCount } from "../lib/review";
 import { useLoader, useOnForeground } from "../lib/useLoader";
+import { AssistantPanel } from "./AssistantPanel";
 import { Logo } from "./Logo";
 
 export interface LayoutContext {
@@ -37,6 +38,7 @@ export function Layout() {
       <main className="flex-1 px-4 pb-24">
         <Outlet context={{ refreshReviewCount: reviewCount.reload } satisfies LayoutContext} />
       </main>
+      <AssistantPanel />
       <nav
         aria-label="Nawigacja"
         className="fixed inset-x-0 bottom-0 mx-auto flex max-w-lg border-t-4 border-water bg-white pb-[env(safe-area-inset-bottom)]"

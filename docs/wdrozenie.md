@@ -189,4 +189,9 @@ Uzupełnia wiadomości, których nie dostarczyły powiadomienia (np. sprzed spar
 3. PWA → **Admin → Import** → wybierz plik. Grupa jest podpowiadana z nazwy pliku (musi być śledzona), podgląd pokazuje liczbę wiadomości i zakres dat.
 4. Wybierz, z jakiego okresu nowe wiadomości mają przejść analizę (domyślnie 30 dni; starsze są zapisywane jako historia bez wysyłania do modelu) i stuknij **Importuj**.
 
-Wiadomości znane już z powiadomień albo z wcześniejszego importu są pomijane. Wyniki analizy pojawiają się po kilku minutach (worker sprawdza nowe wiadomości co minutę). Wymaga `SUPABASE_URL` i `PWA_ORIGIN` w usłudze API – ustawia je `.railway/railway.ts`.
+Wiadomości znane już z powiadomień albo z wcześniejszego importu są pomijane. Analiza nowych wiadomości rusza kilkanaście sekund po imporcie. Wymaga `SUPABASE_URL` i `PWA_ORIGIN` w usłudze API – ustawia je `.railway/railway.ts`.
+
+# Historia czatów i asystent „Zapytaj”
+
+- **Czaty** (zakładka w dolnym menu) pokazują historię każdej śledzonej grupy z wyszukiwaniem. Nie wymagają konfiguracji – dane czytane są z Supabase jak reszta PWA.
+- **Zapytaj** (przycisk na ekranach rodziny) wysyła pytanie do `services/api` (`POST /assistant/ask`), które pobiera dane bieżącego ekranu i pyta model Claude. W usłudze `api` ustaw ręcznie `ANTHROPIC_API_KEY` (ten sam klucz co w workerze albo osobny); `CHAT_MODEL` i `ASSISTANT_DAILY_LIMIT` są w `.railway/railway.ts`. Bez klucza przycisk pokazuje, że asystent nie jest skonfigurowany, a reszta API działa normalnie.
