@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { App } from "../App";
 import { adminProfile, familyProfile, fakeSupabase } from "../test/fakeSupabase";
 import { AuthProvider, NO_ACCESS_MESSAGE, readAuthRedirectError } from "./AuthProvider";
@@ -71,5 +71,19 @@ describe("readAuthRedirectError", () => {
     expect(readAuthRedirectError({ search: "?error=server_error", hash: "" })).toBe(NO_ACCESS_MESSAGE);
     expect(readAuthRedirectError({ search: "", hash: "#error=x&error_description=Inny+b%C5%82%C4%85d" })).toBe("Inny błąd");
     expect(readAuthRedirectError({ search: "?code=abc", hash: "" })).toBeNull();
+  });
+
+  it("w aplikacji Android logowanie wraca przez czyzyk://auth/callback", async () => {
+    (window as { CzyzykAndroid?: unknown }).CzyzykAndroid = { openPhoneSettings: vi.fn() };
+    try {
+      const fake = fakeSupabase();
+      renderApp(fake);
+      await userEvent.click(await screen.findByRole("button", { name: "Zaloguj przez Google" }));
+      expect(fake.auth.signInWithOAuth).toHaveBeenCalledWith(
+        expect.objectContaining({ options: expect.objectContaining({ redirectTo: "czyzyk://auth/callback" }) }),
+      );
+    } finally {
+      delete (window as { CzyzykAndroid?: unknown }).CzyzykAndroid;
+    }
   });
 });

@@ -1,21 +1,30 @@
 package pl.czyzyk.app
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.ViewGroup
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -41,37 +50,121 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
+import pl.czyzyk.app.web.PwaWebView
+import pl.czyzyk.app.web.WebRules
 import pl.czyzyk.app.work.Deps
 import pl.czyzyk.app.work.SyncInterval
 import pl.czyzyk.app.work.Work
 import java.text.DateFormat
 import java.util.Date
 
+/** Which screen the activity shows: the hosted PWA, or the native phone screen. */
+private enum class Screen { Web, Phone }
+
 class MainActivity : ComponentActivity() {
 
     private var refreshTick by mutableIntStateOf(0)
+    private var screen by mutableStateOf(Screen.Phone)
+    private var appUrl by mutableStateOf<String?>(null)
+    private var loadError by mutableStateOf(false)
+    private lateinit var web: PwaWebView
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    // <input type="file"> in the PWA (e.g. Admin → Import of a chat export).
+    private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
+        fileCallback = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        handlePairingIntent(intent)
-        setContent { CzyzykApp(refreshTick, ::pairFromLink) }
+        appUrl = Deps.state(this).appUrl
+        screen = if (appUrl != null) Screen.Web else Screen.Phone
+        web = PwaWebView(
+            this,
+            appUrl = { appUrl },
+            onOpenPhoneSettings = { screen = Screen.Phone },
+            onLoadError = { loadError = it },
+            onFileChooser = { callback, params ->
+                fileCallback?.onReceiveValue(null)
+                fileCallback = callback
+                try {
+                    pickFiles.launch(params.createIntent())
+                    true
+                } catch (_: ActivityNotFoundException) {
+                    fileCallback = null
+                    false
+                }
+            },
+        )
+        handleIntent(intent)
+        setContent { Root() }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handlePairingIntent(intent)
+        handleIntent(intent)
     }
 
-    private fun handlePairingIntent(intent: Intent?) {
-        intent?.data?.toString()?.let(::pairFromLink)
+    override fun onDestroy() {
+        web.view.destroy()
+        super.onDestroy()
     }
 
-    /** Accepts `czyzyk://pair?server=…&token=…` from a tapped link, a QR code or a pasted text. */
+    @Composable
+    private fun Root() {
+        when (screen) {
+            Screen.Web -> {
+                BackHandler {
+                    if (web.view.canGoBack()) web.view.goBack() else finish()
+                }
+                WebScreen(web, loadError, onPhoneSettings = { screen = Screen.Phone })
+            }
+            Screen.Phone -> {
+                BackHandler(enabled = appUrl != null) { screen = Screen.Web }
+                CzyzykApp(
+                    refreshTick = refreshTick,
+                    onPairLink = ::pairFromLink,
+                    appUrl = appUrl,
+                    onSaveAppUrl = ::saveAppUrl,
+                    onOpenApp = { screen = Screen.Web },
+                )
+            }
+        }
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val link = intent?.data?.toString() ?: return
+        if (WebRules.isAuthCallback(link)) {
+            // Google sign-in finished in the browser: complete it in the WebView (PKCE verifier lives there).
+            val target = appUrl?.let { WebRules.authCallbackTarget(link, it) } ?: return
+            screen = Screen.Web
+            web.load(target)
+            return
+        }
+        pairFromLink(link)
+    }
+
+    /** Typed PWA address; returns false when it is not a valid https address. */
+    private fun saveAppUrl(input: String): Boolean {
+        val url = WebRules.normalizeAppUrl(input)
+        if (url == null) {
+            Toast.makeText(this, "Podaj adres https aplikacji, np. czyzyk.up.railway.app", Toast.LENGTH_LONG).show()
+            return false
+        }
+        Deps.state(this).appUrl = url
+        appUrl = url
+        screen = Screen.Web
+        return true
+    }
+
+    /** Accepts `czyzyk://pair?server=…&token=…[&app=…]` from a tapped link, a QR code or a pasted text. */
     private fun pairFromLink(link: String): Boolean {
         val pairing = PairingLink.parse(link)
         if (pairing == null) {
@@ -79,12 +172,47 @@ class MainActivity : ComponentActivity() {
             return false
         }
         Deps.store(this).pair(pairing)
+        PairingLink.appUrl(link)?.let {
+            Deps.state(this).appUrl = it
+            appUrl = it
+        }
         Work.schedulePeriodicSync(this)
         Work.enqueueSync(this)
         Work.enqueueSend(this)
         refreshTick++
         Toast.makeText(this, "Połączono z serwerem", Toast.LENGTH_SHORT).show()
         return true
+    }
+}
+
+/** The hosted PWA, with a fallback when it cannot be loaded (offline, wrong address). */
+@Composable
+private fun WebScreen(web: PwaWebView, loadError: Boolean, onPhoneSettings: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color(0xFFF5EAD8)).safeDrawingPadding()) {
+        AndroidView(
+            factory = {
+                (web.view.parent as? ViewGroup)?.removeView(web.view)
+                web.view
+            },
+            update = { web.ensureLoaded() },
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (loadError) {
+            MaterialTheme {
+                Surface(Modifier.fillMaxSize()) {
+                    Column(
+                        Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text("Nie udało się otworzyć aplikacji", style = MaterialTheme.typography.titleLarge)
+                        Text("Sprawdź połączenie z internetem albo adres aplikacji w ustawieniach telefonu.")
+                        Button(onClick = { web.reload() }) { Text("Spróbuj ponownie") }
+                        OutlinedButton(onClick = onPhoneSettings) { Text("Ustawienia telefonu") }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -123,7 +251,13 @@ private val Ok = Color(0xFF3F6212)
 private val Bad = Color(0xFFB91C1C)
 
 @Composable
-fun CzyzykApp(refreshTick: Int, onPairLink: (String) -> Boolean) {
+fun CzyzykApp(
+    refreshTick: Int,
+    onPairLink: (String) -> Boolean,
+    appUrl: String?,
+    onSaveAppUrl: (String) -> Boolean,
+    onOpenApp: () -> Unit,
+) {
     val context = LocalContext.current
     var status by remember { mutableStateOf(readStatus(context)) }
     LifecycleResumeEffect(refreshTick) {
@@ -134,16 +268,42 @@ fun CzyzykApp(refreshTick: Int, onPairLink: (String) -> Boolean) {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
+                modifier = Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(AppInfo.NAME, style = MaterialTheme.typography.headlineMedium)
                 Text(AppInfo.TAGLINE, style = MaterialTheme.typography.bodyMedium)
+                AppCard(appUrl, onSaveAppUrl, onOpenApp)
                 PairingCard(status, onPairLink)
                 PermissionsCard(status)
                 QueueCard(status)
                 SyncCard(status) { status = readStatus(context) }
                 TipsCard()
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppCard(appUrl: String?, onSave: (String) -> Boolean, onOpen: () -> Unit) {
+    var typed by remember(appUrl) { mutableStateOf(appUrl.orEmpty()) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Aplikacja Czyżyk", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Adres aplikacji (PWA) otwieranej w tym telefonie. Link parowania podaje go sam; możesz też wpisać go ręcznie.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                label = { Text("Adres aplikacji") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onSave(typed) }, enabled = typed.isNotBlank() && typed != appUrl) { Text("Zapisz adres") }
+                if (appUrl != null) Button(onClick = onOpen) { Text("Otwórz aplikację") }
             }
         }
     }

@@ -46,6 +46,11 @@ class AppState(private val prefs: SharedPreferences) {
     val pendingAttachments: Int get() = prefs.getInt(KEY_ATTACHMENTS, 0)
     @Synchronized fun incrementAttachments() = prefs.edit().putInt(KEY_ATTACHMENTS, pendingAttachments + 1).apply()
 
+    /** Origin of the PWA shown as the app's main view (from pairing or typed in), or null. */
+    var appUrl: String?
+        get() = prefs.getString(KEY_APP_URL, null)
+        set(v) = prefs.edit().putString(KEY_APP_URL, v).apply()
+
     var lastDeliveredAt: Long
         get() = prefs.getLong(KEY_LAST_DELIVERED, 0)
         set(v) = prefs.edit().putLong(KEY_LAST_DELIVERED, v).apply()
@@ -60,6 +65,7 @@ class AppState(private val prefs: SharedPreferences) {
         private const val KEY_PENDING_REPORTS = "pending_group_reports"
         private const val KEY_ATTACHMENTS = "pending_attachments"
         private const val KEY_LAST_DELIVERED = "last_delivered_at"
+        private const val KEY_APP_URL = "app_url"
 
         @Volatile private var instance: AppState? = null
 

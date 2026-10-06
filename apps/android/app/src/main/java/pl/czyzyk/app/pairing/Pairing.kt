@@ -1,5 +1,6 @@
 package pl.czyzyk.app.pairing
 
+import pl.czyzyk.app.web.WebRules
 import java.net.URI
 import java.net.URLDecoder
 
@@ -30,5 +31,16 @@ object PairingLink {
         if (serverUri.scheme != "https" && !(serverUri.scheme == "http" && local)) return null
         if (serverUri.host.isNullOrBlank()) return null
         return Pairing(server, token.lowercase())
+    }
+
+    /** The PWA address from the optional `app` parameter (normalised), or null. */
+    fun appUrl(link: String): String? {
+        val uri = runCatching { URI(link.trim()) }.getOrNull() ?: return null
+        if (uri.scheme != "czyzyk" || uri.host != "pair") return null
+        val value = (uri.rawQuery ?: return null).split("&")
+            .map { it.split("=", limit = 2) }
+            .firstOrNull { it.size == 2 && it[0] == "app" }
+            ?.let { URLDecoder.decode(it[1], "UTF-8") }
+        return WebRules.normalizeAppUrl(value)
     }
 }

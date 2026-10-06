@@ -1,5 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ANDROID_AUTH_REDIRECT, androidBridge } from "../lib/androidApp";
 import type { Db } from "../lib/supabase";
 import type { Profile } from "../lib/types";
 
@@ -117,7 +118,9 @@ export function AuthProvider({ client, children }: { client: Db; children: React
         await client.auth.signInWithOAuth({
           provider: "google",
           options: {
-            redirectTo: window.location.origin,
+            // Google blocks sign-in inside the Android WebView: the app opens it in the browser
+            // and takes the czyzyk://auth/callback?code=… redirect back into the WebView.
+            redirectTo: androidBridge() ? ANDROID_AUTH_REDIRECT : window.location.origin,
             queryParams: options?.selectAccount ? { prompt: "select_account" } : undefined,
           },
         });

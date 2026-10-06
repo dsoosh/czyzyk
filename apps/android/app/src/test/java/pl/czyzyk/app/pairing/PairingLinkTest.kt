@@ -38,4 +38,13 @@ class PairingLinkTest {
     fun neverPrintsTheToken() {
         assert(!Pairing("https://a.b", token).toString().contains(token))
     }
+
+    @Test
+    fun readsOptionalAppAddress() {
+        val link = "czyzyk://pair?server=https%3A%2F%2Fapi.czyzyk.example&token=$token&app=https%3A%2F%2Fczyzyk.example%2F"
+        assertEquals(Pairing("https://api.czyzyk.example", token), PairingLink.parse(link))
+        assertEquals("https://czyzyk.example", PairingLink.appUrl(link))
+        assertNull(PairingLink.appUrl("czyzyk://pair?server=https%3A%2F%2Fa.b&token=$token"))
+        assertNull(PairingLink.appUrl("czyzyk://pair?server=https%3A%2F%2Fa.b&token=$token&app=http%3A%2F%2Fevil.example"))
+    }
 }

@@ -12,6 +12,15 @@ Kotlin, Jetpack Compose, minSdk 26.
 - **Kolejka offline** (`queue/MessageQueue`, SQLite) + WorkManager (`work/SendWorker`) – wiadomość jest zapisywana przed wysyłką i usuwana dopiero po odpowiedzi serwera; ponowienia z wykładniczym backoffem. Klucz idempotencji to UUIDv5 z treści powiadomienia, więc ponownie wyświetlone powiadomienie nie tworzy duplikatu.
 - **Ekran statusu** – parowanie, dostęp do powiadomień, optymalizacja baterii (przyciski do ustawień systemu), liczba wiadomości w kolejce, zaległe załączniki, ostatnia wysyłka, wskazówki („cichy dźwięk zamiast wyciszenia”).
 
+## Aplikacja Czyżyk w telefonie (WebView)
+
+Głównym widokiem jest PWA Czyżyka w osadzonym WebView, więc z aplikacji korzysta się tak jak w przeglądarce. Obecny ekran (parowanie, uprawnienia, kolejka, synchronizacja) to **Ustawienia telefonu** – otwiera się z PWA (Ustawienia → „Ustawienia telefonu”), z ekranu błędu ładowania albo sam, gdy aplikacja nie zna adresu PWA.
+
+- **Adres PWA** przychodzi w linku parowania (`&app=…`, dopisuje go panel admina) albo wpisuje się go ręcznie na karcie „Aplikacja Czyżyk”.
+- **Logowanie Google**: Google blokuje logowanie w WebView, więc otwiera się ono w przeglądarce telefonu i wraca do aplikacji przez `czyzyk://auth/callback?code=…`; aplikacja kończy logowanie w WebView. Wymaga wpisu `czyzyk://auth/callback` w Supabase (Authentication → URL Configuration → Redirect URLs).
+- W WebView otwierają się tylko strony z adresu PWA; inne linki (np. z wiadomości) idą do przeglądarki. Most `window.CzyzykAndroid` ma tylko `openPhoneSettings()`.
+- Ograniczenie: Android WebView nie obsługuje powiadomień Web Push – powiadomienia działają w PWA zainstalowanej z przeglądarki.
+
 Aplikacja nigdy nic nie wysyła do WhatsAppa i nie korzysta z jego protokołu.
 
 ## Budowanie
