@@ -35,7 +35,29 @@ echo "sdk.dir=$HOME/Android/Sdk" > local.properties   # ścieżka do Android SDK
 # APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-CI (GitHub Actions) buduje APK przy każdym pushu – artefakt `czyzyk-debug-apk`.
+CI (GitHub Actions) buduje APK przy każdym pushu – artefakt `czyzyk-debug-apk` (do testów; nie aktualizuje się sam).
+
+## Wydania i automatyczne aktualizacje
+
+Każdy merge zmian w `apps/android` do `main` uruchamia workflow **Android release**: buduje APK podpisany stałym kluczem i publikuje wydanie GitHub `android-v<numer>` z plikami `czyzyk.apk` i `version.json` (wersja, SHA-256, rozmiar).
+
+Zainstalowane wydanie raz dziennie (i przy otwarciu, nie częściej niż co 6 h) sprawdza `releases/latest/download/version.json`, pobiera nowszy APK, sprawdza rozmiar i SHA-256 i instaluje go. Na Androidzie 12+ instaluje bez pytania, jeśli poprzednią wersję zainstalował sam Czyżyk; w pozostałych przypadkach pokazuje okno „Nowa wersja Czyżyka” → **Zainstaluj**. Stan i przycisk „Sprawdź teraz” są w ustawieniach telefonu → **Aktualizacje**. Za pierwszym razem Android poprosi o zgodę „Instalowanie nieznanych aplikacji” dla Czyżyka.
+
+### Klucz podpisu (jednorazowo)
+
+Repozytorium jest publiczne – klucz trzymamy tylko w sekretach GitHuba i w bezpiecznej kopii poza nim (utrata klucza = aktualizacje znów wymagają reinstalacji).
+
+```bash
+keytool -genkeypair -v -keystore czyzyk-release.jks -alias czyzyk -keyalg RSA -keysize 4096 -validity 10000
+base64 -w0 czyzyk-release.jks   # wynik → sekret ANDROID_KEYSTORE_BASE64
+```
+
+GitHub → repozytorium → **Settings → Secrets and variables → Actions → New repository secret**:
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`czyzyk`), `ANDROID_KEY_PASSWORD`. Potem **Actions → Android release → Run workflow** publikuje pierwsze wydanie. Bez sekretów workflow tylko ostrzega.
+
+### Przejście z wersji debug
+
+Wersja debug ma inny klucz, więc nie zaktualizuje się do wydania: odinstaluj ją, zainstaluj `czyzyk.apk` z najnowszego wydania (GitHub → Releases), nadaj ponownie dostęp do powiadomień i sparuj telefon (Admin → Urządzenia → Dodaj telefon). Kolejne wersje przyjdą same.
 
 > Środowisko chmurowe Claude Code nie ma Android SDK ani dostępu do repozytorium Google Maven
 > (`dl.google.com`), więc APK budujemy lokalnie. Wersje AGP, Kotlina i Compose w
