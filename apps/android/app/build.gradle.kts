@@ -67,6 +67,8 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    // The code scanner pulls an old fragment; ActivityResult APIs need fragment >= 1.3 (lintVitalRelease).
+    implementation(libs.androidx.fragment)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.security.crypto)
