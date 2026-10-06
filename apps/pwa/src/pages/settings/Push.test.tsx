@@ -76,6 +76,16 @@ describe("Powiadomienia w ustawieniach", () => {
     expect(within(section).getByRole("status")).toHaveTextContent("Zapisano ustawienia powiadomień.");
   });
 
+  it("spóźniona odpowiedź o istniejącej subskrypcji nie cofa włączenia", async () => {
+    let answer: (s: PushSubscription | null) => void = () => undefined;
+    vi.mocked(push.currentSubscription).mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    renderAt("/ustawienia", { tables: { ical_tokens: [] } });
+    const section = await screen.findByRole("region", { name: "Powiadomienia" });
+    await act(async () => fireEvent.click(within(section).getByRole("button", { name: "Włącz powiadomienia" })));
+    await act(async () => answer(null));
+    expect(within(section).getByText("Włączone na tym urządzeniu")).toBeInTheDocument();
+  });
+
   it("odmowa zgody w przeglądarce jest wyjaśniona", async () => {
     vi.mocked(push.enablePush).mockRejectedValueOnce(new Error("permission"));
     renderAt("/ustawienia", { tables: { ical_tokens: [] } });
