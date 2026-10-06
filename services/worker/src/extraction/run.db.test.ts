@@ -21,7 +21,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  for (const t of ["bring_items", "events", "payments", "action_required", "closures", "facts", "messages", "sync_log", "wa_groups"]) {
+  for (const t of ["bring_items", "events", "payments", "action_required", "closures", "facts", "messages", "sync_log", "children", "wa_groups"]) {
     await db.client.query(`delete from ${t}`);
   }
   const { rows } = await db.client.query("insert into wa_groups (wa_name, display_name, tracked) values ('Motylki 2026/27', 'Motylki', true) returning id");
@@ -273,5 +273,38 @@ describe("runGroupExtraction", () => {
     expect(await runGroupExtraction(deps(model), groupId)).toMatchObject({ cancelled: 0, needsReview: 1 });
     const { rows } = await db.client.query("select status, pending_patch->>'op' as proposal from events");
     expect(rows[0]).toEqual({ status: "active", proposal: "cancel" });
+  });
+
+  it("przypisuje dzieci z listy (bez względu na wielkość liter), pomija nieznane, update zmienia przypisanie", async () => {
+    const { rows: kids } = await db.client.query<{ id: string; name: string }>(
+      "insert into children (name, group_id) values ('Zosia', $1), ('Antek', null) returning id, name",
+      [groupId],
+    );
+    const zosia = kids.find((c) => c.name === "Zosia")!.id;
+    const antek = kids.find((c) => c.name === "Antek")!.id;
+    await addMessage("Zosia przynosi jutro kasztany", "2026-10-07T16:02:00Z");
+    const first = scripted((p) => [
+      op({
+        op: "create",
+        type: "bring_item",
+        ref: null,
+        data: { description: "kasztany", due_date: "2026-10-08", event: null },
+        children: ["zosia", "Kasia"],
+        source_messages: [lastAlias(p)],
+      }),
+    ]);
+    await runGroupExtraction(deps(first.model), groupId);
+    expect(first.prompts[0]!.user).toContain('"Zosia" – grupa "Motylki"');
+    const { rows: created } = await db.client.query("select id, child_ids from bring_items");
+    expect(created).toEqual([{ id: expect.any(String), child_ids: [zosia] }]);
+
+    await addMessage("Sorry, kasztany przynosi Antek", "2026-10-07T16:30:00Z");
+    const second = scripted((p) => [
+      op({ op: "update", type: "bring_item", target: "E1", data: {}, children: ["Antek"], source_messages: [lastAlias(p)] }),
+    ]);
+    await runGroupExtraction(deps(second.model), groupId);
+    expect(second.prompts[0]!.user).toContain('| dzieci: ["Zosia"]');
+    const { rows: updated } = await db.client.query("select child_ids, description from bring_items");
+    expect(updated).toEqual([{ child_ids: [antek], description: "kasztany" }]);
   });
 });

@@ -1,4 +1,4 @@
-import { itemDataSchemas, type ItemData, type ItemType } from "@czyzyk/shared";
+import { CHILD_ITEM_TYPES, itemDataSchemas, type ItemData, type ItemType } from "@czyzyk/shared";
 import type pg from "pg";
 import { loadItem } from "./batch.js";
 import type { EventRef, Rejection, ResolvedOperation } from "./resolve.js";
@@ -138,6 +138,18 @@ function checkData(type: ItemType, data: unknown): ItemData[ItemType] {
 
 class ApplyRejection extends Error {}
 
+/** Child names as the model wrote them → ids; unknown names are dropped, the item still counts. */
+async function childIds(client: pg.PoolClient, names: string[]): Promise<string[]> {
+  if (names.length === 0) return [];
+  const { rows } = await client.query<{ id: string }>(
+    `select id from public.children where lower(btrim(name)) = any(select lower(btrim(n)) from unnest($1::text[]) n) order by name`,
+    [names],
+  );
+  return rows.map((r) => r.id);
+}
+
+const takesChildren = (type: ItemType) => (CHILD_ITEM_TYPES as readonly ItemType[]).includes(type);
+
 /**
  * Applies operations inside the caller's transaction. Each operation runs in its own
  * savepoint, so one bad operation is rejected without losing the others.
@@ -217,7 +229,8 @@ async function applyOne(
 
   if (op.op === "create") {
     const data = checkData(op.type, op.data);
-    const cols = render(columns(op.type, data, groupId, eventIdOf(op.eventRef)), 4);
+    const assigned: [string, string, unknown][] = takesChildren(op.type) ? [["child_ids", "$::uuid[]", await childIds(client, op.children)]] : [];
+    const cols = render([...columns(op.type, data, groupId, eventIdOf(op.eventRef)), ...assigned], 4);
     const { rows } = await client.query<{ id: string }>(
       `insert into ${table} (source_message_ids, confidence, rationale, status, ${cols.names.join(", ")})
        values ($1::uuid[], $2, $3, $4, ${cols.exprs.join(", ")})
@@ -258,6 +271,9 @@ async function applyOne(
   const eventId = op.eventRef === undefined ? currentEvent : eventIdOf(op.eventRef);
   // Only events move between "this group" and "whole kindergarten"; other items keep their group.
   const updatable = columns(op.type, data, groupId, eventId).filter(([name]) => op.type === "event" || name !== "group_id");
+  // An empty list keeps the current assignment; names that match no child do not clear it either.
+  const ids = takesChildren(op.type) ? await childIds(client, op.children) : [];
+  if (ids.length) updatable.push(["child_ids", "$::uuid[]", ids]);
   const cols = render(updatable, 5);
   const assignments = cols.names.map((name, i) => `${name} = ${cols.exprs[i]}`).join(", ");
   await client.query(

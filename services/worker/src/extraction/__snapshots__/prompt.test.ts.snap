@@ -4,9 +4,14 @@ exports[`buildExtractionPrompt > renders the user turn deterministically 1`] = `
 "Dzisiaj: środa, 2026-10-07 (strefa Europe/Warsaw).
 Grupa: "Motylki".
 
+<dzieci>
+"Zosia" – grupa "Motylki"
+"Antek"
+</dzieci>
+
 <elementy>
 E1 | event (wydarzenie) | {"title":"Wycieczka do ZOO","start":"2026-10-10","end":null,"all_day":true,"location":"ZOO","whole_kindergarten":false}
-E2 | bring_item (rzecz do przyniesienia) (czeka na przegląd) | {"description":"drugie śniadanie","due_date":"2026-10-10","event":"E1"}
+E2 | bring_item (rzecz do przyniesienia) (czeka na przegląd) | {"description":"drugie śniadanie","due_date":"2026-10-10","event":"E1"} | dzieci: ["Zosia"]
 </elementy>
 
 <wiadomosci_wczesniejsze>

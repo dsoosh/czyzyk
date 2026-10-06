@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
-import { DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
+import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
+import { childNames } from "../lib/children";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
 import { fetchToday, formatAmount, groupLabel, type Closure } from "../lib/items";
 import { doneLabel } from "../lib/tracking";
@@ -73,6 +74,7 @@ export function TodayPage() {
                 <span className={b.packed_at ? "text-muted line-through" : "font-semibold"}>{b.description}</span>
                 <Meta>
                   {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
+                  <ChildTag names={childNames(data.children, b)} />
                   <span>{g(b.group_id)}</span>
                   <SourceLink kind="bring_item" id={b.id} />
                 </Meta>
@@ -93,6 +95,7 @@ export function TodayPage() {
               <Meta>
                 <span className="font-semibold text-ink">{dayLabel(day, today)}</span>
                 <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
+                <ChildTag names={childNames(data.children, e)} />
                 <span>{g(e.group_id)}</span>
                 <SourceLink kind="event" id={e.id} />
               </Meta>
@@ -114,6 +117,7 @@ export function TodayPage() {
                       {overdue ? "po terminie: " : "do "}
                       {dayLabel(p.due_date!, today)}
                     </span>
+                    <ChildTag names={childNames(data.children, p)} />
                     <span>{g(p.group_id)}</span>
                     <SourceLink kind="payment" id={p.id} />
                   </Meta>
@@ -135,6 +139,7 @@ export function TodayPage() {
                   do {dayLabel(a.due_date, today)}
                 </span>
               )}
+              <ChildTag names={childNames(data.children, a)} />
               <span>{g(a.group_id)}</span>
               <SourceLink kind="action_required" id={a.id} />
             </Meta>

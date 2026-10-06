@@ -92,6 +92,15 @@ const anyItemData = z.union([
   factDataSchema,
 ]);
 
+/** Item types that can be assigned to children of the family. */
+export const CHILD_ITEM_TYPES = ["event", "bring_item", "payment", "action_required"] as const satisfies readonly ItemType[];
+
+const childrenField = z
+  .array(z.string().trim().min(1).max(60))
+  .max(10)
+  .default([])
+  .describe("Imiona dzieci z listy <dzieci>, których dotyczy element; pusta lista, gdy dotyczy całej grupy");
+
 /** Shape the model sees; per-type data is validated afterwards (see parseOperation). */
 export const rawOperationSchema = z.discriminatedUnion("op", [
   z.object({
@@ -99,12 +108,14 @@ export const rawOperationSchema = z.discriminatedUnion("op", [
     ...baseOperation,
     ref: z.string().regex(/^nowe\d+$/).nullable().describe("Lokalny identyfikator do odwołań w tej samej odpowiedzi"),
     data: anyItemData.describe("Pełne dane elementu zgodne z jego typem"),
+    children: childrenField,
   }),
   z.object({
     op: z.literal("update"),
     ...baseOperation,
     target: z.string().regex(/^E\d+$/).describe("Alias istniejącego elementu"),
     data: z.record(z.string(), z.unknown()).describe("Tylko zmieniane pola, nazwy jak w danych typu"),
+    children: childrenField.describe("Imiona dzieci z listy <dzieci>; pusta lista zostawia dotychczasowe przypisanie"),
   }),
   z.object({
     op: z.literal("cancel"),
@@ -119,8 +130,8 @@ export const extractionResultSchema = z.object({
 });
 
 export type ParsedOperation =
-  | { op: "create"; type: ItemType; ref: string | null; data: ItemData[ItemType]; sourceMessages: string[]; confidence: number; rationale: string }
-  | { op: "update"; type: ItemType; target: string; data: Partial<ItemData[ItemType]>; sourceMessages: string[]; confidence: number; rationale: string }
+  | { op: "create"; type: ItemType; ref: string | null; data: ItemData[ItemType]; children: string[]; sourceMessages: string[]; confidence: number; rationale: string }
+  | { op: "update"; type: ItemType; target: string; data: Partial<ItemData[ItemType]>; children: string[]; sourceMessages: string[]; confidence: number; rationale: string }
   | { op: "cancel"; type: ItemType; target: string; sourceMessages: string[]; confidence: number; rationale: string };
 
 /** Validates one operation, including type-specific data (partial for updates). */
@@ -135,12 +146,12 @@ export function parseOperation(input: unknown): { ok: true; value: ParsedOperati
   if (o.op === "create") {
     const data = schema.safeParse(o.data);
     if (!data.success) return { ok: false, error: `data: ${formatIssues(data.error)}` };
-    return { ok: true, value: { op: "create", ref: o.ref, data: data.data, ...common } };
+    return { ok: true, value: { op: "create", ref: o.ref, data: data.data, children: o.children, ...common } };
   }
   const data = schema.partial().safeParse(o.data);
   if (!data.success) return { ok: false, error: `data: ${formatIssues(data.error)}` };
-  if (Object.keys(data.data).length === 0) return { ok: false, error: "data: empty update" };
-  return { ok: true, value: { op: "update", target: o.target, data: data.data, ...common } };
+  if (Object.keys(data.data).length === 0 && o.children.length === 0) return { ok: false, error: "data: empty update" };
+  return { ok: true, value: { op: "update", target: o.target, data: data.data, children: o.children, ...common } };
 }
 
 function formatIssues(error: z.ZodError): string {

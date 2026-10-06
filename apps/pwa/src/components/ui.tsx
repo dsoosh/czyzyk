@@ -96,3 +96,13 @@ export function DoneToggle({
     </button>
   );
 }
+
+/** Names of the children an item concerns, as a small pill (nothing when none). */
+export function ChildTag({ names }: { names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <span aria-label={`Dziecko: ${names.join(", ")}`} className="rounded-full bg-lime/45 px-2 py-0.5 text-xs font-semibold text-ink">
+      {names.join(", ")}
+    </span>
+  );
+}
