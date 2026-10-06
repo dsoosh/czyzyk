@@ -1,8 +1,9 @@
 import { matchGroupByFileName, parseChatExport } from "@czyzyk/shared/chat-export";
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
 import { importChat, ImportError, readChatExport, type ImportSummary } from "../../lib/chatImport";
+import { takeSharedChat } from "../../lib/androidApp";
 import { readPublicEnv } from "../../lib/env";
 import { run, type Group } from "../../lib/items";
 import { useLoader } from "../../lib/useLoader";
@@ -44,26 +45,25 @@ export function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
 
-  const choose = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  /** A chat chosen here or shared to the Android app: preview it and suggest the group. */
+  const load = async (fileName: string, readText: () => Promise<string>) => {
     setSelected(null);
     setSummary(null);
     setError(null);
-    if (!file) return;
     setBusy(true);
     try {
-      const text = await readChatExport(file);
+      const text = await readText();
       const { messages } = parseChatExport(text);
       if (messages.length === 0) throw new ImportError("Nie rozpoznano żadnych wiadomości w pliku. Czy to eksport czatu z WhatsAppa?");
       setSelected({
-        fileName: file.name,
+        fileName,
         text,
         messages: messages.length,
         attachments: messages.filter((m) => m.hasAttachment).length,
         from: messages[0]!.localTime,
         to: messages[messages.length - 1]!.localTime,
       });
-      const match = matchGroupByFileName(file.name, groups.data ?? []);
+      const match = matchGroupByFileName(fileName, groups.data ?? []);
       if (match) setGroupId(match.id);
     } catch (err) {
       setError(err instanceof ImportError ? err.message : "Nie udało się odczytać pliku.");
@@ -71,6 +71,25 @@ export function ImportPage() {
       setBusy(false);
     }
   };
+
+  const choose = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setSelected(null);
+      return;
+    }
+    await load(file.name, () => readChatExport(file));
+  };
+
+  // Inside the Android app, a WhatsApp export shared to it lands here once the groups are known.
+  const sharedTaken = useRef(false);
+  useEffect(() => {
+    if (!groups.data || sharedTaken.current) return;
+    sharedTaken.current = true;
+    const shared = takeSharedChat();
+    if (shared) void load(shared.fileName, async () => shared.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups.data]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();

@@ -59,6 +59,25 @@ describe("Admin → Import", () => {
     expect(result).toHaveTextContent("Do analizy: 2");
   });
 
+  it("w aplikacji Android wczytuje czat udostępniony z WhatsAppa (raz)", async () => {
+    const takeSharedChat = vi
+      .fn()
+      .mockReturnValueOnce(JSON.stringify({ fileName: "WhatsApp Chat with Motylki 2026_27.zip", text: CHAT }))
+      .mockReturnValue(null);
+    (window as { CzyzykAndroid?: unknown }).CzyzykAndroid = { openPhoneSettings: vi.fn(), takeSharedChat };
+    try {
+      fetchMock.mockResolvedValue(ok({ messages: 2, inserted: 2, duplicates: 0, for_extraction: 2, skipped_lines: 0 }));
+      renderAt("/admin/import", { admin: true, tables: { wa_groups: groups } });
+      expect(await screen.findByRole("status", { name: "Podgląd" })).toHaveTextContent("2 wiadomości");
+      expect(screen.getByLabelText("Grupa")).toHaveValue("g1");
+      expect(takeSharedChat).toHaveBeenCalledTimes(1);
+      await act(async () => fireEvent.click(screen.getByRole("button", { name: "Importuj" })));
+      expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({ group_id: "g1", text: CHAT, extract_days: 30 });
+    } finally {
+      delete (window as { CzyzykAndroid?: unknown }).CzyzykAndroid;
+    }
+  });
+
   it("plik .txt, ręczny wybór grupy i okresu ekstrakcji", async () => {
     fetchMock.mockResolvedValue(ok({ messages: 2, inserted: 0, duplicates: 2, for_extraction: 0, skipped_lines: 0 }));
     renderAt("/admin/import", { admin: true, tables: { wa_groups: groups } });

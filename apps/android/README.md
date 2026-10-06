@@ -19,6 +19,7 @@ Głównym widokiem jest PWA Czyżyka w osadzonym WebView, więc z aplikacji korz
 - **Adres PWA** przychodzi w linku parowania (`&app=…`, dopisuje go panel admina) albo wpisuje się go ręcznie na karcie „Aplikacja Czyżyk”.
 - **Logowanie Google**: Google blokuje logowanie w WebView, więc otwiera się ono w przeglądarce telefonu i wraca do aplikacji przez `czyzyk://auth/callback?code=…`; aplikacja kończy logowanie w WebView. Wymaga wpisu `czyzyk://auth/callback` w Supabase (Authentication → URL Configuration → Redirect URLs).
 - W WebView otwierają się tylko strony z adresu PWA; inne linki (np. z wiadomości) idą do przeglądarki. Most `window.CzyzykAndroid` ma tylko `openPhoneSettings()`.
+- **Udostępnianie eksportu czatu**: w WhatsAppie grupa → ⋮ → Więcej → Eksportuj czat → wybierz **Czyżyk**. Aplikacja wyciąga z paczki tylko tekst czatu (zdjęcia i filmy zostają na telefonie) i otwiera Admin → Import z podglądem i podpowiedzianą grupą.
 - Ograniczenie: Android WebView nie obsługuje powiadomień Web Push – powiadomienia działają w PWA zainstalowanej z przeglądarki.
 
 Aplikacja nigdy nic nie wysyła do WhatsAppa i nie korzysta z jego protokołu.

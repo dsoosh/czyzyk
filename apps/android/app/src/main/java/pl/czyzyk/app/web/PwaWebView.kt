@@ -24,6 +24,7 @@ class PwaWebView(
     context: Context,
     private val appUrl: () -> String?,
     onOpenPhoneSettings: () -> Unit,
+    takeSharedChat: () -> String?,
     private val onLoadError: (Boolean) -> Unit,
     private val onFileChooser: (ValueCallback<Array<Uri>>, WebChromeClient.FileChooserParams) -> Boolean,
 ) {
@@ -33,7 +34,7 @@ class PwaWebView(
         settings.domStorageEnabled = true
         settings.allowFileAccess = false
         settings.allowContentAccess = false
-        addJavascriptInterface(AppBridge(onOpenPhoneSettings), AppBridge.NAME)
+        addJavascriptInterface(AppBridge(onOpenPhoneSettings, takeSharedChat), AppBridge.NAME)
         webViewClient = Client()
         webChromeClient = object : WebChromeClient() {
             override fun onShowFileChooser(

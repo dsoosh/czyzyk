@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
+import android.provider.OpenableColumns
 import android.provider.Settings
 import android.view.ViewGroup
 import android.webkit.ValueCallback
@@ -52,17 +53,23 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
 import pl.czyzyk.app.web.PwaWebView
+import pl.czyzyk.app.web.SharedChat
+import pl.czyzyk.app.web.SharedChatException
+import pl.czyzyk.app.web.SharedChatReader
 import pl.czyzyk.app.web.WebRules
 import pl.czyzyk.app.work.Deps
 import pl.czyzyk.app.work.SyncInterval
 import pl.czyzyk.app.work.Work
 import java.text.DateFormat
 import java.util.Date
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 /** Which screen the activity shows: the hosted PWA, or the native phone screen. */
 private enum class Screen { Web, Phone }
@@ -75,6 +82,8 @@ class MainActivity : ComponentActivity() {
     private var loadError by mutableStateOf(false)
     private lateinit var web: PwaWebView
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+    // Read by the JS bridge on a binder thread.
+    private val sharedChat = AtomicReference<SharedChat?>(null)
 
     // <input type="file"> in the PWA (e.g. Admin → Import of a chat export).
     private val pickFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -90,6 +99,7 @@ class MainActivity : ComponentActivity() {
             this,
             appUrl = { appUrl },
             onOpenPhoneSettings = { screen = Screen.Phone },
+            takeSharedChat = { sharedChat.getAndSet(null)?.toJson() },
             onLoadError = { loadError = it },
             onFileChooser = { callback, params ->
                 fileCallback?.onReceiveValue(null)
@@ -140,6 +150,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_SEND_MULTIPLE) {
+            receiveSharedExport(intent)
+            return
+        }
         val link = intent?.data?.toString() ?: return
         if (WebRules.isAuthCallback(link)) {
             // Google sign-in finished in the browser: complete it in the WebView (PKCE verifier lives there).
@@ -149,6 +163,54 @@ class MainActivity : ComponentActivity() {
             return
         }
         pairFromLink(link)
+    }
+
+    /**
+     * A WhatsApp chat export shared to the app: the chat text is read off the main thread
+     * (a ZIP with media can be large), then Admin → Import opens and takes it over the bridge.
+     */
+    private fun receiveSharedExport(intent: Intent) {
+        val app = appUrl
+        if (app == null) {
+            screen = Screen.Phone
+            Toast.makeText(this, "Najpierw ustaw adres aplikacji Czyżyk.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val items = sharedItems(intent)
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+        Toast.makeText(this, "Wczytuję eksport czatu…", Toast.LENGTH_SHORT).show()
+        thread(name = "shared-chat") {
+            val result = runCatching {
+                if (items.isEmpty() && !text.isNullOrBlank()) SharedChat("czat.txt", text) else SharedChatReader.read(items)
+            }
+            runOnUiThread {
+                result.onSuccess {
+                    sharedChat.set(it)
+                    screen = Screen.Web
+                    web.load("$app/admin/import")
+                }.onFailure {
+                    val message = (it as? SharedChatException)?.message ?: "Nie udało się odczytać eksportu."
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun sharedItems(intent: Intent): List<SharedChatReader.Item> {
+        val uris = if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+            IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+        } else {
+            listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+        }
+        return uris.map { uri ->
+            val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                ?: uri.lastPathSegment
+                ?: "czat"
+            SharedChatReader.Item(name, contentResolver.getType(uri)) {
+                contentResolver.openInputStream(uri) ?: throw SharedChatException("Nie udało się otworzyć pliku.")
+            }
+        }
     }
 
     /** Typed PWA address; returns false when it is not a valid https address. */

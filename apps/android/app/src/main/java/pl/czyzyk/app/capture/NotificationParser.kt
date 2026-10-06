@@ -45,7 +45,7 @@ object NotificationParser {
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
             ?: return ParseResult.Skip("no messaging style")
         if (!style.isGroupConversation) return ParseResult.Skip("private chat")
-        val title = style.conversationTitle?.toString()?.let { COUNT_SUFFIX.replace(it, "").trim() }
+        val title = style.conversationTitle?.toString()?.let { COUNT_SUFFIX.replace(GroupNames.normalize(it), "").trim() }
         if (title.isNullOrEmpty()) return ParseResult.Skip("no group name")
 
         val messages = style.messages.mapNotNull { m ->

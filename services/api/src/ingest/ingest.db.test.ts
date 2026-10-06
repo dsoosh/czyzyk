@@ -149,6 +149,13 @@ describe("POST /ingest/notification", () => {
     expect(new Date(rows[0].sent_at).toISOString()).toBe("2026-10-07T16:02:11.000Z");
   });
 
+  it("nazwa z niewidocznymi znakami trafia do istniejącej śledzonej grupy", async () => {
+    const before = (await db.client.query("select count(*)::int as n from wa_groups")).rows[0].n;
+    const res = await post(app(), { ...message(), idempotency_key: randomUUID(), text: "inna", group_name: "\u2068Motylki 2026/27\u2069" });
+    expect(res.statusCode).toBe(201);
+    expect((await db.client.query("select count(*)::int as n from wa_groups")).rows[0].n).toBe(before);
+  });
+
   it("200 dla tego samego klucza idempotencji", async () => {
     const a = app();
     const m = message();
