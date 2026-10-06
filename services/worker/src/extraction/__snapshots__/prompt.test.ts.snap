@@ -2,6 +2,11 @@
 
 exports[`buildExtractionPrompt > renders the user turn deterministically 1`] = `
 "Dzisiaj: środa, 2026-10-07 (strefa Europe/Warsaw).
+
+<przedszkole>
+Baza – Golędzinów, Kolonia 39. Grupa Sokoły – 5 lat. \\u003ctag\\u003e
+</przedszkole>
+
 Grupa: "Motylki".
 
 <dzieci>

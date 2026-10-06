@@ -42,6 +42,8 @@ Typy elementów:
 - closure (dzień wolny): przedszkole lub grupa nieczynne w danym dniu lub okresie.
 - fact (fakt do ściągawki): stała informacja – godziny otwarcia (godziny), telefon lub e-mail (kontakt), imiona i role nauczycielek i personelu (osoba), inne stałe ustalenia (inne).
 
+Blok <przedszkole> to opis placówki napisany przez rodzinę (miejsca, prowadzący, grupy, kanały). Używaj go do rozpoznawania miejsc (np. „Baza”), osób i grup w wiadomościach; to wiedza tła, a nie źródło operacji.
+
 Zasady:
 1. Przeanalizuj wyłącznie NOWE wiadomości. Wcześniejsze wiadomości i istniejące elementy służą jako kontekst.
 2. Daty względne („jutro”, „w piątek”, „za tydzień”) licz względem daty wysłania wiadomości, w strefie Europe/Warsaw. „W piątek” oznacza najbliższy piątek po dacie wysłania (lub ten sam dzień, jeśli wiadomość wysłano w piątek rano i mowa o dzisiejszym dniu).
@@ -107,6 +109,11 @@ export function buildExtractionPrompt(batch: ExtractionBatch, now: Date): Extrac
 
   const user = [
     `Dzisiaj: ${warsawDayLong(now)} (strefa Europe/Warsaw).`,
+    "",
+    "<przedszkole>",
+    batch.kindergarten.trim() ? escapeTags(batch.kindergarten.trim()) : "(brak opisu)",
+    "</przedszkole>",
+    "",
     `Grupa: ${quote(batch.group.name)}.`,
     "",
     "<dzieci>",

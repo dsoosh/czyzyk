@@ -253,7 +253,8 @@ describe("loadViewContext", () => {
 
   it("historia grupy nieśledzonej jest niedostępna", async () => {
     const { data } = await loadViewContext(pool, { kind: "group", id: sasiedzi }, NOW);
-    expect(data).toBe("Nie znaleziono śledzonej grupy.");
+    expect(data.endsWith("\n\nNie znaleziono śledzonej grupy.")).toBe(true);
+    expect(data).not.toContain("prywatna rozmowa");
   });
 
   it("wydarzenie: rzeczy do przyniesienia i wiadomość źródłowa z kontekstem", async () => {
@@ -291,12 +292,19 @@ describe("loadViewContext", () => {
     try {
       await db.client.query("update payments set child_ids = $1 where id = $2", [[rows[1]!.id], paymentId]);
       const { data } = await loadViewContext(pool, { kind: "today" }, NOW);
-      expect(data.startsWith("## Dzieci rodziny\n- Antek\n- Zosia (grupa Motylki)")).toBe(true);
+      expect(data).toContain("## Dzieci rodziny\n- Antek\n- Zosia (grupa Motylki)");
+      expect(data.indexOf("## O przedszkolu")).toBeLessThan(data.indexOf("## Dzieci rodziny"));
       expect(data).toContain("Do przyniesienia: przebranie; na piątek 2026-10-09; na wydarzenie „Bal”; jeszcze nie spakowane; grupa Motylki; dziecko: Zosia");
       expect(data).toContain("Płatność: teatrzyk; 12,50 zł; termin poniedziałek 2026-10-12; niezapłacone; grupa Motylki; dziecko: Antek");
     } finally {
       await db.client.query("update payments set child_ids = '{}'; delete from children");
     }
+  });
+
+  it("każdy widok zaczyna się opisem przedszkola od rodziny", async () => {
+    const { data } = await loadViewContext(pool, { kind: "list", list: "bring" }, NOW);
+    expect(data.startsWith("## O przedszkolu\nPlacówka: Leśne Przedszkole i Leśna Klasa „Cztery Żywioły”")).toBe(true);
+    expect(data).toContain("„Baza” – główna siedziba przedszkola i leśnej klasy: Golędzinów");
   });
 
   it("dane nie mogą zamknąć bloku <dane>", async () => {

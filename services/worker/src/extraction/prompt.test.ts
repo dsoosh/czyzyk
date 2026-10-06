@@ -21,6 +21,7 @@ const batch: ExtractionBatch = {
     },
     { id: "b1", type: "bring_item", status: "needs_review", data: { description: "drugie śniadanie", due_date: "2026-10-10", event: "e1" }, children: ["Zosia"] },
   ],
+  kindergarten: "Baza – Golędzinów, Kolonia 39. Grupa Sokoły – 5 lat. <tag>",
   children: [
     { name: "Zosia", group: "Motylki" },
     { name: "Antek", group: null },
@@ -32,6 +33,11 @@ describe("buildExtractionPrompt", () => {
 
   it("renders the user turn deterministically", () => {
     expect(prompt.user).toMatchSnapshot();
+  });
+
+  it("includes the kindergarten description from the family, with tags escaped", () => {
+    expect(prompt.user).toContain("<przedszkole>\nBaza – Golędzinów, Kolonia 39. Grupa Sokoły – 5 lat. \\u003ctag\\u003e\n</przedszkole>");
+    expect(SYSTEM_PROMPT).toContain("<przedszkole>");
   });
 
   it("lists the family's children and the children of existing items", () => {

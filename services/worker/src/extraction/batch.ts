@@ -34,6 +34,8 @@ export interface ExtractionBatch {
   items: ExistingItem[];
   /** Children of the family, so the model can tell which child a message is about. */
   children: FamilyChild[];
+  /** Description of the kindergarten written by the family admin (empty when not set). */
+  kindergarten: string;
 }
 
 type Queryable = Pick<pg.PoolClient, "query">;
@@ -125,7 +127,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     [groupId, MAX_NEW_MESSAGES],
   );
   const newMessages = fresh.map(toMessage);
-  if (newMessages.length === 0) return { group, newMessages, contextMessages: [], items: [], children: [] };
+  if (newMessages.length === 0) return { group, newMessages, contextMessages: [], items: [], children: [], kindergarten: "" };
 
   const { rows: earlier } = await db.query(
     `select * from (
@@ -155,5 +157,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
       order by c.name`,
   );
 
-  return { group, newMessages, contextMessages: earlier.map(toMessage), items, children };
+  const { rows: profile } = await db.query<{ content: string }>("select content from public.kindergarten_profile");
+
+  return { group, newMessages, contextMessages: earlier.map(toMessage), items, children, kindergarten: profile[0]?.content ?? "" };
 }
