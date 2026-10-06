@@ -23,7 +23,7 @@ export function ClosuresPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-brand-900">Dni wolne</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Dni wolne</h1>
       <Section title="Nadchodzące" empty="Brak zapowiedzianych dni wolnych">
         {data.closures.map((c) => (
           <Row key={c.id}>

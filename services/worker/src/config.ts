@@ -9,8 +9,8 @@ export const workerEnvSchema = baseEnvSchema.extend({
   ANTHROPIC_API_KEY: z.string().min(1),
   /** Model name lives only in configuration (see CLAUDE.md). */
   EXTRACTION_MODEL: z.string().min(1),
-  /** Minutes of silence in a group before its new messages are extracted. */
-  EXTRACTION_DEBOUNCE_MINUTES: z.coerce.number().positive().default(30),
+  /** Seconds between a new message and its extraction; messages arriving meanwhile join the same run. */
+  EXTRACTION_DELAY_SECONDS: z.coerce.number().min(0).max(3600).default(15),
   /** Operations below this confidence produce items with status needs_review. */
   EXTRACTION_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.7),
   /** Already processed messages of the group given to the model as context. */

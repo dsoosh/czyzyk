@@ -17,6 +17,10 @@
     "./chat-export": {
       "types": "./dist/chatExport.d.ts",
       "default": "./dist/chatExport.js"
+    },
+    "./assistant": {
+      "types": "./dist/assistant.d.ts",
+      "default": "./dist/assistant.js"
     }
   },
   "scripts": {

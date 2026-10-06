@@ -51,7 +51,7 @@ export function AllowedEmailsPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-bold text-brand-900">Lista rodziny</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Lista rodziny</h1>
       <p className="text-sm text-slate-600">Tylko te adresy mogą zalogować się do aplikacji przez Google.</p>
 
       {error && (

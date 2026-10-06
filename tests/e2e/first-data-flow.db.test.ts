@@ -1,7 +1,7 @@
 /**
  * Stage 2 acceptance on a local database: a notification "W piątek bal, przebrania"
- * travels through the ingest API, waits out the quiet period, is extracted by the
- * worker (model double) and becomes visible to a family member through RLS.
+ * travels through the ingest API, wakes the worker in real time (no scan), is extracted
+ * (model double) and becomes visible to a family member through RLS.
  */
 import { createHash, randomUUID } from "node:crypto";
 import pg from "pg";
@@ -63,13 +63,14 @@ beforeAll(async () => {
     {
       DATABASE_URL: db.url,
       HEALTH_LOG_INTERVAL_SECONDS: 60,
-      EXTRACTION_DEBOUNCE_MINUTES: 0.02, // ~1 s instead of 30 min
+      EXTRACTION_DELAY_SECONDS: 1,
       EXTRACTION_CONFIDENCE_THRESHOLD: 0.7,
       EXTRACTION_CONTEXT_MESSAGES: 50,
     },
     pino({ level: "silent" }),
     { model, now: () => new Date(), scanSchedule: null },
   );
+  await worker.listening;
 });
 
 afterAll(async () => {
@@ -110,11 +111,6 @@ describe("pierwszy przepływ danych", () => {
     });
     expect(res.statusCode).toBe(201);
     await api.close();
-
-    // Not yet: the group is still inside its quiet period.
-    expect(await worker.scanNow()).toEqual([]);
-    await new Promise((r) => setTimeout(r, 1500));
-    expect(await worker.scanNow()).toHaveLength(1);
 
     const seen = await waitFor(async () => {
       const rows = await as(db.client, user(familyId), async (q) =>

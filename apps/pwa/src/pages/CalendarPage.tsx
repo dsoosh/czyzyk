@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { LoadError, Loading, Meta, SourceLink } from "../components/ui";
 import {
@@ -83,7 +83,7 @@ function ListView({ today }: { today: string }) {
       {days.size === 0 && <p className="rounded-2xl bg-white p-4 text-slate-500 shadow-sm">Brak zaplanowanych wydarzeń</p>}
       {[...days].map(([day, entries]) => (
         <section key={day} aria-label={longDayLabel(day)} className="space-y-2">
-          <h2 className={`text-sm font-semibold ${day === today ? "text-brand-700" : "text-slate-500"}`}>
+          <h2 className={`font-display text-2xl font-bold ${day === today ? "text-brand-700" : "text-ink"}`}>
             {longDayLabel(day)}
             {day === today && " · dziś"}
           </h2>
@@ -94,9 +94,16 @@ function ListView({ today }: { today: string }) {
   );
 }
 
+/** The month view keeps its month in the URL (?miesiac=YYYY-MM), so the assistant knows what is on screen. */
+export const MONTH_PARAM = "miesiac";
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 function MonthView({ today }: { today: string }) {
   const { client } = useAuth();
-  const [month, setMonth] = useState(today.slice(0, 7));
+  const [params, setParams] = useSearchParams();
+  const param = params.get(MONTH_PARAM) ?? "";
+  const month = MONTH_RE.test(param) ? param : today.slice(0, 7);
+  const setMonth = (m: string) => setParams({ [MONTH_PARAM]: m }, { replace: true });
   const [selected, setSelected] = useState<string | null>(today);
   const grid = useMemo(() => monthGrid(month), [month]);
   const from = `${month}-01`;
@@ -110,7 +117,7 @@ function MonthView({ today }: { today: string }) {
         <button type="button" aria-label="Poprzedni miesiąc" className="rounded-lg px-3 py-1 hover:bg-white" onClick={() => setMonth(addMonths(month, -1))}>
           ‹
         </button>
-        <h2 className="font-semibold capitalize">{monthTitle(month)}</h2>
+        <h2 className="font-display text-2xl font-bold capitalize text-ink">{monthTitle(month)}</h2>
         <button type="button" aria-label="Następny miesiąc" className="rounded-lg px-3 py-1 hover:bg-white" onClick={() => setMonth(addMonths(month, 1))}>
           ›
         </button>
@@ -159,7 +166,7 @@ function MonthView({ today }: { today: string }) {
       {loading && !data && <Loading />}
       {selected && data && (
         <section aria-label={`Wybrany dzień ${longDayLabel(selected)}`} className="space-y-2">
-          <h2 className="text-sm font-semibold text-slate-500">{longDayLabel(selected)}</h2>
+          <h2 className="font-display text-2xl font-bold text-ink">{longDayLabel(selected)}</h2>
           {days.get(selected) ? (
             <DayItems entries={days.get(selected)!} groups={data.groups} />
           ) : (
@@ -172,8 +179,10 @@ function MonthView({ today }: { today: string }) {
 }
 
 export function CalendarPage() {
-  const [view, setView] = useState<View>("list");
+  const [params, setParams] = useSearchParams();
+  const view: View = params.has(MONTH_PARAM) ? "month" : "list";
   const today = warsawDay(new Date());
+  const setView = (v: View) => setParams(v === "month" ? { [MONTH_PARAM]: today.slice(0, 7) } : {}, { replace: true });
   const tab = (v: View, label: string) => (
     <button
       type="button"
@@ -187,7 +196,7 @@ export function CalendarPage() {
   );
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-brand-900">Kalendarz</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Kalendarz</h1>
       <div role="tablist" className="flex gap-1 rounded-xl bg-brand-100 p-1">
         {tab("list", "Lista")}
         {tab("month", "Miesiąc")}

@@ -18,12 +18,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -43,6 +47,7 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
 import pl.czyzyk.app.work.Deps
+import pl.czyzyk.app.work.SyncInterval
 import pl.czyzyk.app.work.Work
 import java.text.DateFormat
 import java.util.Date
@@ -92,6 +97,8 @@ private data class Status(
     val pendingAttachments: Int,
     val lastDeliveredAt: Long,
     val trackedGroups: Int,
+    val syncInterval: SyncInterval,
+    val trackedFetchedAt: Long,
 )
 
 private fun readStatus(context: Context): Status {
@@ -107,6 +114,8 @@ private fun readStatus(context: Context): Status {
         pendingAttachments = state.pendingAttachments,
         lastDeliveredAt = state.lastDeliveredAt,
         trackedGroups = state.trackedGroups.size,
+        syncInterval = state.syncInterval,
+        trackedFetchedAt = state.trackedFetchedAt,
     )
 }
 
@@ -133,6 +142,7 @@ fun CzyzykApp(refreshTick: Int, onPairLink: (String) -> Boolean) {
                 PairingCard(status, onPairLink)
                 PermissionsCard(status)
                 QueueCard(status)
+                SyncCard(status) { status = readStatus(context) }
                 TipsCard()
             }
         }
@@ -212,13 +222,57 @@ private fun QueueCard(status: Status) {
             }
             Text("Wiadomości w kolejce: ${status.queueSize}")
             Text("Zaległe załączniki: ${status.pendingAttachments}")
-            Text(
-                "Ostatnia wysyłka: " + if (status.lastDeliveredAt == 0L) "jeszcze nie było"
-                else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(status.lastDeliveredAt)),
-            )
+            Text("Ostatnia wysyłka: " + formatTime(status.lastDeliveredAt))
         }
     }
 }
+
+@Composable
+private fun SyncCard(status: Status, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Synchronizacja", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Jak często telefon pobiera listę śledzonych grup. Wiadomości są wysyłane od razu – interwał decyduje " +
+                    "tylko o tym, jak szybko telefon zauważy zmiany grup w panelu admina.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Column(Modifier.selectableGroup()) {
+                SyncInterval.entries.forEach { interval ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().selectable(
+                            selected = interval == status.syncInterval,
+                            role = Role.RadioButton,
+                            onClick = {
+                                Deps.state(context).syncInterval = interval
+                                Work.schedulePeriodicSync(context)
+                                onChanged()
+                            },
+                        ),
+                    ) {
+                        RadioButton(selected = interval == status.syncInterval, onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("co ${interval.label}")
+                    }
+                }
+            }
+            Text("Ostatnie odświeżenie: " + formatTime(status.trackedFetchedAt))
+            OutlinedButton(
+                onClick = {
+                    Work.enqueueSync(context)
+                    Toast.makeText(context, "Odświeżam listę grup", Toast.LENGTH_SHORT).show()
+                },
+                enabled = status.pairing == SecureStore.State.PAIRED,
+            ) { Text("Odśwież teraz") }
+        }
+    }
+}
+
+private fun formatTime(millis: Long): String =
+    if (millis == 0L) "jeszcze nie było"
+    else DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(millis))
 
 @Composable
 private fun TipsCard() {

@@ -6,7 +6,7 @@ export function NoAccessPage({ message }: { message: string }) {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
       <Logo className="h-16 w-16 opacity-60" />
-      <h1 className="text-2xl font-bold text-brand-900">Brak dostępu</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Brak dostępu</h1>
       <p role="alert" className="text-slate-700">
         {message}
       </p>

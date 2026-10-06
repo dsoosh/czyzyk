@@ -13,7 +13,7 @@ export function SourceLink({ kind, id }: { kind: ItemKind; id: string }) {
 export function Section({ title, empty, children }: { title: string; empty: string; children: ReactNode[] }) {
   return (
     <section aria-label={title} className="space-y-2">
-      <h2 className="text-sm font-semibold tracking-wide text-slate-500 uppercase">{title}</h2>
+      <h2 className="font-display text-2xl font-bold text-ink">{title}</h2>
       {children.length === 0 ? (
         <p className="rounded-2xl bg-white p-4 text-slate-500 shadow-sm">{empty}</p>
       ) : (

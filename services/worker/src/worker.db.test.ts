@@ -16,7 +16,7 @@ afterAll(async () => {
 const settings = (url: string) => ({
   DATABASE_URL: url,
   HEALTH_LOG_INTERVAL_SECONDS: 60,
-  EXTRACTION_DEBOUNCE_MINUTES: 30,
+  EXTRACTION_DELAY_SECONDS: 15,
   EXTRACTION_CONFIDENCE_THRESHOLD: 0.7,
   EXTRACTION_CONTEXT_MESSAGES: 50,
 });
@@ -66,6 +66,42 @@ describe("startWorker", () => {
       }
       const { rows: closures } = await db.client.query("select id from closures");
       expect(jobs).toEqual([{ data: { type: "closure", id: closures[0].id } }]);
+    } finally {
+      await worker.stop();
+    }
+  });
+});
+
+describe("ekstrakcja w czasie rzeczywistym", () => {
+  it("seria wiadomości trafia do jednej ekstrakcji bez skanu", async () => {
+    const { rows: g } = await db.client.query("insert into wa_groups (wa_name, tracked) values ('Biedronki', true) returning id");
+    const calls: number[] = [];
+    const worker = await startWorker({ ...settings(db.url), EXTRACTION_DELAY_SECONDS: 1 }, pino({ level: "silent" }), {
+      scanSchedule: null,
+      model: {
+        extract: async (prompt) => {
+          calls.push((prompt as { newMessageIds: string[] }).newMessageIds.length);
+          return { operations: [] };
+        },
+      },
+    });
+    try {
+      await worker.listening;
+      for (const key of ["s1", "s2", "s3"]) {
+        await db.client.query(
+          `insert into messages (group_id, author, sent_at, text, source, dedupe_key)
+           values ($1, 'Pani Ania', now(), 'x', 'notification', $2)`,
+          [g[0].id, key],
+        );
+      }
+      let unprocessed = 3;
+      for (let i = 0; i < 75 && unprocessed > 0; i++) {
+        await new Promise((r) => setTimeout(r, 200));
+        const { rows } = await db.client.query("select count(*)::int as n from messages where group_id = $1 and processed_at is null", [g[0].id]);
+        unprocessed = rows[0].n;
+      }
+      expect(unprocessed).toBe(0);
+      expect(calls).toEqual([3]);
     } finally {
       await worker.stop();
     }

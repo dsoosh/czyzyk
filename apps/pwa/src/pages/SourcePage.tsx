@@ -41,7 +41,7 @@ export function SourcePage() {
       </button>
       <header className="space-y-1">
         <p className="text-sm text-slate-500">{KIND_LABELS[validKind]}</p>
-        <h1 className="text-xl font-bold text-brand-900">{itemTitle(validKind, data.item)}</h1>
+        <h1 className="font-display text-4xl font-bold text-ink">{itemTitle(validKind, data.item)}</h1>
       </header>
       <div className="space-y-1 rounded-2xl bg-white p-4 shadow-sm">
         <p>

@@ -4,8 +4,8 @@ Przetwarzanie w tle (pg-boss na Postgresie Supabase). Na etapie 2: ekstrakcja el
 
 ## Jak działa ekstrakcja
 
-1. Co minutę zadanie `extraction-scan` szuka grup, w których od przyjęcia ostatniej nieprzetworzonej wiadomości minęło `EXTRACTION_DEBOUNCE_MINUTES` (okno ciszy liczone od `received_at`, nie od czasu wysłania).
-2. Dla każdej takiej grupy trafia do kolejki zadanie `extract-group` (jedno na grupę naraz, `singletonKey` + blokada doradcza).
+1. Każda nowa nieprzetworzona wiadomość (powiadomienie z telefonu, import eksportu) wywołuje w bazie `pg_notify('message_ingested', group_id)` (migracja `0009`, bez treści). Worker słucha tego kanału na osobnym połączeniu i kolejkuje `extract-group` dla grupy z opóźnieniem `EXTRACTION_DELAY_SECONDS` – wiadomości z tego czasu trafiają do jednej ekstrakcji.
+2. Kolejka `extract-group` ma politykę `stately` (`singletonKey` = grupa, plus blokada doradcza): najwyżej jedno zadanie oczekujące i jedno trwające na grupę. Wiadomość przyjęta w trakcie ekstrakcji uruchamia kolejną zaraz po bieżącej. Zabezpieczenie: co minutę `extraction-scan` kolejkuje grupy z wiadomościami starszymi niż `EXTRACTION_DELAY_SECONDS` (np. po restarcie, gdy powiadomienie przepadło).
 3. Prompt dostaje nowe wiadomości, `EXTRACTION_CONTEXT_MESSAGES` wcześniejszych wiadomości i aktualne elementy z aliasami (`W1…`, `E1…`). Treść wiadomości jest oznaczona jako niezaufane dane.
 4. Model odpowiada wywołaniem narzędzia `zapisz_operacje` (create / update / cancel). Odpowiedź jest walidowana schematem zod z `@czyzyk/shared`; operacje z nieznanymi aliasami lub niepoprawnymi danymi są odrzucane i trafiają do `sync_log`.
 5. Operacje zapisywane są w jednej transakcji; pewność poniżej `EXTRACTION_CONFIDENCE_THRESHOLD` daje status `needs_review`. Wiadomości dostają `processed_at`.
@@ -20,7 +20,7 @@ Wszystkie w [`.env.example`](.env.example). Wymagane: `DATABASE_URL`, `ANTHROPIC
 | Zmienna | Domyślnie | Znaczenie |
 | --- | --- | --- |
 | `EXTRACTION_MODEL` | – (wymagana) | model Claude do ekstrakcji; nazwy modeli tylko w konfiguracji |
-| `EXTRACTION_DEBOUNCE_MINUTES` | 30 | okno ciszy w grupie przed ekstrakcją |
+| `EXTRACTION_DELAY_SECONDS` | 15 | opóźnienie ekstrakcji po nowej wiadomości (zbiera serię) |
 | `EXTRACTION_CONFIDENCE_THRESHOLD` | 0.7 | próg pewności, poniżej – `needs_review` |
 | `EXTRACTION_CONTEXT_MESSAGES` | 50 | liczba wcześniejszych wiadomości w prompcie |
 

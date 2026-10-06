@@ -39,7 +39,7 @@ export function TodayPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-brand-900">Dziś i jutro</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Dziś i jutro</h1>
 
       {data.closures.map((c) => (
         <div key={c.id} role="status" className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 font-semibold text-amber-900">

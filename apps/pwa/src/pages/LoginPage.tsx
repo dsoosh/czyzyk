@@ -1,13 +1,13 @@
 import { useAuth } from "../auth/AuthProvider";
-import { Logo } from "../components/Logo";
 
 export function LoginPage() {
   const { signInWithGoogle } = useAuth();
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
-      <Logo className="h-20 w-20" />
       <div>
-        <h1 className="text-3xl font-bold text-brand-900">Czyżyk</h1>
+        <h1>
+          <img src="/logo.svg" alt="Czyżyk" className="mx-auto h-auto w-64" />
+        </h1>
         <p className="mt-2 text-slate-600">Asystent przedszkolny rodziny</p>
       </div>
       <button

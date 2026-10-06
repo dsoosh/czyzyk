@@ -75,6 +75,10 @@ export default defineRailway(() => {
       SUPABASE_URL: refTo("pwa", "VITE_SUPABASE_URL"),
       // A bare domain; the API adds https://.
       PWA_ORIGIN: refTo("pwa", "RAILWAY_PUBLIC_DOMAIN"),
+      // View assistant. Model names live in configuration, never in code (CLAUDE.md).
+      ANTHROPIC_API_KEY: preserve(),
+      CHAT_MODEL: "claude-sonnet-5-5",
+      ASSISTANT_DAILY_LIMIT: "100",
     },
   });
 
@@ -91,7 +95,7 @@ export default defineRailway(() => {
       ANTHROPIC_API_KEY: preserve(),
       // Model names live in configuration, never in code (CLAUDE.md).
       EXTRACTION_MODEL: "claude-haiku-4-5",
-      EXTRACTION_DEBOUNCE_MINUTES: "30",
+      EXTRACTION_DELAY_SECONDS: "15",
       EXTRACTION_CONFIDENCE_THRESHOLD: "0.7",
       EXTRACTION_CONTEXT_MESSAGES: "50",
     },

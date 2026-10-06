@@ -12,6 +12,12 @@ export const apiEnvSchema = baseEnvSchema.extend({
   SUPABASE_URL: z.url().optional(),
   /** Legacy HS256 JWT secret, only for projects without asymmetric signing keys. */
   SUPABASE_JWT_SECRET: z.string().min(32).optional(),
+  /** Claude for the view assistant (/assistant/ask). Without the key or the model the endpoint answers 503. */
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  /** Model names live only in configuration (see CLAUDE.md). */
+  CHAT_MODEL: z.string().min(1).optional(),
+  /** Questions per family member and Warsaw day. */
+  ASSISTANT_DAILY_LIMIT: z.coerce.number().int().positive().default(100),
   /** Comma-separated PWA origins (or bare domains) allowed to call /push/* from the browser. */
   PWA_ORIGIN: z
     .string()

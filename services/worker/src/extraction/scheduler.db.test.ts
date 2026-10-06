@@ -31,30 +31,30 @@ async function receive(groupId: string, receivedAt: string, processed = false) {
 
 const at = (hhmm: string) => new Date(`2026-10-07T${hhmm}:00+02:00`);
 
-describe("findDueGroups (okno ciszy 30 minut)", () => {
+describe("findDueGroups (próg 1800 s)", () => {
   it("seria wiadomości jest gotowa dopiero 30 minut po ostatniej", async () => {
     await receive(g1, at("18:00").toISOString());
     await receive(g1, at("18:10").toISOString());
     await receive(g1, at("18:20").toISOString());
 
-    expect(await findDueGroups(db.client, 30, at("18:30"))).toEqual([]);
-    expect(await findDueGroups(db.client, 30, at("18:49"))).toEqual([]);
-    expect(await findDueGroups(db.client, 30, at("18:50"))).toEqual([g1]);
+    expect(await findDueGroups(db.client, 1800, at("18:30"))).toEqual([]);
+    expect(await findDueGroups(db.client, 1800, at("18:49"))).toEqual([]);
+    expect(await findDueGroups(db.client, 1800, at("18:50"))).toEqual([g1]);
   });
 
   it("nowa wiadomość w oknie ciszy przesuwa termin", async () => {
     await receive(g1, at("18:00").toISOString());
     await receive(g1, at("18:25").toISOString());
-    expect(await findDueGroups(db.client, 30, at("18:31"))).toEqual([]);
-    expect(await findDueGroups(db.client, 30, at("18:55"))).toEqual([g1]);
+    expect(await findDueGroups(db.client, 1800, at("18:31"))).toEqual([]);
+    expect(await findDueGroups(db.client, 1800, at("18:55"))).toEqual([g1]);
   });
 
   it("liczy okno osobno dla każdej grupy i pomija przetworzone", async () => {
     await receive(g1, at("17:00").toISOString());
     await receive(g2, at("18:00").toISOString());
     await receive(g2, at("16:00").toISOString(), true);
-    expect(await findDueGroups(db.client, 30, at("18:10"))).toEqual([g1]);
-    expect(await findDueGroups(db.client, 30, at("18:40"))).toEqual([g1, g2]);
+    expect(await findDueGroups(db.client, 1800, at("18:10"))).toEqual([g1]);
+    expect(await findDueGroups(db.client, 1800, at("18:40"))).toEqual([g1, g2]);
   });
 
   it("używa czasu przyjęcia, nie wysłania", async () => {
@@ -63,6 +63,6 @@ describe("findDueGroups (okno ciszy 30 minut)", () => {
        values ($1, 'A', $2, 't', 'notification', 'late', $3)`,
       [g1, at("10:00"), at("18:00")],
     );
-    expect(await findDueGroups(db.client, 30, at("18:10"))).toEqual([]);
+    expect(await findDueGroups(db.client, 1800, at("18:10"))).toEqual([]);
   });
 });

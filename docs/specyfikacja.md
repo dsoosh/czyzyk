@@ -73,7 +73,7 @@ Node.js + TypeScript na Railway w trzech usługach: `api` (ingest, endpointy PWA
 
 ### Ekstrakcja przez LLM
 
-- **Kiedy:** nieprzetworzone wiadomości grupy idą do modelu po 30 minutach ciszy w grupie (debounce) albo zaraz po eksporcie.
+- **Kiedy:** nieprzetworzone wiadomości grupy idą do modelu zaraz po przyjęciu (z telefonu lub eksportu), po kilkunastu sekundach zbierających serię wiadomości (zmiana `ekstrakcja-w-czasie-rzeczywistym`; pierwotnie 30 minut ciszy).
 - **Kontekst w prompcie:** nowe wiadomości, ostatnie ok. 50 wiadomości grupy oraz aktualne przyszłe elementy z bazy razem z ich ID.
 - **Wynik:** JSON przez tool use z operacjami `create`, `update` i `cancel` na: wydarzeniach, rzeczach do przyniesienia, płatnościach, sprawach „wymaga odpowiedzi”, dniach wolnych i faktach do ściągawki. Każdy element ma `source_message_ids`, `confidence` i krótkie uzasadnienie.
 - Element z `confidence` poniżej progu dostaje status `needs_review` i czeka w panelu admina.

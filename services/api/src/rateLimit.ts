@@ -28,3 +28,22 @@ export class RateLimiter {
     for (const [key, w] of this.windows) if (now - w.start >= 60_000) this.windows.delete(key);
   }
 }
+
+/** Per-key counter for one calendar day (the caller passes the day, e.g. in Europe/Warsaw). */
+export class DailyLimiter {
+  private readonly counts = new Map<string, number>();
+  private day = "";
+
+  constructor(private readonly limitPerDay: number) {}
+
+  /** Records a hit and returns false when the key is over its limit for `day`. */
+  hit(key: string, day: string): boolean {
+    if (day !== this.day) {
+      this.day = day;
+      this.counts.clear();
+    }
+    const count = (this.counts.get(key) ?? 0) + 1;
+    this.counts.set(key, count);
+    return count <= this.limitPerDay;
+  }
+}

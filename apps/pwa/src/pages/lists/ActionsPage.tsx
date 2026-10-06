@@ -46,7 +46,7 @@ export function ActionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-brand-900">Wymaga odpowiedzi</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Wymaga odpowiedzi</h1>
       {mark.error && <p role="alert" className="text-red-700">{mark.error}</p>}
       <Section title="Otwarte" empty="Nic nie czeka na odpowiedź">
         {data.open.map(row)}

@@ -1,13 +1,15 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type pg from "pg";
 import type { DestinationStream } from "pino";
+import { assistantRoutes } from "./assistant/routes.js";
+import type { AssistantModel } from "./assistant/model.js";
 import type { ApiConfig } from "./config.js";
 import { icalRoutes } from "./ical/routes.js";
 import { importRoutes } from "./import/routes.js";
 import { ingestRoutes } from "./ingest/routes.js";
 import { pushRoutes } from "./push/routes.js";
 import { createSessionVerifier, type SessionVerifier } from "./push/session.js";
-import { RateLimiter } from "./rateLimit.js";
+import { DailyLimiter, RateLimiter } from "./rateLimit.js";
 
 export interface AppDeps {
   db: pg.Pool;
@@ -16,6 +18,8 @@ export interface AppDeps {
   now?: () => number;
   /** Overrides session verification for /push/* (tests verify against a local key set). */
   verifySession?: SessionVerifier;
+  /** Claude for /assistant/ask; null or absent answers 503 (no CHAT_MODEL / ANTHROPIC_API_KEY). */
+  assistantModel?: AssistantModel | null;
 }
 
 /**
@@ -24,7 +28,7 @@ export interface AppDeps {
  */
 export function buildApp(
   config: Pick<ApiConfig, "LOG_LEVEL" | "NODE_ENV" | "INGEST_RATE_LIMIT_PER_IP" | "INGEST_RATE_LIMIT_PER_TOKEN"> &
-    Partial<Pick<ApiConfig, "SUPABASE_URL" | "SUPABASE_JWT_SECRET" | "PWA_ORIGIN">>,
+    Partial<Pick<ApiConfig, "SUPABASE_URL" | "SUPABASE_JWT_SECRET" | "PWA_ORIGIN" | "ASSISTANT_DAILY_LIMIT">>,
   deps: AppDeps,
 ): FastifyInstance {
   const silent = config.NODE_ENV === "test" && !deps.logStream;
@@ -68,6 +72,16 @@ export function buildApp(
     verify,
     origins: config.PWA_ORIGIN ?? [],
     perIp: new RateLimiter(30, deps.now),
+    now: deps.now,
+  });
+  app.register(assistantRoutes, {
+    prefix: "/assistant",
+    db: deps.db,
+    verify,
+    model: deps.assistantModel ?? null,
+    origins: config.PWA_ORIGIN ?? [],
+    perUser: new RateLimiter(10, deps.now),
+    daily: new DailyLimiter(config.ASSISTANT_DAILY_LIMIT ?? 100),
     now: deps.now,
   });
   app.register(icalRoutes, { prefix: "/ical", db: deps.db, perIp: new RateLimiter(config.INGEST_RATE_LIMIT_PER_IP, deps.now) });

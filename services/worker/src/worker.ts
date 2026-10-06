@@ -5,6 +5,7 @@ import type { Logger } from "pino";
 import type { WorkerConfig } from "./config.js";
 import type { ExtractionModel } from "./extraction/model.js";
 import { runGroupExtraction, type ExtractionDeps } from "./extraction/run.js";
+import { listenForMessages } from "./extraction/listen.js";
 import { findDueGroups } from "./extraction/scheduler.js";
 
 export const EXTRACT_QUEUE = "extract-group";
@@ -14,8 +15,10 @@ export interface RunningWorker {
   boss: PgBoss;
   /** Returns true when the job queue answers. */
   healthy(): Promise<boolean>;
-  /** Enqueues extraction for every group past its quiet period (runs every minute). */
+  /** Enqueues extraction for every group with messages older than the delay (runs every minute). */
   scanNow(): Promise<string[]>;
+  /** Resolves once the realtime listener is active. */
+  listening: Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -23,7 +26,7 @@ export type WorkerSettings = Pick<
   WorkerConfig,
   | "DATABASE_URL"
   | "HEALTH_LOG_INTERVAL_SECONDS"
-  | "EXTRACTION_DEBOUNCE_MINUTES"
+  | "EXTRACTION_DELAY_SECONDS"
   | "EXTRACTION_CONFIDENCE_THRESHOLD"
   | "EXTRACTION_CONTEXT_MESSAGES"
 >;
@@ -73,9 +76,17 @@ export async function startWorker(
     for (const job of jobs) await runGroupExtraction(extractionDeps, job.data.groupId);
   });
 
+  // Realtime: a new message wakes the group's extraction after a short delay. With the stately
+  // policy a group has at most one waiting job, so a burst of messages joins one run, and a
+  // message arriving during a run queues the next one.
+  const enqueue = async (groupId: string, startAfter: number) => {
+    await boss.send(EXTRACT_QUEUE, { groupId }, { singletonKey: groupId, startAfter });
+  };
+  const listener = listenForMessages(config.DATABASE_URL, (groupId) => enqueue(groupId, config.EXTRACTION_DELAY_SECONDS), logger);
+
   const scanNow = async () => {
-    const due = await findDueGroups(pool, config.EXTRACTION_DEBOUNCE_MINUTES, now());
-    for (const groupId of due) await boss.send(EXTRACT_QUEUE, { groupId }, { singletonKey: groupId });
+    const due = await findDueGroups(pool, config.EXTRACTION_DELAY_SECONDS, now());
+    for (const groupId of due) await enqueue(groupId, 0);
     if (due.length) logger.info({ groups: due.length }, "extraction enqueued");
     return due;
   };
@@ -104,8 +115,10 @@ export async function startWorker(
     boss,
     healthy,
     scanNow,
+    listening: listener.ready,
     async stop() {
       clearInterval(timer);
+      await listener.stop();
       await boss.stop({ graceful: true, timeout: 30_000 });
       await pool.end();
       logger.info("worker stopped");

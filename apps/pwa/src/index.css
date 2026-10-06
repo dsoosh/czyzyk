@@ -1,12 +1,43 @@
 @import "tailwindcss";
 
+/* Amatic SC (SIL OFL), self-hosted so the installed PWA renders it offline. */
+@font-face {
+  font-family: "Amatic SC";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/amatic-sc-700-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Amatic SC";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./assets/fonts/amatic-sc-700-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Palette of the "Cztery Żywioły" kindergarten mark: earth, sun, water, air, ink. */
 @theme {
-  --color-brand-50: #f7fee7;
-  --color-brand-100: #ecfccb;
-  --color-brand-600: #4d7c0f;
-  --color-brand-700: #3f6212;
-  --color-brand-900: #1a2e05;
-  --color-accent: #facc15;
+  --font-display: "Amatic SC", ui-sans-serif, system-ui, sans-serif;
+
+  --color-earth: #8dc63f;
+  --color-sun: #f7d117;
+  --color-water: #22b3a6;
+  --color-air: #a8ddd6;
+  --color-ink: #1b1b18;
+
+  --color-brand-50: #f3faf8;
+  --color-brand-100: #d7efeb;
+  --color-brand-600: #0f7f75;
+  --color-brand-700: #0b665e;
+  --color-brand-900: #1b1b18;
+  --color-accent: #f7d117;
 }
 
 html,
@@ -18,4 +49,16 @@ body,
 body {
   @apply bg-brand-50 text-slate-900 antialiased;
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Four brush-like bands under the header, echoing the logo. */
+.element-stripes {
+  height: 10px;
+  background: linear-gradient(
+    to bottom,
+    var(--color-earth) 0 25%,
+    var(--color-sun) 25% 50%,
+    var(--color-water) 50% 75%,
+    var(--color-air) 75% 100%
+  );
 }
