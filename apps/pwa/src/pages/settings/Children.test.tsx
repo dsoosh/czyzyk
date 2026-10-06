@@ -68,7 +68,8 @@ describe("Ustawienia → Dzieci", () => {
       },
     });
     const section = await screen.findByRole("region", { name: "Dzieci" });
-    await userEvent.click(within(section).getByRole("button", { name: "Dodaj dziecko" }));
+    // The section renders before the children load; wait for the button.
+    await userEvent.click(await within(section).findByRole("button", { name: "Dodaj dziecko" }));
     await userEvent.type(within(section).getByRole("textbox", { name: "Imię" }), "Zosia");
     await userEvent.click(within(section).getByRole("button", { name: "Zapisz" }));
     expect(await within(section).findByRole("alert")).toHaveTextContent("Jest już dziecko o tym imieniu.");
