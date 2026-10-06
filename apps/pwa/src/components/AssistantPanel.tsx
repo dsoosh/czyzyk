@@ -52,8 +52,8 @@ export function AssistantPanel() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-4 bottom-20 z-20 rounded-full bg-sun px-5 py-2 font-display text-2xl font-bold text-ink shadow-lg hover:brightness-95"
-        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+        // Sits above the floating tab bar (16px from the bottom, about 68px tall).
+        className="fixed right-5 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-20 rounded-full bg-sun px-5 py-1.5 font-display text-[28px] leading-tight font-bold text-ink shadow-lg hover:brightness-95"
       >
         Zapytaj
       </button>
@@ -64,27 +64,27 @@ export function AssistantPanel() {
     <section
       role="dialog"
       aria-label="Zapytaj asystenta"
-      className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-h-[80vh] max-w-lg flex-col rounded-t-3xl border-t-4 border-water bg-white shadow-2xl"
+      className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-h-[80vh] max-w-lg flex-col rounded-t-[28px] bg-card shadow-2xl"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      <header className="flex items-start gap-2 px-4 pt-3">
+      <header className="flex items-start gap-2 px-5 pt-4">
         <div className="flex-1">
           <h2 className="font-display text-3xl font-bold text-ink">Zapytaj</h2>
-          <p className="text-sm text-slate-500">O: {viewLabel(view)}</p>
+          <p className="text-sm text-muted">O: {viewLabel(view)}</p>
         </div>
         {turns.length > 0 && (
-          <button type="button" className="pt-2 text-sm text-brand-700 underline" onClick={() => setTurns([])}>
+          <button type="button" className="pt-2 text-sm text-clay-700 underline underline-offset-2 hover:text-ink" onClick={() => setTurns([])}>
             Nowa rozmowa
           </button>
         )}
-        <button type="button" aria-label="Zamknij" className="px-2 pt-1 text-2xl text-slate-500" onClick={() => setOpen(false)}>
+        <button type="button" aria-label="Zamknij" className="flex h-11 w-11 items-center justify-center rounded-full text-2xl text-muted hover:bg-ink/5" onClick={() => setOpen(false)}>
           ×
         </button>
       </header>
 
-      <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
+      <div className="flex-1 space-y-2 overflow-y-auto px-5 py-3">
         {turns.length === 0 && (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-muted">
             Np. „Co trzeba przygotować na jutro?”, „Kiedy jest pasowanie?”, „Co pisali o wycieczce?”
           </p>
         )}
@@ -92,8 +92,8 @@ export function AssistantPanel() {
           {turns.map((t, i) => (
             <li
               key={i}
-              className={`max-w-[85%] rounded-2xl px-3 py-2 whitespace-pre-wrap ${
-                t.role === "user" ? "ml-auto bg-brand-100 text-ink" : "bg-brand-50 text-slate-800"
+              className={`max-w-[85%] rounded-3xl px-4 py-2 whitespace-pre-wrap ${
+                t.role === "user" ? "ml-auto bg-lime/45 text-ink" : "bg-white text-ink shadow-sm"
               }`}
             >
               <span className="sr-only">{t.role === "user" ? "Ty: " : "Asystent: "}</span>
@@ -101,7 +101,7 @@ export function AssistantPanel() {
             </li>
           ))}
         </ol>
-        {busy && <p className="text-sm text-slate-500">Asystent myśli…</p>}
+        {busy && <p className="text-sm text-muted">Asystent myśli…</p>}
         {error && (
           <p role="alert" className="rounded-xl bg-red-50 p-2 text-sm text-red-800">
             {error}
@@ -110,20 +110,20 @@ export function AssistantPanel() {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={send} className="flex gap-2 border-t border-slate-100 px-4 py-3">
+      <form onSubmit={send} className="flex gap-2 border-t border-ink/10 px-5 py-3">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={1000}
           placeholder="Twoje pytanie"
           aria-label="Twoje pytanie"
-          className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2"
+          className="min-w-0 flex-1 rounded-full border border-sand-400 bg-white px-4 py-2"
         />
-        <button type="submit" disabled={busy || !draft.trim()} className="rounded-lg bg-brand-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
+        <button type="submit" disabled={busy || !draft.trim()} className="rounded-full bg-ink px-5 py-2 font-semibold text-cream disabled:opacity-45">
           Wyślij
         </button>
       </form>
-      <p className="px-4 pb-2 text-xs text-slate-400">Odpowiedzi tworzy model językowy na podstawie danych tego ekranu – ważne rzeczy sprawdź w źródle.</p>
+      <p className="px-5 pb-3 text-xs text-muted">Odpowiedzi tworzy model językowy na podstawie danych tego ekranu – ważne rzeczy sprawdź w źródle.</p>
     </section>
   );
 }

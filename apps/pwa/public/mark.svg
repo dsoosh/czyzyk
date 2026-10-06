@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="54 60 332 190" role="img" aria-label="Czyżyk">
+  <g stroke-linecap="round" stroke-width="16" fill="none">
+    <path d="M70 92 H370" stroke="#8dc63f"/>
+    <path d="M70 128 H370" stroke="#f7d117"/>
+    <path d="M70 164 H370" stroke="#22b3a6"/>
+    <path d="M70 200 H370" stroke="#a8ddd6"/>
+  </g>
+  <path d="M120 236 H330" stroke="#1b1b18" stroke-width="8" stroke-linecap="round"/>
+  <g>
+    <path d="M276 196 L338 230 L300 230 Z" fill="#1b1b18"/>
+    <path d="M178 172 C180 142 206 130 234 136 C266 144 290 170 290 196 C290 224 262 234 232 234 C200 234 178 206 178 172 Z" fill="#c8d634"/>
+    <path d="M180 178 C184 206 202 226 230 232 C210 220 202 198 202 174 Z" fill="#f7d117"/>
+    <path d="M226 152 C258 152 286 178 296 214 C266 208 236 192 226 152 Z" fill="#1b1b18"/>
+    <path d="M236 174 C254 180 268 190 280 202" stroke="#f7d117" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <circle cx="200" cy="118" r="34" fill="#c8d634"/>
+    <path d="M166 114 A34 34 0 0 1 232 106 C214 100 186 104 166 114 Z" fill="#1b1b18"/>
+    <path d="M168 118 L140 126 L168 132 Z" fill="#1b1b18"/>
+    <circle cx="188" cy="120" r="5.5" fill="#1b1b18"/>
+  </g>
+</svg>

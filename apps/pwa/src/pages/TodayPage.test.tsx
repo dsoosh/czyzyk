@@ -59,9 +59,9 @@ describe("Dziś i jutro", () => {
       },
     });
     const payments = await screen.findByRole("region", { name: "Płatności" });
-    expect(within(payments).getByText("· 10 zł")).toBeInTheDocument();
+    expect(within(payments).getByText("10 zł")).toBeInTheDocument();
     expect(within(payments).getByText(/po terminie/)).toBeInTheDocument();
-    expect(within(payments).getByText("· 25,5 zł")).toBeInTheDocument();
+    expect(within(payments).getByText("25,5 zł")).toBeInTheDocument();
     expect(within(payments).getByText("całe przedszkole")).toBeInTheDocument();
   });
 
