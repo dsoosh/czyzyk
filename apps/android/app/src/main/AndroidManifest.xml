@@ -30,6 +30,19 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="czyzyk" android:host="pair" />
             </intent-filter>
+            <!-- WhatsApp chat export shared to the app: a .txt (without media) or a .zip (with media). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
             <!-- End of Google sign-in started in the hosted PWA: czyzyk://auth/callback?code=… -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

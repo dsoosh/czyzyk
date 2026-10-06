@@ -189,7 +189,7 @@ Uzupełnia wiadomości, których nie dostarczyły powiadomienia (np. sprzed spar
 3. PWA → **Admin → Import** → wybierz plik. Grupa jest podpowiadana z nazwy pliku (musi być śledzona), podgląd pokazuje liczbę wiadomości i zakres dat.
 4. Wybierz, z jakiego okresu nowe wiadomości mają przejść analizę (domyślnie 30 dni; starsze są zapisywane jako historia bez wysyłania do modelu) i stuknij **Importuj**.
 
-Wiadomości znane już z powiadomień albo z wcześniejszego importu są pomijane. Analiza nowych wiadomości rusza kilkanaście sekund po imporcie. Wymaga `SUPABASE_URL` i `PWA_ORIGIN` w usłudze API – ustawia je `.railway/railway.ts`.
+Na telefonie z aplikacją Czyżyk eksport można też od razu **udostępnić do Czyżyka** (Eksportuj czat → Czyżyk) – otworzy się ten sam ekran importu z wczytanym czatem. Wiadomości znane już z powiadomień albo z wcześniejszego importu są pomijane. Analiza nowych wiadomości rusza kilkanaście sekund po imporcie. Wymaga `SUPABASE_URL` i `PWA_ORIGIN` w usłudze API – ustawia je `.railway/railway.ts`.
 
 # Historia czatów i asystent „Zapytaj”
 

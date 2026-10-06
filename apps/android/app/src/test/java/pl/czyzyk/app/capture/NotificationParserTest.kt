@@ -35,6 +35,14 @@ class NotificationParserTest {
     }
 
     @Test
+    fun normalizesGroupNameWithBidiIsolatesAndCountSuffix() {
+        val n = notification("\u2068SOKOŁY - Cztery Żywioły\u2069 (2 wiadomości)", true, Triple("Ciocia", "Jutro ognisko", 1_791_388_920_000))
+        val result = NotificationParser.parse("com.whatsapp", n) as ParseResult.Group
+        assertEquals("SOKOŁY - Cztery Żywioły", result.groupName)
+        assertEquals("SOKOŁY - Cztery Żywioły", result.messages.single().groupName)
+    }
+
+    @Test
     fun readsGroupMessageWithAuthorTextAndTime() {
         val n = notification("Motylki 2026/27", true, Triple("Pani Ania", "W piątek bal, przebrania", 1_791_388_920_000))
         val result = NotificationParser.parse("com.whatsapp", n) as ParseResult.Group
