@@ -8,6 +8,8 @@ import { GroupsPage } from "./pages/admin/GroupsPage";
 import { ImportPage } from "./pages/admin/ImportPage";
 import { ReviewPage } from "./pages/admin/ReviewPage";
 import { CalendarPage } from "./pages/CalendarPage";
+import { ChatsPage } from "./pages/chats/ChatsPage";
+import { GroupHistoryPage } from "./pages/chats/GroupHistoryPage";
 import { EventPage } from "./pages/EventPage";
 import { ActionsPage } from "./pages/lists/ActionsPage";
 import { BringListPage } from "./pages/lists/BringListPage";
@@ -47,6 +49,8 @@ export function App() {
             <Route path="kalendarz" element={<CalendarPage />} />
             <Route path="kalendarz/wydarzenie/:id" element={<EventPage />} />
             <Route path="zrodlo/:kind/:id" element={<SourcePage />} />
+            <Route path="czaty" element={<ChatsPage />} />
+            <Route path="czaty/:id" element={<GroupHistoryPage />} />
             <Route path="ustawienia" element={<SettingsPage />} />
             <Route path="listy" element={<ListsLayout />}>
               <Route index element={<BringListPage />} />

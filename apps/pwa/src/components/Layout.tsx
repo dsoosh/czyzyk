@@ -50,6 +50,9 @@ export function Layout() {
         <NavLink to="/kalendarz" className={tabClass}>
           Kalendarz
         </NavLink>
+        <NavLink to="/czaty" className={tabClass}>
+          Czaty
+        </NavLink>
         {isAdmin && (
           <NavLink to="/admin" className={tabClass}>
             <span className="relative">

@@ -28,6 +28,21 @@ function compare(a: unknown, b: unknown): number {
   return String(a).localeCompare(String(b));
 }
 
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** SQL LIKE pattern (`%`, `_`, backslash escapes) as a regex source. */
+function likeToRegex(pattern: string): string {
+  let out = "";
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i]!;
+    if (ch === "\\" && i + 1 < pattern.length) out += escapeRegex(pattern[++i]!);
+    else if (ch === "%") out += ".*";
+    else if (ch === "_") out += ".";
+    else out += escapeRegex(ch);
+  }
+  return out;
+}
+
 /** Minimal stand-in for the supabase-js surface the PWA uses, with real filtering. */
 export function fakeSupabase(options: FakeOptions = {}) {
   const listeners: AuthCallback[] = [];
@@ -77,6 +92,11 @@ export function fakeSupabase(options: FakeOptions = {}) {
       lt: (c: string, v: unknown) => (filters.push((r) => r[c] != null && compare(r[c], v) < 0), builder),
       lte: (c: string, v: unknown) => (filters.push((r) => r[c] != null && compare(r[c], v) <= 0), builder),
       is: (c: string, v: null) => (filters.push((r) => (r[c] ?? null) === v), builder),
+      ilike: (c: string, pattern: string) => {
+        const re = new RegExp(`^${likeToRegex(pattern)}$`, "is");
+        filters.push((r) => typeof r[c] === "string" && re.test(r[c] as string));
+        return builder;
+      },
       not: (c: string, op: string, v: unknown) => {
         if (op !== "is" || v !== null) throw new Error(`fake: unsupported not(${op})`);
         filters.push((r) => r[c] != null);
