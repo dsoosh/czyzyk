@@ -31,9 +31,14 @@ object Work {
         WorkManager.getInstance(context).enqueueUniqueWork("sync", ExistingWorkPolicy.KEEP, request)
     }
 
-    /** Tracked groups are refreshed at least every 15 minutes (group-tracking). */
+    /** Tracked groups are refreshed every [SyncInterval] chosen on the phone (group-tracking). */
     fun schedulePeriodicSync(context: Context) {
-        val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES).setConstraints(network).build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork("sync-periodic", ExistingPeriodicWorkPolicy.KEEP, request)
+        val minutes = Deps.state(context).syncInterval.minutes
+        val request = PeriodicWorkRequestBuilder<SyncWorker>(minutes, TimeUnit.MINUTES).setConstraints(network).build()
+        // UPDATE keeps the existing work but applies a changed interval.
+        WorkManager.getInstance(context)
+            .enqueueUniquePeriodicWork(PERIODIC_SYNC, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
+
+    const val PERIODIC_SYNC = "sync-periodic"
 }

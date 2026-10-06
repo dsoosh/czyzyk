@@ -2,12 +2,13 @@ package pl.czyzyk.app
 
 import android.content.Context
 import android.content.SharedPreferences
+import pl.czyzyk.app.work.SyncInterval
 
-/** Non-secret local state: tracked-group cache, group reports, counters for the status screen. */
+/** Non-secret local state: tracked-group cache, sync interval, group reports, counters for the status screen. */
 class AppState(private val prefs: SharedPreferences) {
 
     val trackedGroups: Set<String> get() = prefs.getStringSet(KEY_TRACKED, emptySet()).orEmpty()
-    private val trackedFetchedAt: Long get() = prefs.getLong(KEY_TRACKED_AT, 0)
+    val trackedFetchedAt: Long get() = prefs.getLong(KEY_TRACKED_AT, 0)
     var configTtlMillis: Long
         get() = prefs.getLong(KEY_TTL, DEFAULT_TTL_MILLIS)
         private set(v) = prefs.edit().putLong(KEY_TTL, v).apply()
@@ -17,7 +18,13 @@ class AppState(private val prefs: SharedPreferences) {
         configTtlMillis = ttlMillis
     }
 
-    fun trackedGroupsStale(now: Long = System.currentTimeMillis()) = now - trackedFetchedAt >= configTtlMillis
+    /** Chosen on the phone; the list is stale after the longer of the server TTL and this interval. */
+    var syncInterval: SyncInterval
+        get() = SyncInterval.fromMinutes(prefs.getLong(KEY_SYNC_INTERVAL, SyncInterval.DEFAULT.minutes))
+        set(v) = prefs.edit().putLong(KEY_SYNC_INTERVAL, v.minutes).apply()
+
+    fun trackedGroupsStale(now: Long = System.currentTimeMillis()) =
+        now - trackedFetchedAt >= maxOf(configTtlMillis, syncInterval.millis)
 
     /** Group names already sent to the server or waiting to be sent. */
     val knownGroups: Set<String> get() = reportedGroups + pendingGroupReports
@@ -48,6 +55,7 @@ class AppState(private val prefs: SharedPreferences) {
         private const val KEY_TRACKED = "tracked_groups"
         private const val KEY_TRACKED_AT = "tracked_groups_at"
         private const val KEY_TTL = "config_ttl"
+        private const val KEY_SYNC_INTERVAL = "sync_interval_minutes"
         private const val KEY_REPORTED = "reported_groups"
         private const val KEY_PENDING_REPORTS = "pending_group_reports"
         private const val KEY_ATTACHMENTS = "pending_attachments"
