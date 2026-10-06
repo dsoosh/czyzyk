@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, useOutletContext } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
 import { fetchReviewCount } from "../lib/review";
 import { useLoader, useOnForeground } from "../lib/useLoader";
+import { useMediaQuery, WIDE_SCREEN } from "../lib/useMediaQuery";
 import { AssistantPanel } from "./AssistantPanel";
 import { Logo } from "./Logo";
 
@@ -33,13 +34,58 @@ function Icon({ name, className = "h-5 w-5" }: { name: keyof typeof ICONS; class
   );
 }
 
+interface Tab {
+  to: string;
+  label: string;
+  icon: keyof typeof ICONS;
+  end?: boolean;
+}
+
+const TABS: Tab[] = [
+  { to: "/", label: "Dziś", icon: "today", end: true },
+  { to: "/listy", label: "Listy", icon: "lists" },
+  { to: "/kalendarz", label: "Kalendarz", icon: "calendar" },
+  { to: "/czaty", label: "Czaty", icon: "chats" },
+];
+const ADMIN_TAB: Tab = { to: "/admin", label: "Admin", icon: "admin" };
+
+/** Phone: equal-width icon-over-label tabs in the floating bottom bar. */
 const tabClass = ({ isActive }: { isActive: boolean }) =>
   `flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[11px] font-bold transition-colors ${
     isActive ? "bg-lime text-ink" : "text-sand hover:bg-white/10 active:bg-white/20"
   }`;
 
+/** Desktop: full-width rows in the sidebar. */
+const sideTabClass = ({ isActive }: { isActive: boolean }) =>
+  `flex items-center gap-3 rounded-full px-4 py-3 text-[15px] font-bold transition-colors ${
+    isActive ? "bg-lime text-ink" : "text-sand hover:bg-white/10 active:bg-white/20"
+  }`;
+
 const roundButton =
   "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink transition-colors hover:bg-ink/5 active:bg-ink/10";
+
+function ReviewBadge({ pending }: { pending: number }) {
+  if (pending <= 0) return null;
+  return (
+    <span
+      aria-label={`${pending} do przejrzenia`}
+      className="absolute -top-2 -right-3 min-w-5 rounded-full bg-clay px-1 text-center text-xs leading-5 text-white"
+    >
+      {pending}
+    </span>
+  );
+}
+
+function Brand() {
+  return (
+    <>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm">
+        <Logo className="h-8 w-9" />
+      </span>
+      <span className="ml-1 flex-1 font-display text-[32px] leading-none font-bold text-ink">Czyżyk</span>
+    </>
+  );
+}
 
 export function Layout() {
   const profile = useProfile();
@@ -48,60 +94,68 @@ export function Layout() {
   const reviewCount = useLoader(async () => (isAdmin ? fetchReviewCount(client) : 0), [client, isAdmin]);
   useOnForeground(reviewCount.reload);
   const pending = reviewCount.data ?? 0;
+  const wide = useMediaQuery(WIDE_SCREEN);
+  const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
+  const outlet = <Outlet context={{ refreshReviewCount: reviewCount.reload } satisfies LayoutContext} />;
+  const accountButtons = (
+    <>
+      <button type="button" onClick={() => void signOut()} aria-label="Wyloguj" title="Wyloguj" className={roundButton}>
+        <Icon name="logout" />
+      </button>
+      <Link to="/ustawienia" aria-label="Ustawienia" title="Ustawienia" className={`${roundButton} border border-ink/15`}>
+        <Icon name="settings" />
+      </Link>
+    </>
+  );
+
+  // Only one navigation is rendered, so assistive tech (and tests) never see the tabs twice.
+  if (wide) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-6xl gap-10 px-8">
+        <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col gap-6 py-8">
+          <div className="flex items-center gap-2">
+            <Brand />
+          </div>
+          <nav aria-label="Nawigacja" className="flex flex-col gap-1 rounded-[28px] bg-ink p-2 shadow-lg">
+            {tabs.map((t) => (
+              <NavLink key={t.to} to={t.to} end={t.end} className={sideTabClass}>
+                <span className="relative">
+                  <Icon name={t.icon} />
+                  {t === ADMIN_TAB && <ReviewBadge pending={pending} />}
+                </span>
+                {t.label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="mt-auto flex gap-2">{accountButtons}</div>
+        </aside>
+        <main className="min-w-0 flex-1 py-10">{outlet}</main>
+        <AssistantPanel />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex min-h-screen max-w-lg flex-col">
       <header className="flex items-center gap-2 px-5 pt-5 pb-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm">
-          <Logo className="h-8 w-9" />
-        </span>
-        <span className="ml-1 flex-1 font-display text-[32px] leading-none font-bold text-ink">Czyżyk</span>
-        <button type="button" onClick={() => void signOut()} aria-label="Wyloguj" title="Wyloguj" className={roundButton}>
-          <Icon name="logout" />
-        </button>
-        <Link to="/ustawienia" aria-label="Ustawienia" title="Ustawienia" className={`${roundButton} border border-ink/15`}>
-          <Icon name="settings" />
-        </Link>
+        <Brand />
+        {accountButtons}
       </header>
-      <main className="flex-1 px-5 pb-32">
-        <Outlet context={{ refreshReviewCount: reviewCount.reload } satisfies LayoutContext} />
-      </main>
+      <main className="flex-1 px-5 pb-32">{outlet}</main>
       <AssistantPanel />
       <nav
         aria-label="Nawigacja"
         className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] mx-auto flex max-w-[calc(32rem-2rem)] gap-1 rounded-full bg-ink p-1.5 shadow-lg"
       >
-        <NavLink to="/" end className={tabClass}>
-          <Icon name="today" />
-          Dziś
-        </NavLink>
-        <NavLink to="/listy" className={tabClass}>
-          <Icon name="lists" />
-          Listy
-        </NavLink>
-        <NavLink to="/kalendarz" className={tabClass}>
-          <Icon name="calendar" />
-          Kalendarz
-        </NavLink>
-        <NavLink to="/czaty" className={tabClass}>
-          <Icon name="chats" />
-          Czaty
-        </NavLink>
-        {isAdmin && (
-          <NavLink to="/admin" className={tabClass}>
+        {tabs.map((t) => (
+          <NavLink key={t.to} to={t.to} end={t.end} className={tabClass}>
             <span className="relative">
-              <Icon name="admin" />
-              {pending > 0 && (
-                <span
-                  aria-label={`${pending} do przejrzenia`}
-                  className="absolute -top-2 -right-3 min-w-5 rounded-full bg-clay px-1 text-center text-xs leading-5 text-white"
-                >
-                  {pending}
-                </span>
-              )}
+              <Icon name={t.icon} />
+              {t === ADMIN_TAB && <ReviewBadge pending={pending} />}
             </span>
-            Admin
+            {t.label}
           </NavLink>
-        )}
+        ))}
       </nav>
     </div>
   );
