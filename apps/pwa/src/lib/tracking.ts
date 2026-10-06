@@ -1,3 +1,4 @@
+import { fetchChildren, type Child } from "./children";
 import { dayLabel, warsawDay, warsawTime } from "./dates";
 import {
   ACTION_COLUMNS,
@@ -50,11 +51,12 @@ export function doneLabel(
 export interface ListsBase {
   groups: Map<string, string>;
   people: Map<string, string>;
+  children: Child[];
 }
 
 /** Upcoming (and undated) things to bring, soonest first. */
 export async function fetchBringList(db: Db, today: string): Promise<ListsBase & { items: BringItem[] }> {
-  const [dated, undated, groups, people] = await Promise.all([
+  const [dated, undated, groups, people, children] = await Promise.all([
     run<BringItem[]>(
       db.from("bring_items").select(BRING_COLUMNS).eq("status", "active").gte("due_date", today).order("due_date").order("description"),
     ),
@@ -63,12 +65,13 @@ export async function fetchBringList(db: Db, today: string): Promise<ListsBase &
     ),
     fetchGroupNames(db),
     fetchPeople(db),
+    fetchChildren(db),
   ]);
-  return { items: [...dated, ...undated], groups, people };
+  return { items: [...dated, ...undated], groups, people, children };
 }
 
 export async function fetchPaymentList(db: Db): Promise<ListsBase & { open: Payment[]; paid: Payment[] }> {
-  const [open, paid, groups, people] = await Promise.all([
+  const [open, paid, groups, people, children] = await Promise.all([
     run<Payment[]>(db.from("payments").select(PAYMENT_COLUMNS).eq("status", "active").is("paid_at", null).order("due_date")),
     run<Payment[]>(
       db
@@ -81,12 +84,13 @@ export async function fetchPaymentList(db: Db): Promise<ListsBase & { open: Paym
     ),
     fetchGroupNames(db),
     fetchPeople(db),
+    fetchChildren(db),
   ]);
-  return { open, paid, groups, people };
+  return { open, paid, groups, people, children };
 }
 
 export async function fetchActionList(db: Db): Promise<ListsBase & { open: ActionRequired[]; resolved: ActionRequired[] }> {
-  const [open, resolved, groups, people] = await Promise.all([
+  const [open, resolved, groups, people, children] = await Promise.all([
     run<ActionRequired[]>(
       db.from("action_required").select(ACTION_COLUMNS).eq("status", "active").is("resolved_at", null).order("due_date"),
     ),
@@ -101,8 +105,9 @@ export async function fetchActionList(db: Db): Promise<ListsBase & { open: Actio
     ),
     fetchGroupNames(db),
     fetchPeople(db),
+    fetchChildren(db),
   ]);
-  return { open, resolved, groups, people };
+  return { open, resolved, groups, people, children };
 }
 
 export async function fetchClosureList(db: Db, today: string): Promise<{ closures: Closure[]; groups: Map<string, string> }> {

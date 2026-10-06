@@ -30,6 +30,16 @@ describe("parseOperation", () => {
     expect(parseOperation({ ...create, op: "update", target: "E2", data: {} })).toMatchObject({ ok: false });
   });
 
+  it("niesie imiona dzieci (domyślnie pusta lista); update może zmienić same dzieci", () => {
+    const plain = parseOperation(create);
+    expect(plain.ok && plain.value.op === "create" && plain.value.children).toEqual([]);
+    const withChild = parseOperation({ ...create, children: [" Zosia "] });
+    expect(withChild.ok && withChild.value.op === "create" && withChild.value.children).toEqual(["Zosia"]);
+    const onlyChildren = parseOperation({ ...create, op: "update", target: "E2", data: {}, children: ["Antek"] });
+    expect(onlyChildren).toMatchObject({ ok: true, value: { op: "update", children: ["Antek"] } });
+    expect(parseOperation({ ...create, children: Array(11).fill("x") })).toMatchObject({ ok: false });
+  });
+
   it("rejects malformed aliases and confidence", () => {
     expect(parseOperation({ ...create, source_messages: ["msg-uuid"] })).toMatchObject({ ok: false });
     expect(parseOperation({ ...create, confidence: 1.5 })).toMatchObject({ ok: false });

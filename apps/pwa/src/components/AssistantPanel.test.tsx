@@ -65,6 +65,23 @@ describe("Zapytaj", () => {
     expect(screen.queryByText("Zbiórka o 8:00.")).not.toBeInTheDocument();
   });
 
+  it("nie wywraca aplikacji, gdy scrollIntoView zwraca Promise (nowe przeglądarki)", async () => {
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = (() => Promise.resolve()) as unknown as typeof original;
+    try {
+      fetchMock.mockResolvedValueOnce(answer("Kiełbaska na ognisko.")).mockResolvedValueOnce(answer("Jutro."));
+      renderAt("/", { tables: {} });
+      await userEvent.click(await screen.findByRole("button", { name: "Zapytaj" }));
+      await askQuestion("co jutro?");
+      await screen.findByText("Kiełbaska na ognisko.");
+      await askQuestion("kiedy?");
+      expect(await screen.findByText("Jutro.")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Dziś i jutro" })).toBeInTheDocument();
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it("pokazuje komunikat o dziennym limicie", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: "daily_limit" }), { status: 429 }));
     renderAt("/", { tables: {} });

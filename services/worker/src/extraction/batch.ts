@@ -14,6 +14,14 @@ export interface ExistingItem<T extends ItemType = ItemType> {
   type: T;
   status: "active" | "needs_review" | "cancelled";
   data: ItemData[T];
+  /** Names of the children the item is assigned to (empty: the whole group). */
+  children: string[];
+}
+
+export interface FamilyChild {
+  name: string;
+  /** Display name of the child's group, or null when not set. */
+  group: string | null;
 }
 
 export interface ExtractionBatch {
@@ -24,6 +32,8 @@ export interface ExtractionBatch {
   contextMessages: BatchMessage[];
   /** Current and future items of this group and of the whole kindergarten. */
   items: ExistingItem[];
+  /** Children of the family, so the model can tell which child a message is about. */
+  children: FamilyChild[];
 }
 
 type Queryable = Pick<pg.PoolClient, "query">;
@@ -44,28 +54,34 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
                   else to_char(t.ends_at at time zone 'Europe/Warsaw', 'YYYY-MM-DD"T"HH24:MI') end,
       'all_day', t.all_day,
       'location', t.location,
-      'whole_kindergarten', t.group_id is null) as data
+      'whole_kindergarten', t.group_id is null) as data,
+      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
     from public.events t`,
   bring_item: `select t.id, t.status, jsonb_build_object(
       'description', t.description,
       'due_date', to_char(t.due_date, 'YYYY-MM-DD'),
-      'event', t.event_id) as data
+      'event', t.event_id) as data,
+      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
     from public.bring_items t`,
   payment: `select t.id, t.status, jsonb_build_object(
       'description', t.description,
       'amount_pln', t.amount_pln::float8,
-      'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data
+      'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data,
+      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
     from public.payments t`,
   action_required: `select t.id, t.status, jsonb_build_object(
       'question', t.question,
-      'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data
+      'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data,
+      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
     from public.action_required t`,
   closure: `select t.id, t.status, jsonb_build_object(
       'date_from', to_char(t.date_from, 'YYYY-MM-DD'),
       'date_to', to_char(t.date_to, 'YYYY-MM-DD'),
-      'reason', t.reason) as data
+      'reason', t.reason) as data,
+      '{}'::text[] as children
     from public.closures t`,
-  fact: `select t.id, t.status, jsonb_build_object('category', t.category, 'label', t.label, 'value', t.value) as data
+  fact: `select t.id, t.status, jsonb_build_object('category', t.category, 'label', t.label, 'value', t.value) as data,
+      '{}'::text[] as children
     from public.facts t`,
 };
 
@@ -82,7 +98,7 @@ const ITEM_FILTERS: Record<ItemType, string> = {
 export async function loadItem(db: Queryable, type: ItemType, id: string): Promise<ExistingItem | null> {
   const { rows } = await db.query(`${ITEM_DATA_SQL[type]} where t.id = $1`, [id]);
   const row = rows[0];
-  return row ? { id: row.id, type, status: row.status, data: row.data } : null;
+  return row ? { id: row.id, type, status: row.status, data: row.data, children: row.children } : null;
 }
 
 export async function loadBatch(db: Queryable, groupId: string, today: string, contextSize: number): Promise<ExtractionBatch | null> {
@@ -109,7 +125,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     [groupId, MAX_NEW_MESSAGES],
   );
   const newMessages = fresh.map(toMessage);
-  if (newMessages.length === 0) return { group, newMessages, contextMessages: [], items: [] };
+  if (newMessages.length === 0) return { group, newMessages, contextMessages: [], items: [], children: [] };
 
   const { rows: earlier } = await db.query(
     `select * from (
@@ -130,8 +146,14 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
         order by t.created_at limit 100`,
       [groupId, today],
     );
-    for (const r of rows) items.push({ id: r.id, type, status: r.status, data: r.data });
+    for (const r of rows) items.push({ id: r.id, type, status: r.status, data: r.data, children: r.children });
   }
 
-  return { group, newMessages, contextMessages: earlier.map(toMessage), items };
+  const { rows: children } = await db.query<FamilyChild>(
+    `select c.name, coalesce(g.display_name, g.wa_name) as "group"
+       from public.children c left join public.wa_groups g on g.id = c.group_id
+      order by c.name`,
+  );
+
+  return { group, newMessages, contextMessages: earlier.map(toMessage), items, children };
 }

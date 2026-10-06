@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth, useProfile } from "../../auth/AuthProvider";
-import { DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
+import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
+import { childNames } from "../../lib/children";
 import { addDays, dayLabel, warsawDay } from "../../lib/dates";
 import { groupLabel, type ActionRequired } from "../../lib/items";
 import { doneLabel, fetchActionList } from "../../lib/tracking";
@@ -36,6 +37,7 @@ export function ActionsPage() {
               </span>
             )}
             {a.resolved_at && <span>{doneLabel("załatwione", a.resolved_by, a.resolved_at, me, data.people, today)}</span>}
+            <ChildTag names={childNames(data.children, a)} />
             <span>{groupLabel(data.groups, a.group_id)}</span>
             <SourceLink kind="action_required" id={a.id} />
           </Meta>

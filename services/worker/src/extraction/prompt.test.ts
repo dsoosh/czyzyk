@@ -17,8 +17,13 @@ const batch: ExtractionBatch = {
       type: "event",
       status: "active",
       data: { title: "Wycieczka do ZOO", start: "2026-10-10", end: null, all_day: true, location: "ZOO", whole_kindergarten: false },
+      children: [],
     },
-    { id: "b1", type: "bring_item", status: "needs_review", data: { description: "drugie śniadanie", due_date: "2026-10-10", event: "e1" } },
+    { id: "b1", type: "bring_item", status: "needs_review", data: { description: "drugie śniadanie", due_date: "2026-10-10", event: "e1" }, children: ["Zosia"] },
+  ],
+  children: [
+    { name: "Zosia", group: "Motylki" },
+    { name: "Antek", group: null },
   ],
 };
 
@@ -27,6 +32,12 @@ describe("buildExtractionPrompt", () => {
 
   it("renders the user turn deterministically", () => {
     expect(prompt.user).toMatchSnapshot();
+  });
+
+  it("lists the family's children and the children of existing items", () => {
+    expect(prompt.user).toContain('<dzieci>\n"Zosia" – grupa "Motylki"\n"Antek"\n</dzieci>');
+    expect(prompt.user).toContain('| dzieci: ["Zosia"]');
+    expect(SYSTEM_PROMPT).toContain("children");
   });
 
   it("assigns aliases to context and new messages and to items", () => {

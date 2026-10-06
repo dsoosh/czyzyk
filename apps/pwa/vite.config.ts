@@ -23,7 +23,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon.svg", "logo.svg", "apple-touch-icon.png"],
+      includeAssets: ["icon.svg", "logo.svg", "mark.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Czyżyk – asystent przedszkolny",
         short_name: "Czyżyk",

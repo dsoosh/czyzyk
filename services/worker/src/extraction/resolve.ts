@@ -10,6 +10,7 @@ export type ResolvedOperation = { index: number } & (
       type: ItemType;
       ref: string | null;
       data: ItemData[ItemType];
+      children: string[];
       eventRef: EventRef;
       sourceMessageIds: string[];
       confidence: number;
@@ -20,6 +21,7 @@ export type ResolvedOperation = { index: number } & (
       type: ItemType;
       targetId: string;
       data: Partial<ItemData[ItemType]>;
+      children: string[];
       eventRef: EventRef | undefined;
       sourceMessageIds: string[];
       confidence: number;
@@ -93,7 +95,7 @@ export function resolveOperations(raw: unknown[], aliases: Aliases): { accepted:
         }
         seenRefs.add(op.ref);
       }
-      accepted.push({ op: "create", ref: op.ref, data: op.data, eventRef: eventRef ?? null, ...common });
+      accepted.push({ op: "create", ref: op.ref, data: op.data, children: op.children, eventRef: eventRef ?? null, ...common });
       continue;
     }
 
@@ -108,7 +110,7 @@ export function resolveOperations(raw: unknown[], aliases: Aliases): { accepted:
     }
     accepted.push(
       op.op === "update"
-        ? { op: "update", targetId: target.id, data: op.data, eventRef, ...common }
+        ? { op: "update", targetId: target.id, data: op.data, children: op.children, eventRef, ...common }
         : { op: "cancel", targetId: target.id, ...common },
     );
   }

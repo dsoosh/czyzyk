@@ -31,9 +31,22 @@
   --color-water: #22b3a6;
   --color-air: #a8ddd6;
   --color-ink: #1b1b18;
+  /* The bird's body — active tab. */
+  --color-lime: #c8d733;
 
-  --color-brand-50: #f3faf8;
-  --color-brand-100: #d7efeb;
+  /* Warm ground (variant 1a): cream page, lighter cards, sand neutrals, clay for primary actions. */
+  --color-cream: #f5ead8;
+  --color-card: #f9f4ed;
+  --color-sand: #eee7db;
+  --color-sand-400: #c0b6a5;
+  --color-muted: #645c50;
+  --color-clay: #c67139;
+  --color-clay-600: #b2622d;
+  --color-clay-700: #8c491a;
+
+  /* Light brand shades follow the warm ground; teal (600/700) stays for actions and links. */
+  --color-brand-50: #f9f4ed;
+  --color-brand-100: #eee7db;
   --color-brand-600: #0f7f75;
   --color-brand-700: #0b665e;
   --color-brand-900: #1b1b18;
@@ -47,11 +60,16 @@ body,
 }
 
 body {
-  @apply bg-brand-50 text-slate-900 antialiased;
+  @apply bg-cream text-ink antialiased;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Four brush-like bands under the header, echoing the logo. */
+:focus-visible {
+  outline: 2px solid var(--color-clay);
+  outline-offset: 2px;
+}
+
+/* Four brush-like bands, echoing the logo. */
 .element-stripes {
   height: 10px;
   background: linear-gradient(

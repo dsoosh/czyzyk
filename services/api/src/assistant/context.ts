@@ -38,22 +38,35 @@ function addDays(day: string, n: number): string {
 interface Names {
   groups: Map<string, string>;
   people: Map<string, string>;
+  children: { id: string; name: string; group_id: string | null }[];
 }
 
 async function loadNames(db: Db): Promise<Names> {
-  const [groups, people] = await Promise.all([
+  const [groups, people, children] = await Promise.all([
     db.query<{ id: string; name: string }>("select id, coalesce(display_name, wa_name) as name from public.wa_groups"),
     db.query<{ id: string; name: string }>(
       "select id, split_part(coalesce(nullif(trim(display_name), ''), split_part(email, '@', 1)), ' ', 1) as name from public.profiles",
     ),
+    db.query<{ id: string; name: string; group_id: string | null }>("select id, name, group_id from public.children order by name"),
   ]);
   return {
     groups: new Map(groups.rows.map((r) => [r.id, r.name])),
     people: new Map(people.rows.map((r) => [r.id, r.name])),
+    children: children.rows,
   };
 }
 
 const groupOf = (names: Names, id: string | null) => (id ? `grupa ${names.groups.get(id) ?? "?"}` : "całe przedszkole");
+
+/** "; dziecko: Zosia" – assigned children, otherwise the children of the item's group (as in the PWA). */
+function childOf(names: Names, row: { group_id: string | null; child_ids: string[] }): string {
+  const list = row.child_ids.length
+    ? names.children.filter((c) => row.child_ids.includes(c.id))
+    : row.group_id
+      ? names.children.filter((c) => c.group_id === row.group_id)
+      : [];
+  return list.length ? `; dziecko: ${list.map((c) => c.name).join(", ")}` : "";
+}
 const who = (names: Names, id: string | null) => (id ? (names.people.get(id) ?? "ktoś z rodziny") : "ktoś z rodziny");
 
 // --- items ------------------------------------------------------------------
@@ -61,6 +74,7 @@ const who = (names: Names, id: string | null) => (id ? (names.people.get(id) ?? 
 interface EventRow {
   id: string;
   group_id: string | null;
+  child_ids: string[];
   title: string;
   start_day: string;
   start_time: string;
@@ -71,7 +85,7 @@ interface EventRow {
 }
 
 const EVENT_SELECT = `
-  select id, group_id, title, all_day, location,
+  select id, group_id, child_ids, title, all_day, location,
          to_char(starts_at at time zone '${TZ}', 'YYYY-MM-DD') as start_day,
          to_char(starts_at at time zone '${TZ}', 'HH24:MI') as start_time,
          to_char(ends_at at time zone '${TZ}', 'YYYY-MM-DD') as end_day,
@@ -86,11 +100,12 @@ function eventLine(e: EventRow, names: Names): string {
     when += ` ${e.start_time}`;
     if (e.end_day) when += e.end_day === e.start_day ? `–${e.end_time}` : ` – ${dayWithWeekday(e.end_day)} ${e.end_time}`;
   }
-  return `- Wydarzenie: ${e.title}; ${when}${e.location ? `; miejsce: ${e.location}` : ""}; ${groupOf(names, e.group_id)}`;
+  return `- Wydarzenie: ${e.title}; ${when}${e.location ? `; miejsce: ${e.location}` : ""}; ${groupOf(names, e.group_id)}${childOf(names, e)}`;
 }
 
 interface BringRow {
   group_id: string | null;
+  child_ids: string[];
   description: string;
   due_date: string | null;
   packed_by: string | null;
@@ -99,18 +114,19 @@ interface BringRow {
 }
 
 const BRING_SELECT = `
-  select b.group_id, b.description, to_char(b.due_date, 'YYYY-MM-DD') as due_date, b.packed_by, b.packed_at, e.title as event_title
+  select b.group_id, b.child_ids, b.description, to_char(b.due_date, 'YYYY-MM-DD') as due_date, b.packed_by, b.packed_at, e.title as event_title
     from public.bring_items b
     left join public.events e on e.id = b.event_id and e.status = 'active'`;
 
 function bringLine(b: BringRow, names: Names): string {
   const due = b.due_date ? `na ${dayWithWeekday(b.due_date)}` : "bez terminu";
   const packed = b.packed_at ? `spakowane (${who(names, b.packed_by)})` : "jeszcze nie spakowane";
-  return `- Do przyniesienia: ${b.description}; ${due}${b.event_title ? `; na wydarzenie „${b.event_title}”` : ""}; ${packed}; ${groupOf(names, b.group_id)}`;
+  return `- Do przyniesienia: ${b.description}; ${due}${b.event_title ? `; na wydarzenie „${b.event_title}”` : ""}; ${packed}; ${groupOf(names, b.group_id)}${childOf(names, b)}`;
 }
 
 interface PaymentRow {
   group_id: string | null;
+  child_ids: string[];
   description: string;
   amount_pln: string | null;
   due_date: string | null;
@@ -119,18 +135,19 @@ interface PaymentRow {
 }
 
 const PAYMENT_SELECT = `
-  select group_id, description, amount_pln::text, to_char(due_date, 'YYYY-MM-DD') as due_date, paid_by, paid_at
+  select group_id, child_ids, description, amount_pln::text, to_char(due_date, 'YYYY-MM-DD') as due_date, paid_by, paid_at
     from public.payments`;
 
 function paymentLine(p: PaymentRow, names: Names): string {
   const amount = p.amount_pln ? `${p.amount_pln.replace(".", ",")} zł` : "kwota nieznana";
   const due = p.due_date ? `termin ${dayWithWeekday(p.due_date)}` : "bez terminu";
   const paid = p.paid_at ? `zapłacone (${who(names, p.paid_by)}, ${warsawDate(p.paid_at)})` : "niezapłacone";
-  return `- Płatność: ${p.description}; ${amount}; ${due}; ${paid}; ${groupOf(names, p.group_id)}`;
+  return `- Płatność: ${p.description}; ${amount}; ${due}; ${paid}; ${groupOf(names, p.group_id)}${childOf(names, p)}`;
 }
 
 interface ActionRow {
   group_id: string | null;
+  child_ids: string[];
   question: string;
   due_date: string | null;
   resolved_by: string | null;
@@ -138,13 +155,13 @@ interface ActionRow {
 }
 
 const ACTION_SELECT = `
-  select group_id, question, to_char(due_date, 'YYYY-MM-DD') as due_date, resolved_by, resolved_at
+  select group_id, child_ids, question, to_char(due_date, 'YYYY-MM-DD') as due_date, resolved_by, resolved_at
     from public.action_required`;
 
 function actionLine(a: ActionRow, names: Names): string {
   const due = a.due_date ? `do ${dayWithWeekday(a.due_date)}` : "bez terminu";
   const done = a.resolved_at ? `załatwione (${who(names, a.resolved_by)})` : "do załatwienia";
-  return `- Wymaga odpowiedzi: ${a.question}; ${due}; ${done}; ${groupOf(names, a.group_id)}`;
+  return `- Wymaga odpowiedzi: ${a.question}; ${due}; ${done}; ${groupOf(names, a.group_id)}${childOf(names, a)}`;
 }
 
 interface ClosureRow {
@@ -256,6 +273,13 @@ const MONTHS = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "l
  */
 export async function loadViewContext(db: Db, view: AssistantView, now: Date): Promise<ViewContext> {
   const names = await loadNames(db);
+  const context = await viewContext(db, view, now, names);
+  if (names.children.length === 0) return context;
+  const kids = names.children.map((c) => `- ${c.name}${c.group_id ? ` (grupa ${names.groups.get(c.group_id) ?? "?"})` : ""}`);
+  return { ...context, data: `${section("Dzieci rodziny", kids)}\n\n${context.data}` };
+}
+
+async function viewContext(db: Db, view: AssistantView, now: Date, names: Names): Promise<ViewContext> {
   const today = warsawDate(now);
 
   switch (view.kind) {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth, useProfile } from "../../auth/AuthProvider";
-import { DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
+import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
+import { childNames } from "../../lib/children";
 import { dayLabel, warsawDay } from "../../lib/dates";
 import { groupLabel, type BringItem } from "../../lib/items";
 import { doneLabel, fetchBringList } from "../../lib/tracking";
@@ -44,7 +45,8 @@ export function BringListPage() {
                   <span className={b.packed_at ? "text-slate-400 line-through" : "font-medium"}>{b.description}</span>
                   <Meta>
                     {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
-                    <span>{groupLabel(data.groups, b.group_id)}</span>
+                    <ChildTag names={childNames(data.children, b)} />
+            <span>{groupLabel(data.groups, b.group_id)}</span>
                     <SourceLink kind="bring_item" id={b.id} />
                   </Meta>
                 </div>

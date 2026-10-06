@@ -4,40 +4,58 @@ import type { ItemKind } from "../lib/items";
 
 export function SourceLink({ kind, id }: { kind: ItemKind; id: string }) {
   return (
-    <Link to={`/zrodlo/${kind}/${id}`} className="text-xs text-brand-600 underline underline-offset-2">
+    <Link to={`/zrodlo/${kind}/${id}`} className="text-xs text-clay-700 underline underline-offset-2 hover:text-ink">
       skąd to wiem
     </Link>
   );
 }
 
-export function Section({ title, empty, children }: { title: string; empty: string; children: ReactNode[] }) {
+/** Logo band colours, used as a section marker. */
+export type Stripe = "earth" | "sun" | "water" | "air";
+const STRIPE_CLASS: Record<Stripe, string> = { earth: "bg-earth", sun: "bg-sun", water: "bg-water", air: "bg-air" };
+
+export function Section({
+  title,
+  empty,
+  stripe,
+  children,
+}: {
+  title: string;
+  empty: string;
+  stripe?: Stripe;
+  children: ReactNode[];
+}) {
   return (
-    <section aria-label={title} className="space-y-2">
-      <h2 className="font-display text-2xl font-bold text-ink">{title}</h2>
+    <section aria-label={title} className="space-y-2.5">
+      <div className="flex items-center gap-2.5">
+        {stripe && <span aria-hidden="true" className={`h-2.5 w-7 shrink-0 rounded-full ${STRIPE_CLASS[stripe]}`} />}
+        <h2 className="flex-1 text-[13px] font-bold tracking-wider text-ink uppercase">{title}</h2>
+        {children.length > 0 && <span className="text-[13px] font-bold text-muted">{children.length}</span>}
+      </div>
       {children.length === 0 ? (
-        <p className="rounded-2xl bg-white p-4 text-slate-500 shadow-sm">{empty}</p>
+        <p className="rounded-[28px] border-[1.5px] border-dashed border-sand-400 px-5 py-4 text-muted">{empty}</p>
       ) : (
-        <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-sm">{children}</ul>
+        <ul className="divide-y divide-ink/10 rounded-[28px] bg-card px-5 shadow-sm">{children}</ul>
       )}
     </section>
   );
 }
 
 export function Row({ children }: { children: ReactNode }) {
-  return <li className="flex flex-col gap-1 p-4">{children}</li>;
+  return <li className="flex min-h-11 flex-col gap-1 py-3.5">{children}</li>;
 }
 
 export function Meta({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">{children}</div>;
+  return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">{children}</div>;
 }
 
 export function Loading() {
-  return <p className="py-8 text-center text-slate-500">Wczytywanie…</p>;
+  return <p className="py-8 text-center text-muted">Wczytywanie…</p>;
 }
 
 export function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div role="alert" className="rounded-2xl bg-red-50 p-4 text-red-800">
+    <div role="alert" className="rounded-[28px] bg-red-50 p-4 text-red-800">
       {message}{" "}
       <button type="button" className="underline" onClick={onRetry}>
         Spróbuj ponownie
@@ -66,15 +84,25 @@ export function DoneToggle({
       aria-label={label}
       disabled={disabled}
       onClick={onToggle}
-      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 ${
-        checked ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white"
-      } disabled:opacity-50`}
+      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+        checked ? "border-ink bg-ink text-cream" : "border-sand-400 bg-white hover:border-ink"
+      } disabled:opacity-45`}
     >
       {checked && (
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-          <path d="M7.6 13.2 4.4 10l-1.2 1.2 4.4 4.4 9.2-9.2-1.2-1.2z" />
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M20 6 9 17l-5-5" />
         </svg>
       )}
     </button>
+  );
+}
+
+/** Names of the children an item concerns, as a small pill (nothing when none). */
+export function ChildTag({ names }: { names: string[] }) {
+  if (names.length === 0) return null;
+  return (
+    <span aria-label={`Dziecko: ${names.join(", ")}`} className="rounded-full bg-lime/45 px-2 py-0.5 text-xs font-semibold text-ink">
+      {names.join(", ")}
+    </span>
   );
 }
