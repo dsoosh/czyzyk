@@ -13,6 +13,12 @@ Przetwarzanie w tle (pg-boss na Postgresie Supabase). Na etapie 2: ekstrakcja el
 
 Logi i `sync_log` zawierają tylko identyfikatory, liczby i kody błędów – nigdy treści wiadomości.
 
+## Powiadomienia push
+
+Worker wysyła też Web Push (dawniej osobna usługa `cron`; kod w `src/push/`): co 5 minut sprawdza, komu wysłać wieczorny skrót („Jutro: …”), a po ekstrakcji obsługuje zadania `push-alert` (dzień wolny, płatność, sprawa – każdy alert raz). Kolejka alertów budzi się przez LISTEN/NOTIFY pg-boss, więc alert idzie od razu. Bez `VAPID_*` worker działa, a push jest wyłączony. Klucze: `npm run vapid:generate -w @czyzyk/worker`.
+
+Odpytywanie kolejek (`src/polling.ts`): ekstrakcja co 10 s, pozostałe co 30 s – każde zapytanie to ruch do Supabase liczony przez Railway.
+
 ## Zmienne środowiskowe
 
 Wszystkie w [`.env.example`](.env.example). Wymagane: `DATABASE_URL`, `ANTHROPIC_API_KEY`, `EXTRACTION_MODEL`.
@@ -23,6 +29,8 @@ Wszystkie w [`.env.example`](.env.example). Wymagane: `DATABASE_URL`, `ANTHROPIC
 | `EXTRACTION_DELAY_SECONDS` | 15 | opóźnienie ekstrakcji po nowej wiadomości (zbiera serię) |
 | `EXTRACTION_CONFIDENCE_THRESHOLD` | 0.7 | próg pewności, poniżej – `needs_review` |
 | `EXTRACTION_CONTEXT_MESSAGES` | 50 | liczba wcześniejszych wiadomości w prompcie |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | – | Web Push; bez nich powiadomienia są wyłączone |
+| `DIGEST_WINDOW_MINUTES` | 120 | jak długo po wybranej godzinie można jeszcze wysłać zaległy skrót |
 
 ## Ewaluacja promptu
 

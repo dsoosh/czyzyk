@@ -25,7 +25,7 @@ context: |
   Architektura i stos:
   - Monorepo: apps/android (Kotlin, APK spoza Sklepu Play), apps/pwa
     (React + Vite + TypeScript, vite-plugin-pwa, supabase-js, Tailwind,
-    mobile-first), services/api, services/worker, services/cron (Node.js +
+    mobile-first), services/api, services/worker (ekstrakcja i Web Push w jednym procesie; Node.js +
     TypeScript na Railway), supabase/migrations (Postgres + pgvector +
     pg_trgm, region UE).
   - Kolejka zadań w Postgresie (pg-boss), bez Redisa.

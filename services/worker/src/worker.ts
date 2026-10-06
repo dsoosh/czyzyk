@@ -7,6 +7,9 @@ import type { ExtractionModel } from "./extraction/model.js";
 import { runGroupExtraction, type ExtractionDeps } from "./extraction/run.js";
 import { listenForMessages } from "./extraction/listen.js";
 import { findDueGroups } from "./extraction/scheduler.js";
+import { BACKGROUND_POLL_SECONDS, EXTRACTION_POLL_SECONDS } from "./polling.js";
+import { registerPushJobs, type PushJobs } from "./push/cron.js";
+import type { PushSender } from "./push/send.js";
 
 export const EXTRACT_QUEUE = "extract-group";
 export const SCAN_QUEUE = "extraction-scan";
@@ -19,6 +22,8 @@ export interface RunningWorker {
   scanNow(): Promise<string[]>;
   /** Resolves once the realtime listener is active. */
   listening: Promise<void>;
+  /** Web Push jobs (digest, alerts), or null when push is not configured. */
+  push: PushJobs | null;
   stop(): Promise<void>;
 }
 
@@ -34,11 +39,18 @@ export type WorkerSettings = Pick<
 export async function startWorker(
   config: WorkerSettings,
   logger: Logger,
-  deps: { model: ExtractionModel; now?: () => Date; scanSchedule?: string | null },
+  deps: {
+    model: ExtractionModel;
+    now?: () => Date;
+    scanSchedule?: string | null;
+    /** Web Push (formerly the separate cron service); absent = push off. */
+    push?: { sender: PushSender; digestWindowMinutes: number; digestSchedule?: string | null } | null;
+  },
 ): Promise<RunningWorker> {
   const now = deps.now ?? (() => new Date());
   const pool = new pg.Pool({ connectionString: config.DATABASE_URL, max: 5 });
-  const boss = new PgBoss(config.DATABASE_URL);
+  // LISTEN/NOTIFY wakes workers of notify-enabled queues (push alerts) at once; others poll.
+  const boss = new PgBoss({ connectionString: config.DATABASE_URL, useListenNotify: true });
   boss.on("error", (error) => logger.error({ err: error }, "pg-boss error"));
   await boss.start();
 
@@ -62,7 +74,7 @@ export async function startWorker(
     now,
     confidenceThreshold: config.EXTRACTION_CONFIDENCE_THRESHOLD,
     contextMessages: config.EXTRACTION_CONTEXT_MESSAGES,
-    // services/cron decides whether an item deserves an alert and sends it at most once.
+    // The push jobs (src/push) decide whether an item deserves an alert and send it at most once.
     onActiveItems: async (items) => {
       for (const item of items) {
         if (!isAlertItemType(item.type)) continue;
@@ -72,7 +84,7 @@ export async function startWorker(
     },
   };
 
-  await boss.work<{ groupId: string }>(EXTRACT_QUEUE, async (jobs) => {
+  await boss.work<{ groupId: string }>(EXTRACT_QUEUE, { pollingIntervalSeconds: EXTRACTION_POLL_SECONDS }, async (jobs) => {
     for (const job of jobs) await runGroupExtraction(extractionDeps, job.data.groupId);
   });
 
@@ -90,10 +102,14 @@ export async function startWorker(
     if (due.length) logger.info({ groups: due.length }, "extraction enqueued");
     return due;
   };
-  await boss.work(SCAN_QUEUE, async () => {
+  await boss.work(SCAN_QUEUE, { pollingIntervalSeconds: BACKGROUND_POLL_SECONDS }, async () => {
     await scanNow();
   });
   if (deps.scanSchedule !== null) await boss.schedule(SCAN_QUEUE, deps.scanSchedule ?? "* * * * *");
+
+  // One process for extraction and push keeps a single pg-boss instance and connection pool.
+  const push = deps.push ? await registerPushJobs(boss, pool, logger, { ...deps.push, now }) : null;
+  if (!push) logger.warn("push not configured (VAPID_* missing): digest and alerts are off");
 
   const healthy = async () => {
     try {
@@ -116,6 +132,7 @@ export async function startWorker(
     healthy,
     scanNow,
     listening: listener.ready,
+    push,
     async stop() {
       clearInterval(timer);
       await listener.stop();

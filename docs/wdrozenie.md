@@ -65,7 +65,7 @@ Workflow [`Railway`](../.github/workflows/railway.yml) uruchamia Railway CLI na 
 2. GitHub → repozytorium → **Settings → Secrets and variables → Actions → New repository secret**: nazwa `RAILWAY_TOKEN`, wartość = token.
 3. GitHub → **Actions → Railway → Run workflow** → akcja `plan` (podgląd), potem `apply`.
 
-**Nazwy usług.** Railway dopasowuje usługi z pliku po nazwie i nie umie zmienić nazwy istniejącej usługi. Dlatego plik używa nazw, które Railway nadał automatycznie przy imporcie monorepo: `@czyzyk/api`, `@czyzyk/worker`, `@czyzyk/pwa` (oraz nowa `@czyzyk/cron`). Plan nie powinien nigdy pokazywać usunięcia tych usług – jeśli pokazuje, nie uruchamiaj `apply-destructive`. Odwołania między usługami (domena API dla PWA, domena PWA i adres Supabase dla API, publiczny klucz VAPID) są strukturalnymi referencjami Railway, a nie napisami `${{…}}`.
+**Nazwy usług.** Railway dopasowuje usługi z pliku po nazwie i nie umie zmienić nazwy istniejącej usługi. Dlatego plik używa nazw, które Railway nadał automatycznie przy imporcie monorepo: `@czyzyk/api`, `@czyzyk/worker`, `@czyzyk/pwa`. Plan nie powinien pokazywać usunięcia tych usług (jedyny wyjątek to jednorazowe usunięcie dawnej `@czyzyk/cron`, sekcja 11) – jeśli pokazuje, nie uruchamiaj `apply-destructive`. Odwołania między usługami (domena API dla PWA, domena PWA i adres Supabase dla API, publiczny klucz VAPID) są strukturalnymi referencjami Railway, a nie napisami `${{…}}`.
 
 Potem działa samo: PR zmieniający `.railway/**` dostaje `plan`, a scalenie do `main` robi `apply` (nigdy nie usuwa zasobów – do tego służy ręczna akcja `apply-destructive`). Z tego samego miejsca: `status`, `logs` i `build-logs` wybranej usługi, `redeploy` i `domain`.
 
@@ -85,9 +85,8 @@ Sekrety nie są w repozytorium – w pliku mają wartość `preserve()`, czyli R
 | Usługa | Zmienne do ustawienia ręcznie |
 | --- | --- |
 | `api` | `DATABASE_URL` – Supabase → Connect → *Session pooler* (port 5432) |
-| `worker` | `DATABASE_URL` (jak wyżej; nie *Transaction pooler* – kolejka zadań trzyma połączenie), `ANTHROPIC_API_KEY` |
+| `worker` | `DATABASE_URL` (jak wyżej; nie *Transaction pooler* – kolejka zadań trzyma połączenie), `ANTHROPIC_API_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` – patrz sekcja 11 |
 | `pwa` | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (tylko publiczne wartości) |
-| `cron` | `DATABASE_URL` (jak w `worker`), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` – patrz sekcja 11 |
 
 ```bash
 railway variables --service api --set "DATABASE_URL=postgres://…"
@@ -97,7 +96,7 @@ Pozostałe zmienne (np. `CZYZYK_SERVICE`, `EXTRACTION_MODEL`, limity) ustawia pl
 
 Domeny: `@czyzyk/pwa` i `@czyzyk/api` muszą mieć publiczną domenę – bez domeny API referencja `VITE_API_URL` jest pusta. Najprościej: **Actions → Railway → Run workflow → `domain`** z wybraną usługą (pokazuje domenę albo tworzy domenę Railway), potem `redeploy` dla `pwa`. Można też *Generate Domain* w dashboardzie. **Zawsze czytaj `railway config plan` przed `apply`** – apply jest deklaratywny i usuwa to, czego nie ma w pliku (wymaga wtedy potwierdzenia).
 
-Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`, `npm start`), a `CZYZYK_SERVICE` (`api` / `worker` / `cron` / `pwa`) wybiera, którą część zbudować i uruchomić (`scripts/service.mjs`). Gdy `CZYZYK_SERVICE` nie jest ustawione, skrypt rozpoznaje usługę po nazwie usługi w Railway (`RAILWAY_SERVICE_NAME`, np. `pwa` albo `czyzyk-pwa`); jeśli nie umie, build kończy się od razu komunikatem, co ustawić. Zmienne `VITE_*` są wkompilowywane w PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`.
+Jak to działa: każda usługa buduje się z korzenia monorepo (`npm run build`, `npm start`), a `CZYZYK_SERVICE` (`api` / `worker` / `pwa`) wybiera, którą część zbudować i uruchomić (`scripts/service.mjs`). Gdy `CZYZYK_SERVICE` nie jest ustawione, skrypt rozpoznaje usługę po nazwie usługi w Railway (`RAILWAY_SERVICE_NAME`, np. `pwa` albo `czyzyk-pwa`); jeśli nie umie, build kończy się od razu komunikatem, co ustawić. Zmienne `VITE_*` są wkompilowywane w PWA podczas budowania – zmiana wymaga ponownego wdrożenia. Build PWA kończy się strażnikiem `check:secrets`.
 
 ## 7. Sprawdzenie etapu 1
 
@@ -139,9 +138,9 @@ Migracje: stosują się same przy wdrożeniu (`0004_ingest.sql`), patrz sekcja 3
 
 # Etap 3 – codzienne użycie
 
-## 11. Powiadomienia push (VAPID) i nowa usługa `cron`
+## 11. Powiadomienia push (VAPID)
 
-Push działa przez Web Push ze standardowymi kluczami VAPID. Klucz prywatny zna tylko usługa `cron`; publiczny trafia też do PWA.
+Push działa przez Web Push ze standardowymi kluczami VAPID. Wysyła go `worker` (wieczorny skrót co 5 minut i natychmiastowe alerty – dawniej osobna usługa `cron`). Klucz prywatny zna tylko `worker`; publiczny trafia też do PWA.
 
 1. Wygeneruj parę kluczy na swoim komputerze (wystarczy Node.js, nic nie zostaje zainstalowane):
 
@@ -150,16 +149,16 @@ Push działa przez Web Push ze standardowymi kluczami VAPID. Klucz prywatny zna 
    ```
 
    Nie wklejaj klucza prywatnego do czatu ani do repozytorium.
-2. Zastosuj `.railway/railway.ts` (scalenie do `main` robi to samo, patrz sekcja 6) – powstaje usługa `@czyzyk/cron`.
-3. Ustaw zmienne usługi `cron` (dashboard → `cron` → Variables):
-   - `DATABASE_URL` – ten sam *Session pooler* co w `worker`,
+2. Ustaw zmienne usługi `worker` (dashboard → `worker` → Variables):
    - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` – z kroku 1,
    - `VAPID_SUBJECT` – `mailto:` z Twoim adresem (usługi push kontaktują się tam w razie problemów).
-4. Wdróż ponownie `pwa` (Railway → `pwa` → *Redeploy* albo akcja `redeploy` w workflow), bo `VITE_VAPID_PUBLIC_KEY` (referencja do `VAPID_PUBLIC_KEY` usługi `@czyzyk/cron`) jest wkompilowywany przy budowaniu.
+3. Wdróż ponownie `pwa` (Railway → `pwa` → *Redeploy* albo akcja `redeploy` w workflow), bo `VITE_VAPID_PUBLIC_KEY` (referencja do `VAPID_PUBLIC_KEY` usługi `@czyzyk/worker`) jest wkompilowywany przy budowaniu.
+
+**Przejście z osobnej usługi `cron`:** przed zastosowaniem pliku bez `@czyzyk/cron` skopiuj jej `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` i `VAPID_SUBJECT` do usługi `worker` (te same wartości – inaczej istniejące subskrypcje przestaną działać). Potem uruchom akcję `apply-destructive` (usuwa `@czyzyk/cron`) i wdróż ponownie `pwa`. Bez kluczy `worker` działa, ale nie wysyła powiadomień (log „push not configured”).
 
 Usługa `@czyzyk/api` dostaje z pliku `SUPABASE_URL` (referencja do `VITE_SUPABASE_URL` usługi PWA) i `PWA_ORIGIN` (domena PWA): na tej podstawie sprawdza sesję użytkownika (klucze JWKS projektu Supabase) i przyjmuje wywołania `/push/*` tylko z PWA. Jeśli projekt Supabase używa jeszcze starego wspólnego sekretu JWT (Settings → JWT Keys → *Legacy JWT secret*), dopisz w `.railway/railway.ts` w usłudze `api` `SUPABASE_JWT_SECRET: preserve()` i ustaw wartość w dashboardzie.
 
-Migracje `0005`–`0008` stosują się same przy wdrożeniu (sekcja 3). Wyłączenie usługi `cron` zatrzymuje powiadomienia bez wpływu na resztę.
+Migracje `0005`–`0008` stosują się same przy wdrożeniu (sekcja 3). Usunięcie kluczy VAPID z `worker` wyłącza powiadomienia bez wpływu na analizę wiadomości.
 
 ## 12. Telefony rodziny
 
@@ -175,7 +174,7 @@ Migracje `0005`–`0008` stosują się same przy wdrożeniu (sekcja 3). Wyłącz
 3. Element z niską pewnością pojawia się w **Admin → Przegląd**, a zakładka **Admin** pokazuje licznik. Popraw datę i zatwierdź → element jest w kalendarzu.
 4. Subskrypcja kalendarza pokazuje wydarzenia i dni wolne; po unieważnieniu linku plik zwraca 404.
 5. Push: dzień przed wydarzeniem o ustawionej godzinie przychodzi „Jutro: …”; stuknięcie otwiera **Dziś i jutro**. Nowy dzień wolny daje jeden alert, nawet gdy pojawi się w kilku wiadomościach.
-6. Logi usługi `cron` pokazują tylko liczby („push delivered”, „digest skipped”), bez treści powiadomień.
+6. Logi usługi `worker` pokazują tylko liczby („push delivered”, „digest skipped”), bez treści powiadomień.
 
 
 ---

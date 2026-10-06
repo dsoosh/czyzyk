@@ -3,9 +3,9 @@ import pg from "pg";
 import { PgBoss } from "pg-boss";
 import { pino } from "pino";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../supabase/tests/db.js";
+import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
 import { handleAlert } from "./alerts.js";
-import { startCron } from "./cron.js";
+import { registerPushJobs } from "./cron.js";
 import { runDigest } from "./digest.js";
 import type { DeliveryResult, PushPayload, PushSender, Subscription } from "./send.js";
 
@@ -205,15 +205,18 @@ describe("Alerty natychmiastowe", () => {
   });
 });
 
-describe("startCron", () => {
+describe("registerPushJobs", () => {
   it("startuje kolejki, wykonuje skrót na żądanie i przetwarza zadania push-alert", async () => {
     await seedTomorrow();
     const { rows } = await db.client.query(
       "insert into closures (date_from, date_to, reason) values ('2026-10-12', '2026-10-12', 'dzień nauczyciela') returning id",
     );
     const { sender, sent } = fakeSender();
-    const cron = await startCron({ DATABASE_URL: db.url, DIGEST_WINDOW_MINUTES: 120 }, logger, {
+    const boss = new PgBoss({ connectionString: db.url, useListenNotify: true });
+    await boss.start();
+    const cron = await registerPushJobs(boss, pool, logger, {
       sender,
+      digestWindowMinutes: 120,
       now: () => at("2026-10-08T19:00:00"),
       digestSchedule: null,
     });
@@ -230,7 +233,7 @@ describe("startCron", () => {
         "Przedszkole nieczynne 12.10 (dzień nauczyciela)",
       ]);
     } finally {
-      await cron.stop();
+      await boss.stop({ graceful: true, timeout: 10_000 });
     }
   });
 });

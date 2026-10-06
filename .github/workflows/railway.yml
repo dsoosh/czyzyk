@@ -25,7 +25,7 @@ on:
       service:
         description: Service (for logs, build-logs, redeploy, domain)
         type: choice
-        options: [api, worker, cron, pwa]
+        options: [api, worker, pwa]
         default: api
       lines:
         description: Log lines (for logs, build-logs)
@@ -81,7 +81,7 @@ jobs:
             plan)              railway config plan ;;
             apply)             railway config plan && railway config apply --yes ;;
             apply-destructive) railway config plan && railway config apply --yes --confirm-destructive ;;
-            status)            railway status && for s in api worker cron pwa; do railway service status --service "@czyzyk/$s" || true; done ;;
+            status)            railway status && for s in api worker pwa; do railway service status --service "@czyzyk/$s" || true; done ;;
             logs)              railway logs --service "$SVC" --deployment --lines "${LINES:-200}" ;;
             build-logs)        railway logs --service "$SVC" --build --lines "${LINES:-200}" ;;
             redeploy)          railway service redeploy --service "$SVC" --yes ;;

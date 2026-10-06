@@ -6,7 +6,7 @@
  *   railway config plan         # preview the diff against the linked environment
  *   railway config apply        # apply (prompts before destructive changes)
  *
- * Database migrations run as the pre-deploy command of api, worker and cron (Railway runs it
+ * Database migrations run as the pre-deploy command of api and worker (Railway runs it
  * after the build, before the new version takes traffic; a failure stops the deploy).
  * scripts/migrate.mjs is idempotent and takes an advisory lock, so every service may run it.
  *
@@ -22,7 +22,7 @@ const REPO = "dsoosh/czyzyk";
 /** Applies pending supabase/migrations with DATABASE_URL before the new version starts. */
 const MIGRATE = "npm run db:migrate";
 
-type ServiceKey = "api" | "worker" | "cron" | "pwa";
+type ServiceKey = "api" | "worker" | "pwa";
 
 /**
  * Railway service names. They match the services Railway created from the monorepo
@@ -56,10 +56,18 @@ const fromMonorepo = (name: ServiceKey, watch: string[]) => ({
   env: { CZYZYK_SERVICE: name },
 });
 
+/**
+ * Node services start their entry point directly: `npm start` would keep three extra
+ * processes alive (npm → scripts/service.mjs → npm -w), each tens of MB of billed RAM.
+ * The heap cap keeps an idle service small.
+ */
+const node = (entry: string) => `node --max-old-space-size=256 ${entry}`;
+
 export default defineRailway(() => {
   const apiBase = fromMonorepo("api", ["services/api/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
   const api = service(NAME("api"), {
     ...apiBase,
+    start: node("services/api/dist/server.js"),
     preDeploy: MIGRATE,
     healthcheck: "/health",
     healthcheckTimeout: 60,
@@ -85,8 +93,9 @@ export default defineRailway(() => {
   const workerBase = fromMonorepo("worker", ["services/worker/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
   const worker = service(NAME("worker"), {
     ...workerBase,
+    start: node("services/worker/dist/main.js"),
     preDeploy: MIGRATE,
-    // No HTTP port: pg-boss worker that must always run.
+    // No HTTP port: extraction and Web Push (digest every 5 minutes, alerts) in one always-on process.
     deploy: { restartPolicyType: "ALWAYS" },
     env: {
       ...workerBase.env,
@@ -98,20 +107,8 @@ export default defineRailway(() => {
       EXTRACTION_DELAY_SECONDS: "15",
       EXTRACTION_CONFIDENCE_THRESHOLD: "0.7",
       EXTRACTION_CONTEXT_MESSAGES: "50",
-    },
-  });
-
-  const cronBase = fromMonorepo("cron", ["services/cron/**", "packages/shared/**", "supabase/migrations/**", "scripts/migrate.mjs"]);
-  const cron = service(NAME("cron"), {
-    ...cronBase,
-    preDeploy: MIGRATE,
-    // No HTTP port: evening digest every 5 minutes and push-alert jobs from the worker.
-    deploy: { restartPolicyType: "ALWAYS" },
-    env: {
-      ...cronBase.env,
-      LOG_LEVEL: "info",
-      DATABASE_URL: preserve(),
-      // VAPID key pair: `npm run vapid:generate -w @czyzyk/cron` (docs/wdrozenie.md).
+      // Web Push (formerly the separate cron service). VAPID pair: `npm run vapid:generate -w @czyzyk/worker`
+      // (docs/wdrozenie.md). Without them the worker runs extraction only.
       VAPID_PUBLIC_KEY: preserve(),
       VAPID_PRIVATE_KEY: preserve(),
       VAPID_SUBJECT: preserve(),
@@ -119,7 +116,12 @@ export default defineRailway(() => {
     },
   });
 
-  const pwaBase = fromMonorepo("pwa", ["apps/pwa/**", "packages/shared/src/extraction.ts", "packages/shared/src/chatExport.ts"]);
+  const pwaBase = fromMonorepo("pwa", [
+    "apps/pwa/**",
+    "packages/shared/src/extraction.ts",
+    "packages/shared/src/chatExport.ts",
+    "packages/shared/src/assistant.ts",
+  ]);
   const pwa = service(NAME("pwa"), {
     ...pwaBase,
     healthcheck: "/",
@@ -132,11 +134,11 @@ export default defineRailway(() => {
       // The API's public domain (bare; the PWA adds https://), resolved at build time.
       VITE_API_URL: refTo("api", "RAILWAY_PUBLIC_DOMAIN"),
       // Public half of the VAPID pair, needed by the browser to subscribe.
-      VITE_VAPID_PUBLIC_KEY: refTo("cron", "VAPID_PUBLIC_KEY"),
+      VITE_VAPID_PUBLIC_KEY: refTo("worker", "VAPID_PUBLIC_KEY"),
     },
   });
 
   return project("czyzyk", {
-    resources: [group("czyzyk", [api, worker, cron, pwa])],
+    resources: [group("czyzyk", [api, worker, pwa])],
   });
 });
