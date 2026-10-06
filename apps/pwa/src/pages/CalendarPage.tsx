@@ -83,7 +83,7 @@ function ListView({ today }: { today: string }) {
       {days.size === 0 && <p className="rounded-2xl bg-white p-4 text-slate-500 shadow-sm">Brak zaplanowanych wydarzeń</p>}
       {[...days].map(([day, entries]) => (
         <section key={day} aria-label={longDayLabel(day)} className="space-y-2">
-          <h2 className={`text-sm font-semibold ${day === today ? "text-brand-700" : "text-slate-500"}`}>
+          <h2 className={`font-display text-2xl font-bold ${day === today ? "text-brand-700" : "text-ink"}`}>
             {longDayLabel(day)}
             {day === today && " · dziś"}
           </h2>
@@ -110,7 +110,7 @@ function MonthView({ today }: { today: string }) {
         <button type="button" aria-label="Poprzedni miesiąc" className="rounded-lg px-3 py-1 hover:bg-white" onClick={() => setMonth(addMonths(month, -1))}>
           ‹
         </button>
-        <h2 className="font-semibold capitalize">{monthTitle(month)}</h2>
+        <h2 className="font-display text-2xl font-bold capitalize text-ink">{monthTitle(month)}</h2>
         <button type="button" aria-label="Następny miesiąc" className="rounded-lg px-3 py-1 hover:bg-white" onClick={() => setMonth(addMonths(month, 1))}>
           ›
         </button>
@@ -159,7 +159,7 @@ function MonthView({ today }: { today: string }) {
       {loading && !data && <Loading />}
       {selected && data && (
         <section aria-label={`Wybrany dzień ${longDayLabel(selected)}`} className="space-y-2">
-          <h2 className="text-sm font-semibold text-slate-500">{longDayLabel(selected)}</h2>
+          <h2 className="font-display text-2xl font-bold text-ink">{longDayLabel(selected)}</h2>
           {days.get(selected) ? (
             <DayItems entries={days.get(selected)!} groups={data.groups} />
           ) : (
@@ -187,7 +187,7 @@ export function CalendarPage() {
   );
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-brand-900">Kalendarz</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Kalendarz</h1>
       <div role="tablist" className="flex gap-1 rounded-xl bg-brand-100 p-1">
         {tab("list", "Lista")}
         {tab("month", "Miesiąc")}

@@ -24,7 +24,7 @@ export function EventPage() {
       <Link to="/kalendarz" className="text-sm text-brand-700">
         ← Kalendarz
       </Link>
-      <h1 className="text-2xl font-bold text-brand-900">{event.title}</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">{event.title}</h1>
       {event.status === "cancelled" && <p className="font-semibold text-red-700">Odwołane</p>}
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-2xl bg-white p-4 shadow-sm">
         <dt className="text-slate-500">Termin</dt>
@@ -39,7 +39,7 @@ export function EventPage() {
         <dd>{groupLabel(groups, event.group_id)}</dd>
       </dl>
       <section aria-label="Do przyniesienia" className="space-y-2">
-        <h2 className="text-sm font-semibold tracking-wide text-slate-500 uppercase">Do przyniesienia</h2>
+        <h2 className="font-display text-2xl font-bold text-ink">Do przyniesienia</h2>
         {bring.length === 0 ? (
           <p className="text-slate-500">Nic</p>
         ) : (

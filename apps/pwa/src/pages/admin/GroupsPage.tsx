@@ -62,7 +62,7 @@ export function GroupsPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-bold text-brand-900">Grupy</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Grupy</h1>
       <p className="text-sm text-slate-600">
         Grupy WhatsApp wykryte na telefonie. Treść trafia na serwer tylko ze śledzonych grup; telefon pobiera zmiany w ciągu 15 minut.
       </p>

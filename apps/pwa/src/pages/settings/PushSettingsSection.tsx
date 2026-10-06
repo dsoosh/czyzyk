@@ -111,7 +111,7 @@ export function PushSettingsSection() {
 
   return (
     <section aria-label="Powiadomienia" className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-bold text-brand-900">Powiadomienia</h2>
+      <h2 className="font-display text-3xl font-bold text-ink">Powiadomienia</h2>
       <p className="text-sm text-slate-600">
         Wieczorny skrót na jutro i natychmiastowe alerty: dzień wolny, nowa sprawa do załatwienia, płatność na jutro.
       </p>

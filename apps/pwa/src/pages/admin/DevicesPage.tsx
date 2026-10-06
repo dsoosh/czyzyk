@@ -31,7 +31,7 @@ function TokenDialog({ name, token, onClose }: { name: string; token: string; on
   return (
     <div role="dialog" aria-modal="true" aria-label={`Parowanie: ${name}`} className="fixed inset-0 z-10 flex items-end justify-center bg-black/40 p-4 sm:items-center">
       <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5">
-        <h2 className="text-lg font-bold">Sparuj „{name}”</h2>
+        <h2 className="font-display text-3xl font-bold text-ink">Sparuj „{name}”</h2>
         <p className="text-sm text-slate-600">
           Zeskanuj kod w aplikacji Czyżyk na telefonie albo otwórz link na telefonie. Token zobaczysz tylko teraz.
         </p>
@@ -92,7 +92,7 @@ export function DevicesPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-2xl font-bold text-brand-900">Urządzenia</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Urządzenia</h1>
       <p className="text-sm text-slate-600">Telefon z aplikacją Czyżyk, który wysyła wiadomości z grup przedszkola.</p>
       {actionError && (
         <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">

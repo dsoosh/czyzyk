@@ -1,9 +1,89 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#3f6212"/>
-  <ellipse cx="270" cy="300" rx="150" ry="120" fill="#facc15"/>
-  <circle cx="200" cy="200" r="90" fill="#facc15"/>
-  <path d="M190 120 q20 -40 70 -20 q-30 10 -40 40 z" fill="#1a2e05"/>
-  <circle cx="180" cy="190" r="16" fill="#1a2e05"/>
-  <path d="M110 205 l-55 18 l58 14 z" fill="#f97316"/>
-  <path d="M300 270 q90 -10 140 60 q-80 10 -140 -20 z" fill="#1a2e05"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Czyżyk">
+
+  <defs>
+    <filter id="rough" x="-5%" y="-10%" width="110%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="7"/>
+      <feDisplacementMap in="SourceGraphic" scale="7"/>
+    </filter>
+    <filter id="roughSoft" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="3"/>
+      <feDisplacementMap in="SourceGraphic" scale="2.5"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="#fffdf6"/>
+  <g transform="translate(12 90) scale(1.1)">
+
+  <g filter="url(#rough)">
+    <!-- lime band + zigzag -->
+    <path d="M44 74 C90 52 160 60 230 50 C300 42 360 48 402 40 L396 66 C340 76 280 70 214 80 C150 88 96 86 50 96 Z" fill="#8dc63f"/>
+    <path d="M70 84 L96 46 L118 82 L142 44 L166 80 L190 42 L214 78 L238 40 L262 76 L286 40 L310 74 L334 40 L354 70"
+          fill="none" stroke="#1b1b18" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- yellow band + dots -->
+    <path d="M36 118 C110 104 200 112 280 104 C340 98 380 102 410 96 L414 132 C350 140 270 134 190 142 C120 148 70 144 30 150 Z" fill="#f7d117"/>
+    <path d="M30 132 C100 124 300 122 404 116 L408 128 C300 134 100 138 32 144 Z" fill="#e8a91a" opacity=".35"/>
+  </g>
+  <g fill="#1b1b18">
+    <ellipse cx="58" cy="126.0" rx="5.2" ry="7" /><ellipse cx="77" cy="125.5" rx="5.2" ry="8" /><ellipse cx="96" cy="124.9" rx="5.2" ry="9" /><ellipse cx="115" cy="124.3" rx="5.2" ry="7" /><ellipse cx="134" cy="123.8" rx="5.2" ry="8" /><ellipse cx="153" cy="123.2" rx="5.2" ry="9" /><ellipse cx="172" cy="122.7" rx="5.2" ry="7" /><ellipse cx="191" cy="122.2" rx="5.2" ry="8" /><ellipse cx="210" cy="121.6" rx="5.2" ry="9" /><ellipse cx="229" cy="121.0" rx="5.2" ry="7" /><ellipse cx="248" cy="120.5" rx="5.2" ry="8" /><ellipse cx="267" cy="120.0" rx="5.2" ry="9" /><ellipse cx="286" cy="119.4" rx="5.2" ry="7" /><ellipse cx="305" cy="118.8" rx="5.2" ry="8" /><ellipse cx="324" cy="118.3" rx="5.2" ry="9" /><ellipse cx="343" cy="117.8" rx="5.2" ry="7" /><ellipse cx="362" cy="117.2" rx="5.2" ry="8" /><ellipse cx="381" cy="116.7" rx="5.2" ry="9" /><ellipse cx="400" cy="116.1" rx="5.2" ry="7" />
+  </g>
+  <g filter="url(#rough)">
+    <!-- teal band + wave -->
+    <path d="M24 176 C100 160 190 170 270 160 C330 152 380 156 420 150 L416 190 C350 196 270 192 190 200 C120 206 70 202 30 210 Z" fill="#22b3a6"/>
+    <path d="M48 196 C80 172 100 172 124 192 C148 212 170 210 196 186 M296 186 C320 166 344 166 364 184 C384 202 400 200 414 186"
+          fill="none" stroke="#1b1b18" stroke-width="7" stroke-linecap="round"/>
+    <!-- pale aqua band (air) -->
+    <path d="M50 228 C120 214 220 222 300 214 C350 210 386 212 404 208 L398 246 C330 252 250 248 170 256 C110 262 70 258 44 262 Z" fill="#a8ddd6"/>
+  </g>
+
+
+  <path d="M66 250 C86 224 104 222 106 238 C108 256 84 262 92 240 C102 214 140 222 150 240
+           C160 256 128 262 136 240 C146 214 186 224 200 240 C214 256 182 262 190 240
+           C200 216 246 226 262 240 C276 254 250 262 256 240 C264 218 312 222 336 238
+           C352 248 368 240 384 228"
+        fill="none" stroke="#1b1b18" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#rough)"/>
+
+
+  <g filter="url(#roughSoft)">
+    <!-- tail -->
+    <path d="M286 196 L352 232 L340 238 L360 254 L330 250 L276 214 Z" fill="#1b1b18"/>
+    <path d="M282 200 L312 216 L300 224 L274 210 Z" fill="#f2d21b"/>
+    <!-- body -->
+    <path d="M150 128 C150 92 180 70 212 76 C244 82 262 104 278 132 C292 156 300 186 290 208
+             C276 230 234 236 204 226 C172 216 152 190 150 160 Z" fill="#c8d634"/>
+    <!-- yellow breast -->
+    <path d="M158 130 C164 112 186 110 200 124 C216 142 226 174 222 200 C214 222 188 222 172 206 C156 188 152 156 158 130 Z" fill="#f6dc1e"/>
+    <!-- pale belly with streaks -->
+    <path d="M200 204 C216 204 236 210 250 218 C238 228 214 228 202 222 C194 216 194 208 200 204 Z" fill="#eef0b8"/>
+    <g stroke="#3d4520" stroke-width="3.2" stroke-linecap="round" fill="none">
+      <path d="M176 168 l5 9"/><path d="M190 182 l5 8"/><path d="M178 196 l6 7"/><path d="M212 212 l8 3"/><path d="M230 218 l8 2"/>
+    </g>
+    <!-- wing -->
+    <path d="M206 132 C230 118 266 124 288 148 C306 168 318 196 326 220 C296 214 262 204 238 188 C214 172 200 152 206 132 Z" fill="#2a3318"/>
+    <path d="M214 150 C236 150 258 160 274 176 L266 184 C250 170 232 162 212 160 Z" fill="#f2d21b"/>
+    <path d="M226 170 C246 174 266 186 284 202 L276 208 C260 196 242 186 224 180 Z" fill="#f2d21b"/>
+    <g stroke="#c8d634" stroke-width="2.6" fill="none" stroke-linecap="round">
+      <path d="M262 136 C280 152 296 178 306 204"/><path d="M248 132 C266 150 280 176 290 200"/>
+    </g>
+    <!-- head -->
+    <circle cx="176" cy="104" r="40" fill="#c8d634"/>
+    <!-- black cap -->
+    <path d="M139 96 C138 74 156 62 178 62 C198 62 212 72 214 84 C200 82 186 84 174 90 C160 94 148 96 139 96 Z" fill="#1b1b18"/>
+    <!-- yellow eyebrow -->
+    <path d="M168 92 C184 86 204 88 216 98 C204 96 188 96 174 100 Z" fill="#f6dc1e"/>
+    <!-- black bib -->
+    <path d="M142 117 C146 126 152 130 160 129 C156 123 151 118 147 115 Z" fill="#1b1b18"/>
+    <!-- bill -->
+    <path d="M142 98 L108 108 L142 116 Z" fill="#d8b89a" stroke="#1b1b18" stroke-width="2.4" stroke-linejoin="round"/>
+    <path d="M142 107 L112 108" stroke="#1b1b18" stroke-width="2" stroke-linecap="round"/>
+    <!-- eye -->
+    <circle cx="160" cy="102" r="6.5" fill="#1b1b18"/>
+    <circle cx="158" cy="100" r="2" fill="#fff"/>
+  </g>
+  <!-- legs -->
+  <g stroke="#6b4a2f" stroke-width="4" stroke-linecap="round" fill="none">
+    <path d="M200 222 L196 242 M196 242 l-10 4 M196 242 l4 6"/>
+    <path d="M224 226 L224 244 M224 244 l-10 3 M224 244 l5 6"/>
+  </g>
+
+  </g>
 </svg>

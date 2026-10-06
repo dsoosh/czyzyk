@@ -241,7 +241,7 @@ export function ReviewPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-brand-900">Do przejrzenia</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Do przejrzenia</h1>
       {data.items.length === 0 ? (
         <p className="rounded-2xl bg-white p-4 text-slate-500 shadow-sm">Nic nie czeka na przegląd</p>
       ) : (

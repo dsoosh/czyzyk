@@ -26,7 +26,7 @@ export function BringListPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-brand-900">Do przyniesienia</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Do przyniesienia</h1>
       {mark.error && <p role="alert" className="text-red-700">{mark.error}</p>}
       {byDay.size === 0 && <p className="rounded-2xl bg-white p-4 text-slate-500 shadow-sm">Nic do przyniesienia</p>}
       {[...byDay].map(([day, items]) => (

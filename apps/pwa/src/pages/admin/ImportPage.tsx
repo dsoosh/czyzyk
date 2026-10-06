@@ -92,7 +92,7 @@ export function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-brand-900">Import eksportu czatu</h1>
+      <h1 className="font-display text-4xl font-bold text-ink">Import eksportu czatu</h1>
       <div className="space-y-2 rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm">
         <p>
           W WhatsAppie otwórz grupę → <strong>⋮ → Więcej → Eksportuj czat</strong> i zapisz plik. Możesz wybrać „Bez multimediów” albo

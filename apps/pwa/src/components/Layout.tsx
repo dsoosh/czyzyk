@@ -12,7 +12,7 @@ export interface LayoutContext {
 export const useLayoutContext = () => useOutletContext<LayoutContext>();
 
 const tabClass = ({ isActive }: { isActive: boolean }) =>
-  `flex flex-1 flex-col items-center py-3 text-sm font-medium ${isActive ? "text-brand-700" : "text-slate-500"}`;
+  `flex flex-1 flex-col items-center py-2 font-display text-2xl font-bold ${isActive ? "text-brand-700" : "text-slate-500"}`;
 
 export function Layout() {
   const profile = useProfile();
@@ -24,8 +24,8 @@ export function Layout() {
   return (
     <div className="mx-auto flex min-h-screen max-w-lg flex-col">
       <header className="flex items-center gap-3 px-4 py-3">
-        <Logo className="h-8 w-8" />
-        <span className="flex-1 text-lg font-bold text-brand-900">Czyżyk</span>
+        <Logo className="h-10 w-10" />
+        <span className="flex-1 font-display text-4xl leading-none font-bold text-ink">Czyżyk</span>
         <Link to="/ustawienia" className="text-sm text-slate-600 hover:underline">
           Ustawienia
         </Link>
@@ -33,12 +33,13 @@ export function Layout() {
           Wyloguj
         </button>
       </header>
+      <div aria-hidden="true" className="element-stripes mb-4" />
       <main className="flex-1 px-4 pb-24">
         <Outlet context={{ refreshReviewCount: reviewCount.reload } satisfies LayoutContext} />
       </main>
       <nav
         aria-label="Nawigacja"
-        className="fixed inset-x-0 bottom-0 mx-auto flex max-w-lg border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]"
+        className="fixed inset-x-0 bottom-0 mx-auto flex max-w-lg border-t-4 border-water bg-white pb-[env(safe-area-inset-bottom)]"
       >
         <NavLink to="/" end className={tabClass}>
           Dziś

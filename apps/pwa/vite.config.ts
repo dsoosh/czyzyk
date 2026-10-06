@@ -21,7 +21,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon.svg", "apple-touch-icon.png"],
+      includeAssets: ["icon.svg", "logo.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Czyżyk – asystent przedszkolny",
         short_name: "Czyżyk",
@@ -31,15 +31,17 @@ export default defineConfig({
         scope: "/",
         display: "standalone",
         orientation: "portrait",
-        background_color: "#f7fee7",
-        theme_color: "#3f6212",
+        background_color: "#f3faf8",
+        theme_color: "#22b3a6",
         icons: [
           { src: "pwa-192.png", sizes: "192x192", type: "image/png" },
           { src: "pwa-512.png", sizes: "512x512", type: "image/png" },
-          { src: "pwa-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "pwa-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
+        // App shell plus the self-hosted display font, so headings render offline.
+        globPatterns: ["**/*.{js,css,html,woff2}"],
         // Never cache API or Supabase responses: family data must not linger offline.
         navigateFallbackDenylist: [/^\/auth\//],
         runtimeCaching: [],
