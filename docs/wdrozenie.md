@@ -131,7 +131,7 @@ Migracje: stosują się same przy wdrożeniu (`0004_ingest.sql`), patrz sekcja 3
 ## 10. Sprawdzenie etapu 2
 
 1. Nauczycielka (lub Ty z drugiego numeru) pisze w śledzonej grupie np. „W piątek bal, przebrania”.
-2. Po 30 minutach ciszy w grupie worker wysyła wiadomość do modelu; w ciągu kolejnych kilku minut na ekranie **Dziś i jutro** i w **Kalendarzu** pojawia się wydarzenie „Bal” w piątek z rzeczą „przebranie”. Link „skąd to wiem” pokazuje wiadomość w kontekście rozmowy.
+2. Kilkanaście sekund po przyjęciu wiadomości worker wysyła ją do modelu; w ciągu około minuty na ekranie **Dziś i jutro** i w **Kalendarzu** pojawia się wydarzenie „Bal” w piątek z rzeczą „przebranie”. Link „skąd to wiem” pokazuje wiadomość w kontekście rozmowy.
 3. W **Admin → Urządzenia** przy telefonie widać „ostatni kontakt: przed chwilą”.
 4. Dziennik działania: tabela `sync_log` (rodzaj `extraction`, status `ok`/`partial`/`error`, bez treści wiadomości).
 
