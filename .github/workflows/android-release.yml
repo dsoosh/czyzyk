@@ -47,6 +47,19 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
         if: steps.key.outputs.ok == 'true'
+      - name: Check signing key
+        if: steps.key.outputs.ok == 'true'
+        # Fails early with a readable reason instead of an EOFException deep in packageRelease.
+        env:
+          STOREPASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          ks="$RUNNER_TEMP/release.jks"
+          echo "Keystore: $(stat -c%s "$ks") bytes, $(file -b "$ks")"
+          if ! keytool -list -keystore "$ks" -storepass "$STOREPASS" -alias "$ALIAS" > /dev/null 2> "$RUNNER_TEMP/keytool.err"; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 + ANDROID_KEYSTORE_PASSWORD + ANDROID_KEY_ALIAS do not open the key: $(tr '\n' ' ' < "$RUNNER_TEMP/keytool.err" | head -c 300)"
+            exit 1
+          fi
       - name: Version
         if: steps.key.outputs.ok == 'true'
         # Grows with every run; a re-run (attempt 2, 3…) gets its own number and tag.
