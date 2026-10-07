@@ -6,6 +6,6 @@ import org.junit.Test
 class AppInfoTest {
     @Test
     fun appNameIsPolish() {
-        assertEquals("Czyżyk", AppInfo.NAME)
+        assertEquals("Czyżyk Connect", AppInfo.NAME)
     }
 }

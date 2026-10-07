@@ -91,17 +91,17 @@ jobs:
           out="$RUNNER_TEMP/release"
           mkdir -p "$out"
           # Fails when the build was not signed (the file would be app-release-unsigned.apk).
-          cp apps/android/app/build/outputs/apk/release/app-release.apk "$out/czyzyk.apk"
+          cp apps/android/app/build/outputs/apk/release/app-release.apk "$out/czyzyk-connect.apk"
           tag="android-v$CZYZYK_VERSION_CODE"
-          sha=$(sha256sum "$out/czyzyk.apk" | cut -d' ' -f1)
-          size=$(stat -c%s "$out/czyzyk.apk")
+          sha=$(sha256sum "$out/czyzyk-connect.apk" | cut -d' ' -f1)
+          size=$(stat -c%s "$out/czyzyk-connect.apk")
           printf '{"versionCode":%d,"versionName":"%s","tag":"%s","sha256":"%s","size":%d}\n' \
             "$CZYZYK_VERSION_CODE" "$CZYZYK_VERSION_NAME" "$tag" "$sha" "$size" > "$out/version.json"
           cat "$out/version.json"
-          gh release create "$tag" "$out/czyzyk.apk" "$out/version.json" \
+          gh release create "$tag" "$out/czyzyk-connect.apk" "$out/version.json" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest \
-            --title "Czyżyk Android $CZYZYK_VERSION_NAME" \
-            --notes "Aplikacja Android Czyżyk $CZYZYK_VERSION_NAME (kod $CZYZYK_VERSION_CODE). Zainstalowana aplikacja zaktualizuje się sama."
+            --title "Czyżyk Connect $CZYZYK_VERSION_NAME" \
+            --notes "Czyżyk Connect (aplikacja Android) $CZYZYK_VERSION_NAME (kod $CZYZYK_VERSION_CODE). Zainstalowana aplikacja zaktualizuje się sama."
           echo "Published $tag" >> "$GITHUB_STEP_SUMMARY"
       - name: Remove signing key
         if: always()

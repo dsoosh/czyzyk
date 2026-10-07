@@ -1,4 +1,6 @@
-# Czyżyk – aplikacja Android
+# Czyżyk Connect – aplikacja Android
+
+Na telefonie nazywa się **Czyżyk Connect** (pakiet `pl.czyzyk.connect`), żeby nie myliła się z PWA „Czyżyk” zainstalowaną z przeglądarki.
 
 Źródło danych dla asystenta przedszkolnego: czytnik powiadomień WhatsApp (etap 2) i eksport na klik z kontrolą obrazów na telefonie (etap 4). Instalowana ręcznie z pliku APK, poza Sklepem Play.
 
@@ -19,7 +21,7 @@ Głównym widokiem jest PWA Czyżyka w osadzonym WebView, więc z aplikacji korz
 - **Adres PWA** przychodzi w linku parowania (`&app=…`, dopisuje go panel admina) albo wpisuje się go ręcznie na karcie „Aplikacja Czyżyk”.
 - **Logowanie Google**: Google blokuje logowanie w WebView, więc otwiera się ono w przeglądarce telefonu i wraca do aplikacji przez `czyzyk://auth/callback?code=…`; aplikacja kończy logowanie w WebView. Wymaga wpisu `czyzyk://auth/callback` w Supabase (Authentication → URL Configuration → Redirect URLs).
 - W WebView otwierają się tylko strony z adresu PWA; inne linki (np. z wiadomości) idą do przeglądarki. Most `window.CzyzykAndroid` ma tylko `openPhoneSettings()`.
-- **Udostępnianie eksportu czatu**: w WhatsAppie grupa → ⋮ → Więcej → Eksportuj czat → wybierz **Czyżyk**. Aplikacja wyciąga z paczki tylko tekst czatu (zdjęcia i filmy zostają na telefonie) i otwiera Admin → Import z podglądem i podpowiedzianą grupą.
+- **Udostępnianie eksportu czatu**: w WhatsAppie grupa → ⋮ → Więcej → Eksportuj czat → wybierz **Czyżyk Connect**. Aplikacja wyciąga z paczki tylko tekst czatu (zdjęcia i filmy zostają na telefonie) i otwiera Admin → Import z podglądem i podpowiedzianą grupą.
 - Ograniczenie: Android WebView nie obsługuje powiadomień Web Push – powiadomienia działają w PWA zainstalowanej z przeglądarki.
 
 Aplikacja nigdy nic nie wysyła do WhatsAppa i nie korzysta z jego protokołu.
@@ -39,9 +41,9 @@ CI (GitHub Actions) buduje APK przy każdym pushu – artefakt `czyzyk-debug-apk
 
 ## Wydania i automatyczne aktualizacje
 
-Każdy merge zmian w `apps/android` do `main` uruchamia workflow **Android release**: buduje APK podpisany stałym kluczem i publikuje wydanie GitHub `android-v<numer>` z plikami `czyzyk.apk` i `version.json` (wersja, SHA-256, rozmiar).
+Każdy merge zmian w `apps/android` do `main` uruchamia workflow **Android release**: buduje APK podpisany stałym kluczem i publikuje wydanie GitHub `android-v<numer>` z plikami `czyzyk-connect.apk` i `version.json` (wersja, SHA-256, rozmiar).
 
-Zainstalowane wydanie raz dziennie (i przy otwarciu, nie częściej niż co 6 h) sprawdza `releases/latest/download/version.json`, pobiera nowszy APK, sprawdza rozmiar i SHA-256 i instaluje go. Na Androidzie 12+ instaluje bez pytania, jeśli poprzednią wersję zainstalował sam Czyżyk; w pozostałych przypadkach pokazuje okno „Nowa wersja Czyżyka” → **Zainstaluj**. Stan i przycisk „Sprawdź teraz” są w ustawieniach telefonu → **Aktualizacje**. Za pierwszym razem Android poprosi o zgodę „Instalowanie nieznanych aplikacji” dla Czyżyka.
+Zainstalowane wydanie raz dziennie (i przy otwarciu, nie częściej niż co 6 h) sprawdza `releases/latest/download/version.json`, pobiera nowszy APK, sprawdza rozmiar i SHA-256 i instaluje go. Na Androidzie 12+ instaluje bez pytania, jeśli poprzednią wersję zainstalował sam Czyżyk Connect; w pozostałych przypadkach pokazuje okno „Nowa wersja Czyżyk Connect” → **Zainstaluj**. Stan i przycisk „Sprawdź teraz” są w ustawieniach telefonu → **Aktualizacje**. Za pierwszym razem Android poprosi o zgodę „Instalowanie nieznanych aplikacji” dla Czyżyk Connect.
 
 ### Klucz podpisu (jednorazowo)
 
@@ -55,9 +57,9 @@ base64 -w0 czyzyk-release.jks   # wynik → sekret ANDROID_KEYSTORE_BASE64
 GitHub → repozytorium → **Settings → Secrets and variables → Actions → New repository secret**:
 `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`czyzyk`), `ANDROID_KEY_PASSWORD`. Potem **Actions → Android release → Run workflow** publikuje pierwsze wydanie. Bez sekretów workflow tylko ostrzega.
 
-### Przejście z wersji debug
+### Przejście ze starszej wersji
 
-Wersja debug ma inny klucz, więc nie zaktualizuje się do wydania: odinstaluj ją, zainstaluj `czyzyk.apk` z najnowszego wydania (GitHub → Releases), nadaj ponownie dostęp do powiadomień i sparuj telefon (Admin → Urządzenia → Dodaj telefon). Kolejne wersje przyjdą same.
+Wersje sprzed zmiany nazwy (debug „Czyżyk” i wydanie 1.7, pakiet `pl.czyzyk.app`) to dla Androida inna aplikacja: odinstaluj ją, zainstaluj `czyzyk-connect.apk` z najnowszego wydania (GitHub → Releases), nadaj ponownie dostęp do powiadomień i sparuj telefon (Admin → Urządzenia → Dodaj telefon). Kolejne wersje przyjdą same.
 
 > Środowisko chmurowe Claude Code nie ma Android SDK ani dostępu do repozytorium Google Maven
 > (`dl.google.com`), więc APK budujemy lokalnie. Wersje AGP, Kotlina i Compose w
