@@ -12,7 +12,7 @@ Rodzaje (`bring`, `payment`, `event`, `answer`, `done`, `not_applicable`) są st
 Pole `suggestions` jest opcjonalne bez wartości domyślnej: aktualizacja sprawy bez nowych propozycji zostawia zapisane (domyślna pusta lista wyczyściłaby je przy każdej zmianie terminu).
 
 ### D4. Stare sprawy
-Bez propozycji (`[]`) – tylko dotychczasowe odhaczanie; „Analizuj ponownie” przy wiadomości źródłowej dopisze propozycje.
+Bez propozycji (`[]`) – do czasu uzupełnienia tylko dotychczasowe odhaczanie. Model widzi propozycje istniejących spraw w kontekście (także pustą listę) i przy najbliższej analizie grupy – np. po „Analizuj ponownie” – uzupełnia je operacją update z samym polem `suggestions`. Taka operacja zapisuje tylko propozycje: nie zmienia statusu, pewności ani źródeł i nie trafia do kolejki przeglądu, nawet przy sprawie zatwierdzonej przez admina.
 
 ## Risks / Trade-offs
 

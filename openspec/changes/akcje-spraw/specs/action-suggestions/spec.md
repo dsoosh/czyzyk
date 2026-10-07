@@ -11,6 +11,13 @@ Analiza wiadomości SHALL proponować do każdej sprawy „wymaga odpowiedzi” 
 - **WHEN** sprawa brzmi „Czy Elena chce wziąć udział w zajęciach szachowych od 6.10.2026?”
 - **THEN** proponowane akcje to odpowiedzi, np. „Tak, zapisujemy” i „Nie”, bez „Do przyniesienia”
 
+### Requirement: Uzupełnianie propozycji istniejących spraw
+Otwarta sprawa bez propozycji SHALL dostać je przy najbliższej analizie wiadomości jej grupy (np. po „Analizuj ponownie”). Uzupełnienie MUST NOT zmieniać statusu, pewności ani decyzji admina o sprawie.
+
+#### Scenario: Sprawa sprzed zmiany
+- **WHEN** admin wysyła do ponownej analizy wiadomość o sprayu, a sprawa „Zakup sprayu” istnieje bez propozycji
+- **THEN** sprawa dostaje akcje, np. „Do przyniesienia”, i pozostaje aktywna
+
 ### Requirement: Wykonanie akcji jednym stuknięciem
 Członek rodziny SHALL móc wybrać proponowaną akcję otwartej sprawy. „Do przyniesienia”, „do zapłaty” i „do kalendarza” MUST utworzyć odpowiedni element z grupą, dziećmi i wiadomościami źródłowymi sprawy; każda akcja MUST zamknąć sprawę z adnotacją (etykietą wybranej akcji). Cofnięcie „załatwione” MUST usunąć adnotację.
 

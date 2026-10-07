@@ -82,7 +82,8 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
     from public.payments t`,
   action_required: `select t.id, t.status, jsonb_build_object(
       'question', t.question,
-      'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data,
+      'due_date', to_char(t.due_date, 'YYYY-MM-DD'),
+      'suggestions', t.suggested_actions) as data,
       coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
     from public.action_required t`,
   closure: `select t.id, t.status, jsonb_build_object(
