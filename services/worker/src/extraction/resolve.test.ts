@@ -10,6 +10,7 @@ const aliases: Aliases = {
   items: new Map([
     ["E1", { id: "e1", type: "event" as const }],
     ["E2", { id: "p1", type: "payment" as const }],
+    ["E3", { id: "x1", type: "event" as const, foreign: true }],
   ]),
 };
 
@@ -53,6 +54,27 @@ describe("resolveOperations", () => {
     expect(rejected).toEqual([]);
     expect(accepted.map((a) => a.type)).toEqual(["event", "payment", "bring_item"]);
     expect(accepted[2]).toMatchObject({ eventRef: { kind: "new", ref: "nowe1" } });
+  });
+
+  it("join tylko dla spraw innych grup; tych spraw nie można zmieniać ani odwoływać", () => {
+    const join = (target: string, type = "event") => ({ op: "join", type, target, children: [], source_messages: ["W1"], confidence: 0.9, rationale: "Ta sama wycieczka." });
+    const { accepted, rejected } = resolveOperations(
+      [
+        join("E3"),
+        join("E1"),
+        join("E3", "closure"),
+        { op: "update", type: "event", target: "E3", data: { title: "X" }, source_messages: ["W1"], confidence: 0.9, rationale: "x" },
+        { op: "cancel", type: "event", target: "E3", source_messages: ["W1"], confidence: 0.9, rationale: "x" },
+      ],
+      aliases,
+    );
+    expect(accepted).toEqual([expect.objectContaining({ index: 0, op: "join", targetId: "x1", children: [], sourceMessageIds: ["m1"] })]);
+    expect(rejected.map((r) => [r.index, r.reason])).toEqual([
+      [1, "item E1 is not from another group"],
+      [2, expect.stringContaining("join is not available")],
+      [3, "item E3 belongs to another group"],
+      [4, "item E3 belongs to another group"],
+    ]);
   });
 
   it("links to an existing event by alias", () => {

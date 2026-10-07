@@ -1,5 +1,5 @@
 import type { ContactRoleRow } from "@czyzyk/shared";
-import type { ItemData, ItemType } from "@czyzyk/shared";
+import { CHILD_ITEM_TYPES, type ItemData, type ItemType } from "@czyzyk/shared";
 import type pg from "pg";
 
 export interface BatchMessage {
@@ -38,6 +38,8 @@ export interface ExistingItem<T extends ItemType = ItemType> {
   data: ItemData[T];
   /** Names of the children the item is assigned to (empty: the whole group). */
   children: string[];
+  /** Set for an item of another group (shared-items): the model may only join it. */
+  groupName?: string;
 }
 
 export interface FamilyChild {
@@ -61,6 +63,11 @@ export interface ExtractionBatch {
   laterMessages: BatchMessage[];
   /** Current and future items of this group and of the whole kindergarten. */
   items: ExistingItem[];
+  /**
+   * Active items of the family's other children's groups (shared-items): the same trip or
+   * payment announced in two groups is joined instead of created twice.
+   */
+  otherItems?: ExistingItem[];
   /** Children of the family, so the model can tell which child a message is about. */
   children: FamilyChild[];
   /** Description of the kindergarten written by the family admin (empty when not set). */
@@ -96,25 +103,29 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
       'whole_kindergarten', t.group_id is null,
       'repeat', case when t.repeat_weekdays is null then null
                      else jsonb_build_object('weekdays', to_jsonb(t.repeat_weekdays), 'until', to_char(t.repeat_until, 'YYYY-MM-DD')) end) as data,
-      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
+      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children,
+      t.group_id
     from public.events t`,
   bring_item: `select t.id, t.status, jsonb_build_object(
       'description', t.description,
       'due_date', to_char(t.due_date, 'YYYY-MM-DD'),
       'event', t.event_id) as data,
-      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
+      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children,
+      t.group_id
     from public.bring_items t`,
   payment: `select t.id, t.status, jsonb_build_object(
       'description', t.description,
       'amount_pln', t.amount_pln::float8,
       'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data,
-      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
+      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children,
+      t.group_id
     from public.payments t`,
   action_required: `select t.id, t.status, jsonb_build_object(
       'question', t.question,
       'due_date', to_char(t.due_date, 'YYYY-MM-DD'),
       'suggestions', t.suggested_actions) as data,
-      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
+      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children,
+      t.group_id
     from public.action_required t`,
   closure: `select t.id, t.status, jsonb_build_object(
       'date_from', to_char(t.date_from, 'YYYY-MM-DD'),
@@ -143,6 +154,39 @@ export async function loadItem(db: Queryable, type: ItemType, id: string): Promi
   const { rows } = await db.query(`${ITEM_DATA_SQL[type]} where t.id = $1`, [id]);
   const row = rows[0];
   return row ? { id: row.id, type, status: row.status, data: row.data, children: row.children } : null;
+}
+
+/** Items of other groups per type in the prompt; nearest first. */
+const MAX_OTHER_ITEMS = 25;
+
+/**
+ * Active items with children (events, things to bring, payments, actions) of the other groups
+ * the family's children attend; only when a child of the family attends this group too.
+ */
+async function loadOtherItems(db: Queryable, groupId: string, today: string): Promise<ExistingItem[]> {
+  const { rows: groups } = await db.query<{ id: string; name: string }>(
+    `select g.id, coalesce(g.display_name, g.wa_name) as name
+       from public.wa_groups g
+      where g.tracked and g.id <> $1
+        and exists (select 1 from public.children c where c.group_id = g.id)
+        and exists (select 1 from public.children c where c.group_id = $1)`,
+    [groupId],
+  );
+  if (groups.length === 0) return [];
+  const names = new Map(groups.map((g) => [g.id, g.name]));
+  const items: ExistingItem[] = [];
+  for (const type of CHILD_ITEM_TYPES) {
+    const { rows } = await db.query(
+      `${ITEM_DATA_SQL[type]}
+        where t.group_id = any($1::uuid[]) and ${ITEM_FILTERS[type]} and t.status = 'active'
+        order by t.created_at desc limit ${MAX_OTHER_ITEMS}`,
+      [[...names.keys()], today],
+    );
+    for (const r of rows) {
+      items.push({ id: r.id, type, status: r.status, data: r.data, children: r.children, groupName: names.get(r.group_id) });
+    }
+  }
+  return items;
 }
 
 export async function loadBatch(db: Queryable, groupId: string, today: string, contextSize: number): Promise<ExtractionBatch | null> {
@@ -213,6 +257,8 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     for (const r of rows) items.push({ id: r.id, type, status: r.status, data: r.data, children: r.children });
   }
 
+  const otherItems = await loadOtherItems(db, groupId, today);
+
   const { rows: children } = await db.query<FamilyChild>(
     `select c.name, c.aliases, coalesce(g.display_name, g.wa_name) as "group"
        from public.children c left join public.wa_groups g on g.id = c.group_id
@@ -260,6 +306,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     laterMessages,
     images: images.map((i) => ({ messageId: i.message_id, fileName: i.file_name, data: i.data })),
     items,
+    otherItems,
     children,
     kindergarten: profile[0]?.content ?? "",
     family: family.map((f) => f.name),

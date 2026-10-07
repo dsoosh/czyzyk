@@ -177,14 +177,15 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
     await ctx.client.query("savepoint op");
     try {
       const status = statusFor(op, ctx.threshold);
-      const outcome = await applyOne(ctx, op, status, refIds);
+      const outcome = op.op === "join" ? await applyJoin(ctx, op) : await applyOne(ctx, op, status, refIds);
       await ctx.client.query("release savepoint op");
-      if (outcome !== "proposed" && status === "active") {
+      // Joining adds a child to an item the family already knows about: no new alert.
+      if (outcome !== "proposed" && status === "active" && op.op !== "join") {
         summary.activeItems.push({ type: op.type, id: outcome.id });
       }
       if (outcome === "proposed" || status === "needs_review") summary.needsReview++;
       else if (op.op === "create") summary.created++;
-      else if (op.op === "update") summary.updated++;
+      else if (op.op === "update" || op.op === "join") summary.updated++;
       else summary.cancelled++;
     } catch (error) {
       await ctx.client.query("rollback to savepoint op");
@@ -250,9 +251,47 @@ async function queueProposal(client: pg.PoolClient, table: string, op: Extract<R
   await client.query(`update ${table} set pending_patch = $2 where id = $1`, [op.targetId, proposal]);
 }
 
+/**
+ * Shared items (shared-items): the item of another group gets this group's children
+ * (the named ones, or all the family's children here) on top of the ones it concerned,
+ * and the new messages as sources. Its content, group and status stay as they are.
+ */
+async function applyJoin(ctx: Ctx, op: Extract<ResolvedOperation, { op: "join" }>): Promise<{ id: string }> {
+  const { client, groupId } = ctx;
+  if (op.confidence < ctx.threshold) throw new ApplyRejection("join below the confidence threshold");
+  const table = TABLE[op.type];
+  const existing = await loadItem(client, op.type, op.targetId);
+  if (!existing || existing.status !== "active") throw new ApplyRejection("target item is not active");
+  const named = await childIds(client, op.children);
+  const { rows } = await client.query<{ before: string[]; after: string[]; ids: string[] }>(
+    `with item as (select child_ids, group_id from ${table} where id = $1),
+          current as (
+            select c.id, c.name from public.children c, item
+             where case when cardinality(item.child_ids) > 0 then c.id = any(item.child_ids) else c.group_id = item.group_id end),
+          joining as (
+            select c.id, c.name from public.children c
+             where case when cardinality($2::uuid[]) > 0 then c.id = any($2::uuid[]) else c.group_id = $3 end)
+     select array(select name from current order by name) as before,
+            array(select name from (select * from current union select * from joining) u order by name) as after,
+            array(select id from (select id from current union select id from joining) u) as ids`,
+    [op.targetId, named, groupId],
+  );
+  const { before, after, ids } = rows[0]!;
+  await client.query(
+    `update ${table}
+        set child_ids = $2::uuid[],
+            source_message_ids = array(select distinct unnest(source_message_ids || $3::uuid[]))
+      where id = $1`,
+    [op.targetId, ids, op.sourceMessageIds],
+  );
+  const changes = JSON.stringify(before) === JSON.stringify(after) ? {} : { children: { from: before, to: after } };
+  await recordChange(client, op.type, op.targetId, "update", changes, op.sourceMessageIds, op.rationale);
+  return { id: op.targetId };
+}
+
 async function applyOne(
   ctx: Ctx,
-  op: ResolvedOperation,
+  op: Exclude<ResolvedOperation, { op: "join" }>,
   status: Status,
   refIds: Map<string, string>,
 ): Promise<{ id: string } | "proposed"> {
