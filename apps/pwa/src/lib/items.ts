@@ -295,6 +295,72 @@ export async function fetchSource(db: Db, kind: ItemKind, id: string, before: nu
   return { item, messages, history, sources };
 }
 
+/** A document from a WhatsApp photo (document-import): the image or only the text read on the phone. */
+export interface MessageDocument {
+  id: string;
+  message_id: string;
+  screening: "image" | "text_only" | null;
+  doc_text: string | null;
+  description: string | null;
+}
+
+/** A change of the event or of one of its things to bring, for the event history. */
+export interface EventChange extends ItemChange {
+  item_type: "event" | "bring_item";
+  item_id: string;
+}
+
+export interface EventHistory {
+  changes: EventChange[];
+  /** Every message behind the event and its things to bring, oldest first. */
+  messages: ContextMessage[];
+  documents: MessageDocument[];
+  /** Descriptions of the things to bring, for change labels. */
+  bringNames: Record<string, string>;
+}
+
+/** Full history of an event (event-history): its changes, messages and documents. */
+export async function fetchEventHistory(db: Db, eventId: string): Promise<EventHistory> {
+  const CHANGE_COLUMNS = "id, item_type, item_id, op, changes, source_message_ids, rationale, created_at";
+  const [event, bring] = await Promise.all([
+    run<{ source_message_ids: string[] } | null>(db.from("events").select("source_message_ids").eq("id", eventId).maybeSingle()),
+    run<{ id: string; description: string; source_message_ids: string[] }[]>(
+      db.from("bring_items").select("id, description, source_message_ids").eq("event_id", eventId),
+    ),
+  ]);
+  const bringIds = bring.map((b) => b.id);
+  const [eventChanges, bringChanges] = await Promise.all([
+    run<EventChange[]>(db.from("item_changes").select(CHANGE_COLUMNS).eq("item_type", "event").eq("item_id", eventId)),
+    bringIds.length
+      ? run<EventChange[]>(db.from("item_changes").select(CHANGE_COLUMNS).eq("item_type", "bring_item").in("item_id", bringIds))
+      : Promise.resolve<EventChange[]>([]),
+  ]);
+  const changes = [...eventChanges, ...bringChanges].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const ids = [
+    ...new Set([
+      ...(event?.source_message_ids ?? []),
+      ...bring.flatMap((b) => b.source_message_ids),
+      ...changes.flatMap((c) => c.source_message_ids),
+    ]),
+  ];
+  const bringNames = Object.fromEntries(bring.map((b) => [b.id, b.description]));
+  if (ids.length === 0) return { changes, messages: [], documents: [], bringNames };
+  const [messages, documents] = await Promise.all([
+    run<ContextMessage[]>(db.from("messages").select(SOURCE_COLUMNS).in("id", ids).order("sent_at", { ascending: true })),
+    run<MessageDocument[]>(
+      db.from("attachments").select("id, message_id, screening, doc_text, description").in("message_id", ids).eq("doc_status", "ready"),
+    ),
+  ]);
+  return { changes, messages, documents, bringNames };
+}
+
+/** A document image as a data URL; null when there is none (only text kept, or not checked yet). */
+export async function fetchDocumentImage(db: Db, attachmentId: string): Promise<string | null> {
+  const rows = await run<{ mime: string; data: string }[]>(db.rpc("attachment_image", { p_attachment_id: attachmentId }));
+  const row = rows[0];
+  return row ? `data:${row.mime};base64,${row.data}` : null;
+}
+
 export function confidenceLabel(confidence: number | null): string {
   if (confidence == null) return "nieznana";
   if (confidence >= 0.85) return "wysoka";

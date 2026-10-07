@@ -70,4 +70,52 @@ describe("Szczegóły wydarzenia", () => {
     expect(within(screen.getByRole("region", { name: "Do przyniesienia" })).getByText("przebranie")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "skąd to wiem" }).map((a) => a.getAttribute("href"))).toContain("/zrodlo/event/e1");
   });
+
+  it("pokazuje pełną historię: wiadomości, zdjęcie dokumentu i zmiany wydarzenia i rzeczy do przyniesienia", async () => {
+    const msg = (id: string, sent_at: string, text: string, author = "Pani Ania") => ({
+      id, group_id: "g1", author, sent_at, text, has_attachment: false, status: "active",
+    });
+    const change = (o: Record<string, unknown>) => ({ rationale: null, source_message_ids: [], changes: null, ...o });
+    const { rpc } = renderAt("/kalendarz/wydarzenie/e1", {
+      tables: {
+        ...tables,
+        events: [f.event({ source_message_ids: ["m1", "m2"] })],
+        bring_items: [f.bring({ source_message_ids: ["m3"] })],
+        messages: [
+          msg("m1", "2026-10-01T08:00:00.000Z", "W piątek bal"),
+          msg("m2", "2026-10-02T08:00:00.000Z", ""),
+          msg("m3", "2026-10-03T08:00:00.000Z", "Prosimy o przebrania", "Mama Zosi"),
+          msg("m9", "2026-10-03T09:00:00.000Z", "Inna sprawa"),
+        ],
+        attachments: [
+          { id: "a1", message_id: "m2", screening: "image", doc_text: null, description: "Plakat balu", doc_status: "ready" },
+          { id: "a2", message_id: "m3", screening: "text_only", doc_text: "Lista: przebranie", description: null, doc_status: "ready" },
+        ],
+        item_changes: [
+          change({ id: "c1", item_type: "event", item_id: "e1", op: "create", source_message_ids: ["m1"], created_at: "2026-10-01T08:01:00.000Z" }),
+          change({ id: "c2", item_type: "event", item_id: "e1", op: "update", changes: { start: { from: "2026-10-09", to: "2026-10-10" } }, rationale: "Przesunięty termin.", source_message_ids: ["m2"], created_at: "2026-10-02T08:01:00.000Z" }),
+          change({ id: "c3", item_type: "bring_item", item_id: "b1", op: "create", source_message_ids: ["m3"], created_at: "2026-10-03T08:01:00.000Z" }),
+          change({ id: "c4", item_type: "event", item_id: "e2", op: "create", created_at: "2026-10-03T08:02:00.000Z" }),
+        ],
+      },
+      rpc: { attachment_image: () => [{ mime: "image/jpeg", data: "AAAA" }] },
+    });
+    const history = await screen.findByRole("region", { name: "Historia" });
+    await within(history).findByText("W piątek bal");
+    const items = [...history.querySelector("ol")!.children] as HTMLElement[];
+    expect(items.map((li) => li.textContent?.slice(0, 40))).toEqual([
+      expect.stringContaining("Pani Ania"),
+      expect.stringContaining("Utworzono"),
+      expect.stringContaining("Pani Ania"),
+      expect.stringContaining("Zmieniono"),
+      expect.stringContaining("Mama Zosi"),
+      expect.stringContaining("Utworzono · Do przyniesienia: przebranie"),
+    ]);
+    expect(within(history).queryByText("Inna sprawa")).not.toBeInTheDocument();
+    expect(within(items[3]!).getByText("Przesunięty termin.")).toBeInTheDocument();
+    expect(await within(history).findByRole("img", { name: "Plakat balu" })).toHaveAttribute("src", "data:image/jpeg;base64,AAAA");
+    expect(rpc).toHaveBeenCalledWith("attachment_image", { p_attachment_id: "a1" });
+    expect(within(history).getByText("Lista: przebranie")).toBeInTheDocument();
+  });
 });
+

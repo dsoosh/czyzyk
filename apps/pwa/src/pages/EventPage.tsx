@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
+import { EventHistory } from "../components/EventHistory";
 import { LoadError, Loading, SourceLink } from "../components/ui";
 import { longDayLabel, warsawDay, warsawTime } from "../lib/dates";
 import { fetchEvent, groupLabel } from "../lib/items";
@@ -54,6 +55,7 @@ export function EventPage() {
           </ul>
         )}
       </section>
+      <EventHistory eventId={event.id} />
       <SourceLink kind="event" id={event.id} />
     </article>
   );
