@@ -45,3 +45,21 @@ Obraz z decyzją `image` SHALL być wysyłany jako nowo zakodowany JPEG o dłuż
 #### Scenario: Zdjęcie z lokalizacją GPS
 - **WHEN** dokument ma w EXIF współrzędne GPS
 - **THEN** wysłany obraz nie zawiera EXIF
+
+### Requirement: Zdjęcie udostępnione ręcznie
+Grupy z zaawansowaną ochroną prywatności czatu nie zapisują zdjęć, dlatego użytkownik SHALL móc udostępnić zdjęcie z WhatsAppa do Czyżyk Connect. Zdjęcie MUST przejść tę samą kontrolę na telefonie i SHALL zostać dołączone do najnowszej wiadomości ze zdjęciem z obserwowanej grupy z ostatnich 12 godzin; gdy takie wiadomości ma kilka grup, aplikacja MUST zapytać o grupę. Bez takiej wiadomości zdjęcie MUST zostać na telefonie.
+
+#### Scenario: Jedna grupa
+- **WHEN** użytkownik udostępnia zdjęcie jadłospisu, a zdjęcie w ostatnich godzinach przysłała tylko grupa „Motylki”
+- **THEN** dokument trafia do najnowszej wiadomości ze zdjęciem z „Motylków”
+
+#### Scenario: Kilka grup
+- **WHEN** zdjęcia przysłały ostatnio dwie obserwowane grupy
+- **THEN** aplikacja pyta, z której grupy jest zdjęcie
+
+### Requirement: Podgląd z powiadomienia
+Gdy powiadomienie o zdjęciu z obserwowanej grupy zawiera podgląd, a aplikacja może go odczytać, SHALL zachować go w prywatnym katalogu i – jeśli w ciągu minuty nie pojawi się zapisane zdjęcie tej wiadomości – sprawdzić go jak zdjęcie z folderu. Podglądy z innych czatów MUST NOT być odczytywane. Aplikacja SHALL pokazywać liczniki: zdjęcia z obserwowanych grup, podglądy dołączone, odczytane i największy rozmiar.
+
+#### Scenario: Grupa z ochroną prywatności
+- **WHEN** powiadomienie o zdjęciu z chronionej grupy ma czytelny podgląd jadłospisu
+- **THEN** dokument z podglądu trafia do wiadomości tej grupy

@@ -1,10 +1,13 @@
 package pl.czyzyk.app.capture
 
+import android.graphics.BitmapFactory
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import pl.czyzyk.app.photos.PhotoNote
 import pl.czyzyk.app.work.Deps
 import pl.czyzyk.app.work.Work
+import java.io.File
+import kotlin.concurrent.thread
 
 /**
  * Reads WhatsApp notifications (requires the user to grant notification access).
@@ -35,12 +38,47 @@ class CaptureService : NotificationListenerService() {
         val log = Deps.photos(this)
         val now = System.currentTimeMillis()
         var trackedPhoto = false
+        val previews = mutableListOf<PhotoNotice>()
         for (notice in notices) {
             val isTracked = notice.groupName != null && notice.groupName in tracked
             trackedPhoto = trackedPhoto || isTracked
-            log.addNote(PhotoNote(notice.key, now, if (isTracked) notice.key else null, if (isTracked) notice.groupName else null))
+            val isNew = log.addNote(PhotoNote(notice.key, now, if (isTracked) notice.key else null, if (isTracked) notice.groupName else null))
+            if (isTracked && isNew) {
+                Deps.state(this).incrementTrackedPhotos()
+                // Previews are read only for tracked groups; other chats contribute just a time.
+                if (notice.imageUri != null) previews += notice
+            }
         }
+        if (previews.isNotEmpty()) thread(name = "photo-previews") { keepPreviews(previews) }
         if (trackedPhoto) Work.enqueuePhotos(this, PHOTO_DELAY_SECONDS)
+    }
+
+    /**
+     * Copies notification previews of tracked photos to private storage while WhatsApp's grant
+     * lasts (groups with chat privacy never save the photo itself). Counters show whether this
+     * works on the phone at all and how large the previews are.
+     */
+    private fun keepPreviews(previews: List<PhotoNotice>) {
+        val state = Deps.state(this)
+        val log = Deps.photos(this)
+        val dir = File(filesDir, "previews").apply { mkdirs() }
+        for (notice in previews) {
+            state.incrementPreviewsAttached()
+            val file = File(dir, "${notice.key}.img")
+            val copied = runCatching {
+                contentResolver.openInputStream(notice.imageUri!!)?.use { input ->
+                    file.outputStream().use { out -> input.copyTo(out) }
+                } != null
+            }.getOrDefault(false)
+            if (!copied || file.length() == 0L) {
+                file.delete()
+                continue
+            }
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.path, bounds)
+            state.recordPreviewRead(minOf(bounds.outWidth, bounds.outHeight))
+            if (!log.addPreview(notice.key, file.path)) file.delete()
+        }
     }
 
     private fun handle(result: ParseResult) {

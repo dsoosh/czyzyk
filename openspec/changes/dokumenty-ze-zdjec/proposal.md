@@ -14,7 +14,8 @@ Zmiana poza kolejnością etapów, na prośbę użytkownika (jak `import-eksport
   - telefon zapamiętuje tylko czas powiadomień o zdjęciach (ze wszystkich czatów, bez treści);
   - nowy plik w „WhatsApp Images” jest łączony z wiadomością obserwowanej grupy po czasie, wyłącznie gdy dopasowanie jest jednoznaczne;
   - zdjęcie jest sprawdzane lokalnie (ML Kit z modelami w APK: twarze, etykiety osób, rozpoznawanie tekstu) i dostaje decyzję `image`, `text_only` albo `withheld`;
-  - wysyłane są tylko dokumenty: `image` jako nowo zakodowany JPEG bez EXIF z tekstem, `text_only` jako sam tekst.
+  - wysyłane są tylko dokumenty: `image` jako nowo zakodowany JPEG bez EXIF z tekstem, `text_only` jako sam tekst;
+  - grupy z zaawansowaną ochroną prywatności nie zapisują zdjęć: zdjęcie można udostępnić do Czyżyk Connect ręcznie, a podgląd z powiadomienia (jeśli czytelny) jest sprawdzany automatycznie.
 - `services/api`: `POST /ingest/document` (token urządzenia) – dokument dla dostarczonej wiadomości, deduplikacja po `sha256`, ponowna analiza wiadomości.
 - `services/worker`: przed analizą grupy kontrola zapasowa każdego nowego obrazu modelem z wizją (`DOCUMENT_MODEL`, domyślnie `EXTRACTION_MODEL`) – ludzie lub odmowa → obraz usunięty; obraz dokumentu trafia do modelu razem z wiadomością (z etykietą aliasu), tekst dokumentu – do treści wiadomości w prompcie. Kontrola zapasowa trafia do dziennika LLM admina.
 
