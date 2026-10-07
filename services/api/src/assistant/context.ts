@@ -95,15 +95,29 @@ interface EventRow {
   end_time: string | null;
   all_day: boolean;
   location: string | null;
+  repeat_weekdays: number[] | null;
 }
 
 const EVENT_SELECT = `
-  select id, group_id, child_ids, title, all_day, location,
+  select id, group_id, child_ids, title, all_day, location, repeat_weekdays,
          to_char(starts_at at time zone '${TZ}', 'YYYY-MM-DD') as start_day,
          to_char(starts_at at time zone '${TZ}', 'HH24:MI') as start_time,
          to_char(ends_at at time zone '${TZ}', 'YYYY-MM-DD') as end_day,
          to_char(ends_at at time zone '${TZ}', 'HH24:MI') as end_time
     from public.events`;
+
+/** Each occurrence between $1 and $2 (recurring events repeat, closure days skipped). */
+const OCCURRENCE_SELECT = `
+  select e.id, e.group_id, e.child_ids, e.title, e.all_day, e.location, e.repeat_weekdays,
+         to_char(o.starts_at at time zone '${TZ}', 'YYYY-MM-DD') as start_day,
+         to_char(o.starts_at at time zone '${TZ}', 'HH24:MI') as start_time,
+         to_char(o.ends_at at time zone '${TZ}', 'YYYY-MM-DD') as end_day,
+         to_char(o.ends_at at time zone '${TZ}', 'HH24:MI') as end_time
+    from public.event_occurrences($1::date, $2::date) o join public.events e on e.id = o.id
+   where e.status = 'active'
+   order by o.starts_at`;
+
+const WEEKDAYS = ["", "pon", "wt", "śr", "czw", "pt", "sob", "niedz"];
 
 function eventLine(e: EventRow, names: Names): string {
   let when = dayWithWeekday(e.start_day);
@@ -113,6 +127,7 @@ function eventLine(e: EventRow, names: Names): string {
     when += ` ${e.start_time}`;
     if (e.end_day) when += e.end_day === e.start_day ? `–${e.end_time}` : ` – ${dayWithWeekday(e.end_day)} ${e.end_time}`;
   }
+  if (e.repeat_weekdays?.length) when += ` (stałe zajęcia: co ${e.repeat_weekdays.map((d) => WEEKDAYS[d]).join(", ")})`;
   return `- Wydarzenie: ${e.title}; ${when}${e.location ? `; miejsce: ${e.location}` : ""}; ${groupOf(names, e.group_id)}${childOf(names, e)}`;
 }
 
@@ -265,10 +280,7 @@ export interface ViewContext {
 
 async function upcoming(db: Db, names: Names, from: string, to: string): Promise<string[]> {
   const [events, bring, payments, actions, closures] = await Promise.all([
-    db.query<EventRow>(
-      `${EVENT_SELECT} where status = 'active' and (starts_at at time zone '${TZ}')::date between $1 and $2 order by starts_at`,
-      [from, to],
-    ),
+    db.query<EventRow>(OCCURRENCE_SELECT, [from, to]),
     db.query<BringRow>(`${BRING_SELECT} where b.status = 'active' and b.due_date between $1 and $2 order by b.due_date, b.description`, [from, to]),
     db.query<PaymentRow>(`${PAYMENT_SELECT} where status = 'active' and paid_at is null order by due_date nulls last, description`),
     db.query<ActionRow>(`${ACTION_SELECT} where status = 'active' and resolved_at is null order by due_date nulls last`),
@@ -342,13 +354,7 @@ async function viewContext(db: Db, view: AssistantView, now: Date, names: Names)
       const [y, m] = view.month.split("-").map(Number) as [number, number];
       const to = addDays(m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`, -1);
       const [events, closures, bring] = await Promise.all([
-        db.query<EventRow>(
-          `${EVENT_SELECT} where status = 'active'
-             and (starts_at at time zone '${TZ}')::date <= $2
-             and (coalesce(ends_at, starts_at) at time zone '${TZ}')::date >= $1
-           order by starts_at`,
-          [from, to],
-        ),
+        db.query<EventRow>(OCCURRENCE_SELECT, [from, to]),
         db.query<ClosureRow>(`${CLOSURE_SELECT} where status = 'active' and date_to >= $1 and date_from <= $2 order by date_from`, [from, to]),
         db.query<BringRow>(`${BRING_SELECT} where b.status = 'active' and b.due_date between $1 and $2 order by b.due_date`, [from, to]),
       ]);

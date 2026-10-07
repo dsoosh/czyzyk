@@ -26,6 +26,23 @@ describe("Dziś i jutro", () => {
     expect(within(events).getByRole("link", { name: "skąd to wiem" })).toHaveAttribute("href", "/zrodlo/event/e1");
   });
 
+  it("stałe zajęcia: każde wystąpienie w najbliższym tygodniu z opisem „co …”", async () => {
+    const basen = f.event({
+      id: "e9",
+      title: "Basen",
+      starts_at: "2026-09-29T07:00:00.000Z", // a Tuesday, 9:00
+      all_day: false,
+      repeat_weekdays: [2, 5],
+      repeat_until: null,
+    });
+    renderAt("/", { tables: { wa_groups: f.groups, events: [basen] } });
+    const events = await screen.findByRole("region", { name: "Wydarzenia" });
+    // Friday 9.10 and Tuesday 13.10 within the week from Thursday 8.10.
+    expect(within(events).getAllByText("Basen")).toHaveLength(2);
+    expect(within(events).getAllByText("co wt, pt")).toHaveLength(2);
+    expect(within(events).getByText("jutro")).toBeInTheDocument();
+  });
+
   it("ukrywa elementy needs_review i odwołane", async () => {
     renderAt("/", {
       tables: {

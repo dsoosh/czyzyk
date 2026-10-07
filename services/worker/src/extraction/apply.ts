@@ -48,6 +48,8 @@ function columns(type: ItemType, data: ItemData[ItemType], groupId: string, even
         ["starts_at", "starts", d.start],
         ["ends_at", "ends", d.end],
         ["location", "$", d.location],
+        ["repeat_weekdays", "$::smallint[]", d.repeat ? [...new Set(d.repeat.weekdays)].sort() : null],
+        ["repeat_until", "$::date", d.repeat?.until ?? null],
       ];
     }
     case "bring_item": {

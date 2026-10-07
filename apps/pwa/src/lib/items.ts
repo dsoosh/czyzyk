@@ -1,6 +1,7 @@
 import type { ActionSuggestion } from "@czyzyk/shared/extraction";
 import { fetchChildren, type Child } from "./children";
 import { addDays, startOfWarsawDay } from "./dates";
+import { withOccurrences } from "./recurrence";
 import type { Db } from "./supabase";
 
 export type ItemKind = "event" | "bring_item" | "payment" | "action_required" | "closure" | "fact";
@@ -31,6 +32,11 @@ export interface EventItem extends Provenance {
   ends_at: string | null;
   all_day: boolean;
   location: string | null;
+  /** Recurring events (recurring-events): ISO weekdays, 1 = Monday; null for one-off events. */
+  repeat_weekdays?: number[] | null;
+  repeat_until?: string | null;
+  /** Set on an occurrence of a recurring event (lib/recurrence). */
+  occurrence_day?: string;
 }
 export interface BringItem extends Provenance {
   event_id: string | null;
@@ -69,7 +75,7 @@ export interface Group {
 }
 
 const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, status";
-export const EVENT_COLUMNS = `${PROVENANCE}, child_ids, title, starts_at, ends_at, all_day, location`;
+export const EVENT_COLUMNS = `${PROVENANCE}, child_ids, title, starts_at, ends_at, all_day, location, repeat_weekdays, repeat_until`;
 export const BRING_COLUMNS = `${PROVENANCE}, child_ids, event_id, description, due_date, packed_by, packed_at`;
 export const PAYMENT_COLUMNS = `${PROVENANCE}, child_ids, description, amount_pln, due_date, paid_by, paid_at`;
 export const ACTION_COLUMNS = `${PROVENANCE}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution`;
@@ -115,7 +121,7 @@ export interface TodayData {
 
 /** Everything the home screen shows; only active items (needs_review stays hidden). */
 export async function fetchToday(db: Db, today: string): Promise<TodayData> {
-  const [bring, events, payments, actions, closures, groups, people, children] = await Promise.all([
+  const [bring, oneOff, recurring, payments, actions, closures, groups, people, children] = await Promise.all([
     run<BringItem[]>(
       db
         .from("bring_items")
@@ -131,10 +137,12 @@ export async function fetchToday(db: Db, today: string): Promise<TodayData> {
         .from("events")
         .select(EVENT_COLUMNS)
         .eq("status", "active")
+        .is("repeat_weekdays", null)
         .gte("starts_at", startOfWarsawDay(today).toISOString())
         .lt("starts_at", startOfWarsawDay(addDays(today, 8)).toISOString())
         .order("starts_at"),
     ),
+    fetchRecurring(db, addDays(today, 7)),
     run<Payment[]>(
       db
         .from("payments")
@@ -164,7 +172,7 @@ export async function fetchToday(db: Db, today: string): Promise<TodayData> {
   return {
     bringToday: bring.filter((b) => b.due_date === today),
     bringWeek: bring.filter((b) => b.due_date !== today),
-    events,
+    events: withOccurrences(oneOff, recurring, closures, today, addDays(today, 7)),
     payments,
     actions,
     closures,
@@ -182,17 +190,19 @@ export interface CalendarData {
 
 /** Active events and closures between two days (inclusive). */
 export async function fetchCalendar(db: Db, fromDay: string, toDay: string): Promise<CalendarData> {
-  const [events, closures, groups] = await Promise.all([
+  const [oneOff, recurring, closures, groups] = await Promise.all([
     run<EventItem[]>(
       db
         .from("events")
         .select(EVENT_COLUMNS)
         .eq("status", "active")
+        .is("repeat_weekdays", null)
         .gte("starts_at", startOfWarsawDay(fromDay).toISOString())
         .lt("starts_at", startOfWarsawDay(addDays(toDay, 1)).toISOString())
         .order("starts_at")
         .limit(500),
     ),
+    fetchRecurring(db, toDay),
     run<Closure[]>(
       db
         .from("closures")
@@ -204,7 +214,20 @@ export async function fetchCalendar(db: Db, fromDay: string, toDay: string): Pro
     ),
     fetchGroupNames(db),
   ]);
-  return { events, closures, groups };
+  return { events: withOccurrences(oneOff, recurring, closures, fromDay, toDay), closures, groups };
+}
+
+/** Active recurring events that start by `toDay` (lib/recurrence expands and trims them). */
+function fetchRecurring(db: Db, toDay: string): Promise<EventItem[]> {
+  return run<EventItem[]>(
+    db
+      .from("events")
+      .select(EVENT_COLUMNS)
+      .eq("status", "active")
+      .not("repeat_weekdays", "is", null)
+      .lt("starts_at", startOfWarsawDay(addDays(toDay, 1)).toISOString())
+      .limit(200),
+  );
 }
 
 export async function fetchEvent(db: Db, id: string) {

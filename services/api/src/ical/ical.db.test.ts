@@ -72,6 +72,20 @@ describe("GET /ical/{token}.ics", () => {
     expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(3);
   });
 
+  it("stałe zajęcia: osobny wpis na każde wystąpienie w ciągu roku, bez dni wolnych", async () => {
+    await db.client.query(
+      `insert into events (group_id, title, starts_at, all_day, repeat_weekdays, repeat_until)
+       values ($1, 'Basen', date_trunc('day', now() at time zone 'Europe/Warsaw') at time zone 'Europe/Warsaw' + interval '9 hours',
+               false, '{1,2,3,4,5,6,7}', (now() at time zone 'Europe/Warsaw')::date + 4)`,
+      [groupId],
+    );
+    await db.client.query("insert into closures (date_from, date_to) values ((now() at time zone 'Europe/Warsaw')::date + 2, (now() at time zone 'Europe/Warsaw')::date + 2)");
+    const token = await newToken();
+    const { body } = await app().inject({ method: "GET", url: `/ical/${token}.ics` });
+    expect(body.match(/SUMMARY:Basen/g)).toHaveLength(4);
+    expect(body.match(/UID:[0-9a-f-]+-\d{8}@czyzyk/g)).toHaveLength(4);
+  });
+
   it("dzień wolny kończy się dzień po ostatnim dniu (DTEND wyłączny)", async () => {
     await db.client.query("insert into closures (date_from, date_to, reason) values ('2026-12-23', '2027-01-01', 'przerwa świąteczna')");
     const token = await newToken();

@@ -56,6 +56,15 @@ export function startOfWarsawDay(day: string): Date {
   return new Date(guess - offsetAt(first));
 }
 
+/** UTC instant of a local Warsaw day and "HH:MM" time (DST aware). */
+export function warsawInstant(day: string, time: string): Date {
+  const [y, m, d] = day.split("-").map(Number) as [number, number, number];
+  const [hh, mm] = time.split(":").map(Number) as [number, number];
+  const guess = Date.UTC(y, m - 1, d, hh, mm);
+  const first = guess - offsetAt(guess);
+  return new Date(guess - offsetAt(first));
+}
+
 /** "9.10" */
 export function shortDate(day: string): string {
   const [, m, d] = day.split("-").map(Number);

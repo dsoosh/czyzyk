@@ -4,6 +4,7 @@ import { ActionSuggestions } from "../components/ActionSuggestions";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
 import { childNames } from "../lib/children";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
+import { eventKey, repeatLabel } from "../lib/recurrence";
 import { fetchToday, formatAmount, groupLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
 import { doneLabel } from "../lib/tracking";
 import { useLoader, useOnForeground } from "../lib/useLoader";
@@ -114,13 +115,14 @@ export function TodayPage() {
           {data.events.map((e) => {
             const day = warsawDay(e.starts_at);
             return (
-              <Row key={e.id}>
+              <Row key={eventKey(e)}>
                 <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-semibold hover:underline">
                   {e.title}
                 </Link>
                 <Meta>
                   <span className="font-semibold text-ink">{dayLabel(day, today)}</span>
                   <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
+                  {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
                   <ChildTag names={childNames(data.children, e)} />
                   <span>{g(e.group_id)}</span>
                   <SourceLink kind="event" id={e.id} />
