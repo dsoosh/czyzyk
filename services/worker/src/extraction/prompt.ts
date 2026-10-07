@@ -105,6 +105,7 @@ export function buildExtractionPrompt(batch: ExtractionBatch, now: Date): Extrac
 
   const contextLines = batch.contextMessages.map((m) => renderMessage(messageAlias(m), m, batch.contactRoles));
   const newLines = batch.newMessages.map((m) => renderMessage(messageAlias(m), m, batch.contactRoles));
+  const laterLines = batch.laterMessages.map((m) => renderMessage(messageAlias(m), m, batch.contactRoles));
 
   const user = [
     `Dzisiaj: ${warsawDayLong(now)} (strefa Europe/Warsaw).`,
@@ -123,6 +124,8 @@ export function buildExtractionPrompt(batch: ExtractionBatch, now: Date): Extrac
     ...newLines,
     "</wiadomosci_nowe>",
     "",
+    // Only when an older message is analysed again: what was written after it.
+    ...(laterLines.length ? ["<wiadomosci_pozniejsze>", ...laterLines, "</wiadomosci_pozniejsze>", ""] : []),
     `Przeanalizuj nowe wiadomości i wywołaj narzędzie ${EXTRACTION_TOOL_NAME}.`,
   ].join("\n");
 

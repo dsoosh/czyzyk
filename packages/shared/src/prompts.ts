@@ -47,7 +47,7 @@ Typy elementów:
 Blok <przedszkole> to opis placówki napisany przez rodzinę (miejsca, prowadzący, grupy, kanały). Używaj go do rozpoznawania miejsc (np. „Baza”), osób i grup w wiadomościach; to wiedza tła, a nie źródło operacji.
 
 Zasady:
-1. Przeanalizuj wyłącznie NOWE wiadomości. Wcześniejsze wiadomości i istniejące elementy służą jako kontekst.
+1. Przeanalizuj wyłącznie NOWE wiadomości. Wcześniejsze wiadomości, istniejące elementy i – przy ponownej analizie starszej wiadomości – blok <wiadomosci_pozniejsze> (wiadomości napisane po niej, już przeanalizowane) służą jako kontekst: np. późniejsza korekta terminu, odwołanie albo odpowiedź zmienia to, co wynika z nowej wiadomości.
 2. Daty względne („jutro”, „w piątek”, „za tydzień”) licz względem daty wysłania wiadomości, w strefie Europe/Warsaw. „W piątek” oznacza najbliższy piątek po dacie wysłania (lub ten sam dzień, jeśli wiadomość wysłano w piątek rano i mowa o dzisiejszym dniu).
 3. Gdy nie ma godziny, wydarzenie jest całodniowe: all_day = true, start = YYYY-MM-DD. Z godziną: all_day = false, start = YYYY-MM-DDTHH:mm.
 4. Jeśli nowa informacja dotyczy istniejącego elementu (zmiana terminu, kwoty, szczegółów), użyj operacji update z jego aliasem E…, zamiast tworzyć duplikat. Odwołanie – operacja cancel.

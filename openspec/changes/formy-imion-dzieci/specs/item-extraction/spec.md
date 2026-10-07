@@ -23,7 +23,11 @@ Rzecz do przyniesienia, przy której wiadomość nie podaje dnia, SHALL dostać 
 - **THEN** rzecz ma termin na wtorek 6.10
 
 ### Requirement: Ponowna analiza wiadomości
-Admin SHALL móc wysłać pojedynczą wiadomość do ponownej analizy z historii grupy; analiza MUST uwzględniać istniejące elementy (aktualizacja zamiast duplikatu). Pozostali członkowie rodziny MUST NOT mieć tej możliwości.
+Admin SHALL móc wysłać pojedynczą wiadomość do ponownej analizy z historii grupy; analiza MUST uwzględniać istniejące elementy (aktualizacja zamiast duplikatu) oraz wiadomości z grupy napisane przed i po niej (np. późniejszą korektę terminu). Pozostali członkowie rodziny MUST NOT mieć tej możliwości.
+
+#### Scenario: Późniejsza korekta
+- **WHEN** admin wysyła do ponownej analizy prośbę o spray, a godzinę później nauczycielka napisała „Spray wystarczy do piątku”
+- **THEN** model widzi tę późniejszą wiadomość jako kontekst i może ustawić termin na piątek
 
 #### Scenario: Po dodaniu formy imienia
 - **WHEN** admin po dopisaniu formy „Elcia” stuka „Analizuj ponownie” przy wiadomości

@@ -10,6 +10,8 @@
 - [x] 2.2 Eval: przypadki list imion i sprawdzanie dzieci; weryfikacja: testy oceny; przebieg na prawdziwym modelu (`npm run eval:extraction`) – do wykonania z kluczem API
 - [x] 2.3 Asystent: formy imion w kontekście; weryfikacja: test bazy kontekstu
 
+- [x] 2.4 Ponowna analiza z wiadomościami napisanymi po analizowanej (`<wiadomosci_pozniejsze>`); weryfikacja: testy promptu i bazy
+
 ## 3. PWA
 
 - [x] 3.1 Dzieci: pole „Inne formy imienia”, komunikat o kolizji; weryfikacja: testy komponentu

@@ -371,4 +371,17 @@ describe("runGroupExtraction", () => {
     );
     expect(after[0]).toEqual({ suggested_actions: suggestions, status: "active", confidence: 0.9, pending_patch: null });
   });
+
+  it("ponowna analiza starszej wiadomości widzi też wiadomości napisane po niej", async () => {
+    await addMessage("Dzień dobry", "2026-10-05T08:00:00Z", true);
+    await addMessage("Prośba o spray przeciwko insektom", "2026-10-05T10:47:00Z");
+    await addMessage("Spray wystarczy do piątku", "2026-10-05T12:00:00Z", true);
+    const { model, prompts } = scripted(() => []);
+    await runGroupExtraction(deps(model), groupId);
+    const user = prompts[0]!.user;
+    expect(user).toMatch(/<wiadomosci_wczesniejsze>\n[^<]*Dzień dobry[^<]*<\/wiadomosci_wczesniejsze>/);
+    expect(user).toMatch(/<wiadomosci_nowe>\n[^<]*Prośba o spray[^<]*<\/wiadomosci_nowe>/);
+    expect(user).toMatch(/<wiadomosci_pozniejsze>\n[^<]*Spray wystarczy do piątku[^<]*<\/wiadomosci_pozniejsze>/);
+    expect(prompts[0]!.newMessageIds).toHaveLength(1);
+  });
 });
