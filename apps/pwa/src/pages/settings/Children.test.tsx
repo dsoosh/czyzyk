@@ -15,10 +15,10 @@ const saveChild = (args: Record<string, unknown>, tables: Record<string, Record<
   tables.children ??= [];
   if (args.p_id) {
     const row = tables.children.find((c) => c.id === args.p_id)!;
-    Object.assign(row, { name: args.p_name, group_id: args.p_group_id });
+    Object.assign(row, { name: args.p_name, group_id: args.p_group_id, aliases: args.p_aliases });
     return row;
   }
-  const row = { id: `c${tables.children.length + 1}`, name: args.p_name, group_id: args.p_group_id };
+  const row = { id: `c${tables.children.length + 1}`, name: args.p_name, group_id: args.p_group_id, aliases: args.p_aliases };
   tables.children.push(row);
   return row;
 };
@@ -37,25 +37,55 @@ describe("Ustawienia → Dzieci", () => {
     await userEvent.selectOptions(select, "g1");
     await userEvent.click(within(form).getByRole("button", { name: "Zapisz" }));
 
-    expect(rpc).toHaveBeenCalledWith("save_child", { p_id: null, p_name: "Zosia", p_group_id: "g1" });
+    expect(rpc).toHaveBeenCalledWith("save_child", { p_id: null, p_name: "Zosia", p_group_id: "g1", p_aliases: [] });
     expect(await within(section).findByRole("form", { name: "Zosia" })).toBeInTheDocument();
     expect(within(section).getByRole("button", { name: "Dodaj dziecko" })).toBeInTheDocument();
   });
 
   it("zmienia grupę i usuwa dziecko", async () => {
     const { rpc } = renderAt("/ustawienia", {
-      tables: { wa_groups: groups, children: [{ id: "c1", name: "Antek", group_id: "g1" }] },
+      tables: { wa_groups: groups, children: [{ id: "c1", name: "Antek", group_id: "g1", aliases: [] }] },
       rpc: { save_child: saveChild, delete_child: (args, tables) => (tables.children = tables.children!.filter((c) => c.id !== args.p_id)) && null },
     });
     const form = await screen.findByRole("form", { name: "Antek" });
     expect(within(form).getByRole("button", { name: "Zapisz" })).toBeDisabled();
     await userEvent.selectOptions(within(form).getByRole("combobox", { name: "Grupa" }), "g2");
     await userEvent.click(within(form).getByRole("button", { name: "Zapisz" }));
-    expect(rpc).toHaveBeenCalledWith("save_child", { p_id: "c1", p_name: "Antek", p_group_id: "g2" });
+    expect(rpc).toHaveBeenCalledWith("save_child", { p_id: "c1", p_name: "Antek", p_group_id: "g2", p_aliases: [] });
 
     await userEvent.click(within(await screen.findByRole("form", { name: "Antek" })).getByRole("button", { name: "Usuń" }));
     expect(rpc).toHaveBeenCalledWith("delete_child", { p_id: "c1" });
     expect(await screen.findByText("Nie dodano jeszcze dzieci.")).toBeInTheDocument();
+  });
+
+  it("inne formy imienia: zapis po przecinkach, odczyt przy dziecku", async () => {
+    const { rpc } = renderAt("/ustawienia", {
+      tables: { wa_groups: groups, children: [{ id: "c1", name: "Elena", group_id: "g1", aliases: ["El"] }] },
+      rpc: { save_child: saveChild },
+    });
+    const form = await screen.findByRole("form", { name: "Elena" });
+    const aliases = within(form).getByRole("textbox", { name: "Inne formy imienia" });
+    expect(aliases).toHaveValue("El");
+    await userEvent.clear(aliases);
+    await userEvent.type(aliases, "Eleonora,  El , , Elcia");
+    await userEvent.click(within(form).getByRole("button", { name: "Zapisz" }));
+    expect(rpc).toHaveBeenCalledWith("save_child", { p_id: "c1", p_name: "Elena", p_group_id: "g1", p_aliases: ["Eleonora", "El", "Elcia"] });
+    expect(await within(await screen.findByRole("form", { name: "Elena" })).findByDisplayValue("Eleonora, El, Elcia")).toBeInTheDocument();
+  });
+
+  it("forma należąca do innego dziecka daje czytelny komunikat", async () => {
+    renderAt("/ustawienia", {
+      tables: { wa_groups: groups, children: [{ id: "c1", name: "Wicek", group_id: null, aliases: [] }] },
+      rpc: {
+        save_child: () => {
+          throw new Error("Forma „wincenty” należy już do innego dziecka.");
+        },
+      },
+    });
+    const form = await screen.findByRole("form", { name: "Wicek" });
+    await userEvent.type(within(form).getByRole("textbox", { name: "Inne formy imienia" }), "Wincenty");
+    await userEvent.click(within(form).getByRole("button", { name: "Zapisz" }));
+    expect(await within(form).findByRole("alert")).toHaveTextContent("Imię lub forma „wincenty” należy już do innego dziecka.");
   });
 
   it("duplikat imienia daje czytelny komunikat", async () => {
@@ -78,8 +108,8 @@ describe("Ustawienia → Dzieci", () => {
 
 describe("imię dziecka przy elementach", () => {
   const children = [
-    { id: "c1", name: "Zosia", group_id: "g1" },
-    { id: "c2", name: "Antek", group_id: "g2" },
+    { id: "c1", name: "Zosia", group_id: "g1", aliases: [] },
+    { id: "c2", name: "Antek", group_id: "g2", aliases: [] },
   ];
 
   it("childNames: wprost przypisane, inaczej dzieci z grupy, nic dla całego przedszkola", () => {

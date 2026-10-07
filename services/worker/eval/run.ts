@@ -28,7 +28,7 @@ export function batchFor(c: EvalCase): { batch: ExtractionBatch; now: Date } {
   const items = (c.items ?? []).map((item, i) => {
     const data = { ...item.data } as Record<string, unknown>;
     if (item.type === "bring_item" && typeof data.event === "string") data.event = itemId(data.event);
-    return { id: `item-${i + 1}`, type: item.type as ItemType, status: "active" as const, data: data as ItemData[ItemType] };
+    return { id: `item-${i + 1}`, type: item.type as ItemType, status: "active" as const, data: data as ItemData[ItemType], children: [] };
   });
   const newMessages = c.messages.map((m, i) => ({
     id: `msg-${i + 1}`,
@@ -39,7 +39,7 @@ export function batchFor(c: EvalCase): { batch: ExtractionBatch; now: Date } {
   }));
   const last = Math.max(...newMessages.map((m) => m.sentAt.getTime()));
   return {
-    batch: { group: { id: "group", name: "Motylki" }, newMessages, contextMessages: [], items },
+    batch: { group: { id: "group", name: "Motylki" }, newMessages, contextMessages: [], items, children: c.children ?? [], kindergarten: "" },
     now: new Date(last + 30 * 60_000),
   };
 }

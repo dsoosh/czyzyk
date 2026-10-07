@@ -51,3 +51,9 @@ export async function fetchGroupHistory(db: Db, groupId: string, limit: number, 
   ]);
   return { group, messages: rows.slice(0, limit).reverse(), hasMore: rows.length > limit };
 }
+
+/** Admin: send a message back to extraction (e.g. after adding a child's name form). */
+export async function reprocessMessage(db: Db, id: string): Promise<void> {
+  const { error } = await db.rpc("admin_reprocess_message", { p_id: id });
+  if (error) throw new Error(error.message);
+}

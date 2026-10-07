@@ -4,19 +4,37 @@ export interface Child {
   id: string;
   name: string;
   group_id: string | null;
+  /** Other forms of the name ("Eleonora", "Elcia") the assistant also recognises. */
+  aliases: string[];
 }
 
 export async function fetchChildren(db: Db): Promise<Child[]> {
-  const { data, error } = await db.from("children").select("id, name, group_id").order("name");
+  const { data, error } = await db.from("children").select("id, name, group_id, aliases").order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as Child[];
 }
 
 /** Creates (id null) or updates a child; the database checks family membership. */
-export async function saveChild(db: Db, child: { id: string | null; name: string; group_id: string | null }): Promise<Child> {
-  const { data, error } = await db.rpc("save_child", { p_id: child.id, p_name: child.name.trim(), p_group_id: child.group_id });
+export async function saveChild(
+  db: Db,
+  child: { id: string | null; name: string; group_id: string | null; aliases: string[] },
+): Promise<Child> {
+  const { data, error } = await db.rpc("save_child", {
+    p_id: child.id,
+    p_name: child.name.trim(),
+    p_group_id: child.group_id,
+    p_aliases: child.aliases,
+  });
   if (error) throw new Error(error.message);
   return data as Child;
+}
+
+/** "Eleonora, El,  Elcia" → ["Eleonora", "El", "Elcia"] (trimmed, without empty entries). */
+export function parseAliases(text: string): string[] {
+  return text
+    .split(/[,;\n]/)
+    .map((a) => a.trim())
+    .filter(Boolean);
 }
 
 export async function deleteChild(db: Db, id: string): Promise<void> {

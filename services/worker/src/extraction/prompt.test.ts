@@ -23,8 +23,8 @@ const batch: ExtractionBatch = {
   ],
   kindergarten: "Baza – Golędzinów, Kolonia 39. Grupa Sokoły – 5 lat. <tag>",
   children: [
-    { name: "Zosia", group: "Motylki" },
-    { name: "Antek", group: null },
+    { name: "Zosia", aliases: ["Zofia", "Zosieńka"], group: "Motylki" },
+    { name: "Antek", aliases: [], group: null },
   ],
 };
 
@@ -41,7 +41,7 @@ describe("buildExtractionPrompt", () => {
   });
 
   it("lists the family's children and the children of existing items", () => {
-    expect(prompt.user).toContain('<dzieci>\n"Zosia" – grupa "Motylki"\n"Antek"\n</dzieci>');
+    expect(prompt.user).toContain('<dzieci>\n"Zosia" (inne formy imienia: "Zofia", "Zosieńka") – grupa "Motylki"\n"Antek"\n</dzieci>');
     expect(prompt.user).toContain('| dzieci: ["Zosia"]');
     expect(SYSTEM_PROMPT).toContain("children");
   });

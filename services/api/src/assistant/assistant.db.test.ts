@@ -287,13 +287,13 @@ describe("loadViewContext", () => {
 
   it("dzieci rodziny: lista na początku i imię przy elementach (wprost albo z grupy)", async () => {
     const { rows } = await db.client.query<{ id: string }>(
-      "insert into children (name, group_id) values ('Zosia', $1), ('Antek', null) returning id",
+      "insert into children (name, group_id, aliases) values ('Zosia', $1, '{Zofia,Zosieńka}'), ('Antek', null, '{}') returning id",
       [motylki],
     );
     try {
       await db.client.query("update payments set child_ids = $1 where id = $2", [[rows[1]!.id], paymentId]);
       const { data } = await loadViewContext(pool, { kind: "today" }, NOW);
-      expect(data).toContain("## Dzieci rodziny\n- Antek\n- Zosia (grupa Motylki)");
+      expect(data).toContain("## Dzieci rodziny\n- Antek\n- Zosia (też: Zofia, Zosieńka) (grupa Motylki)");
       expect(data.indexOf("## O przedszkolu")).toBeLessThan(data.indexOf("## Dzieci rodziny"));
       expect(data).toContain("Do przyniesienia: przebranie; na piątek 2026-10-09; na wydarzenie „Bal”; jeszcze nie spakowane; grupa Motylki; dziecko: Zosia");
       expect(data).toContain("Płatność: teatrzyk; 12,50 zł; termin poniedziałek 2026-10-12; niezapłacone; grupa Motylki; dziecko: Antek");

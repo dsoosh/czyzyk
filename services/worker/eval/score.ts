@@ -9,10 +9,14 @@ export interface ExpectedOperation {
   fields?: Record<string, unknown>;
   /** Case-insensitive substrings in data text fields. */
   contains?: Record<string, string>;
+  /** Exact set of children the operation is assigned to (main names). */
+  children?: string[];
 }
 
 export interface EvalCase {
   id: string;
+  /** The family's children (default: none). */
+  children?: { name: string; aliases: string[]; group: string | null }[];
   items?: { type: ItemType; data: Record<string, unknown> }[];
   messages: { author: string; sent_at: string; text: string }[];
   expected: ExpectedOperation[];
@@ -35,6 +39,10 @@ function matches(expected: ExpectedOperation, actual: ParsedOperation): boolean 
   for (const [k, v] of Object.entries(expected.fields ?? {})) if (data[k] !== v) return false;
   for (const [k, v] of Object.entries(expected.contains ?? {})) {
     if (!String(data[k] ?? "").toLocaleLowerCase("pl-PL").includes(v.toLocaleLowerCase("pl-PL"))) return false;
+  }
+  if (expected.children) {
+    const actualChildren = actual.op === "cancel" ? [] : ((actual as { children?: string[] }).children ?? []);
+    if ([...actualChildren].sort().join("|") !== [...expected.children].sort().join("|")) return false;
   }
   return true;
 }
@@ -62,7 +70,9 @@ export function scoreCase(c: EvalCase, raw: unknown[], threshold: number): CaseS
   const unmatched = [...ops];
   for (const e of c.expected) {
     const i = unmatched.findIndex((o) => matches(e, o));
-    if (i === -1) problems.push(`brak oczekiwanej operacji: ${e.op} ${e.type} ${JSON.stringify({ ...e.fields, ...e.contains })}`);
+    if (i === -1) {
+      problems.push(`brak oczekiwanej operacji: ${e.op} ${e.type} ${JSON.stringify({ ...e.fields, ...e.contains, ...(e.children && { children: e.children }) })}`);
+    }
     else unmatched.splice(i, 1);
   }
 

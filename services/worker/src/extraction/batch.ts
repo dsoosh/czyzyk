@@ -20,6 +20,8 @@ export interface ExistingItem<T extends ItemType = ItemType> {
 
 export interface FamilyChild {
   name: string;
+  /** Other forms of the name: nicknames, full form ("Eleonora", "Elcia"). */
+  aliases: string[];
   /** Display name of the child's group, or null when not set. */
   group: string | null;
 }
@@ -152,7 +154,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
   }
 
   const { rows: children } = await db.query<FamilyChild>(
-    `select c.name, coalesce(g.display_name, g.wa_name) as "group"
+    `select c.name, c.aliases, coalesce(g.display_name, g.wa_name) as "group"
        from public.children c left join public.wa_groups g on g.id = c.group_id
       order by c.name`,
   );

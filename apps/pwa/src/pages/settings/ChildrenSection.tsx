@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
-import { deleteChild, fetchChildren, saveChild, type Child } from "../../lib/children";
+import { deleteChild, fetchChildren, parseAliases, saveChild, type Child } from "../../lib/children";
 import { run, type Group } from "../../lib/items";
 import { useLoader } from "../../lib/useLoader";
 
@@ -9,6 +9,8 @@ interface Draft {
   id: string | null;
   name: string;
   group_id: string | null;
+  /** Other forms of the name, comma-separated as typed. */
+  aliases: string;
 }
 
 async function load(db: ReturnType<typeof useAuth>["client"]) {
@@ -29,7 +31,8 @@ export function ChildrenSection() {
     <section aria-label="Dzieci" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Dzieci</h2>
       <p className="text-sm text-muted">
-        Wpisz imiona tak, jak piszą je nauczycielki (np. „Zosia”). Dzięki temu przy sprawach widać, którego dziecka dotyczą.
+        Wpisz imiona tak, jak piszą je nauczycielki (np. „Zosia”), a w „Innych formach imienia” – pełne imię i zdrobnienia (np.
+        „Zofia, Zosieńka”). Dzięki temu przy sprawach widać, którego dziecka dotyczą.
       </p>
       {error ? (
         <LoadError message={error} onRetry={reload} />
@@ -40,7 +43,8 @@ export function ChildrenSection() {
           {data.children.length === 0 && !adding && <p className="text-muted">Nie dodano jeszcze dzieci.</p>}
           <ul className="space-y-3">
             {data.children.map((c) => (
-              <li key={c.id}>
+              // Keyed by the saved values: after a save the form shows them as stored (trimmed forms).
+              <li key={`${c.id}:${c.name}:${c.group_id}:${c.aliases.join("|")}`}>
                 <ChildForm child={c} groups={data.groups} onSaved={reload} />
               </li>
             ))}
@@ -81,10 +85,19 @@ function ChildForm({
   onCancel?: () => void;
 }) {
   const { client } = useAuth();
-  const [draft, setDraft] = useState<Draft>({ id: child?.id ?? null, name: child?.name ?? "", group_id: child?.group_id ?? null });
+  const [draft, setDraft] = useState<Draft>({
+    id: child?.id ?? null,
+    name: child?.name ?? "",
+    group_id: child?.group_id ?? null,
+    aliases: child?.aliases.join(", ") ?? "",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const changed = !child || draft.name.trim() !== child.name || draft.group_id !== child.group_id;
+  const changed =
+    !child ||
+    draft.name.trim() !== child.name ||
+    draft.group_id !== child.group_id ||
+    parseAliases(draft.aliases).join("\n") !== child.aliases.join("\n");
   const label = child ? child.name : "Nowe dziecko";
 
   const act = async (fn: () => Promise<unknown>) => {
@@ -94,7 +107,16 @@ function ChildForm({
       await fn();
       onSaved();
     } catch (err) {
-      setError(/duplicate|children_name_key/i.test(String(err)) ? "Jest już dziecko o tym imieniu." : "Nie udało się zapisać.");
+      const message = String(err);
+      setError(
+        /należy już do innego dziecka/.test(message)
+          ? message.replace(/^Error: /, "").replace("Forma", "Imię lub forma")
+          : /duplicate|children_name_key/i.test(message)
+            ? "Jest już dziecko o tym imieniu."
+            : /Najwyżej 10|40 znaków/.test(message)
+              ? message.replace(/^Error: /, "")
+              : "Nie udało się zapisać.",
+      );
     } finally {
       setBusy(false);
     }
@@ -103,7 +125,7 @@ function ChildForm({
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!draft.name.trim() || !changed) return;
-    void act(() => saveChild(client, draft));
+    void act(() => saveChild(client, { ...draft, aliases: parseAliases(draft.aliases) }));
   };
 
   return (
@@ -132,6 +154,14 @@ function ChildForm({
           ))}
         </select>
       </div>
+      <input
+        value={draft.aliases}
+        onChange={(e) => setDraft({ ...draft, aliases: e.target.value })}
+        maxLength={400}
+        placeholder="Inne formy imienia, np. Eleonora, El, Elcia"
+        aria-label="Inne formy imienia"
+        className="w-full rounded-full border border-sand-400 px-4 py-2"
+      />
       <div className="flex gap-2">
         <button
           type="submit"

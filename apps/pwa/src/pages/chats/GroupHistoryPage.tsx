@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
-import { useAuth } from "../../auth/AuthProvider";
+import { useAuth, useProfile } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
 import { dayLabel, warsawDay, warsawTime } from "../../lib/dates";
-import { fetchGroupHistory, HISTORY_PAGE } from "../../lib/history";
+import { fetchGroupHistory, HISTORY_PAGE, reprocessMessage } from "../../lib/history";
 import { useLoader, useOnForeground } from "../../lib/useLoader";
 
 /** History of one tracked group: newest messages, older ones on demand, text search. */
@@ -15,6 +15,9 @@ export function GroupHistoryPage() {
 
 function GroupHistory({ id }: { id: string }) {
   const { client } = useAuth();
+  const isAdmin = useProfile().role === "admin";
+  // Message id → state of an admin's "analyse again" request.
+  const [reprocess, setReprocess] = useState<Record<string, "pending" | "queued" | "failed">>({});
   const [limit, setLimit] = useState(HISTORY_PAGE);
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
@@ -23,6 +26,16 @@ function GroupHistory({ id }: { id: string }) {
     [client, id, limit, query],
   );
   useOnForeground(reload);
+
+  const analyseAgain = async (messageId: string) => {
+    setReprocess((r) => ({ ...r, [messageId]: "pending" }));
+    try {
+      await reprocessMessage(client, messageId);
+      setReprocess((r) => ({ ...r, [messageId]: "queued" }));
+    } catch {
+      setReprocess((r) => ({ ...r, [messageId]: "failed" }));
+    }
+  };
 
   const search = (e: FormEvent) => {
     e.preventDefault();
@@ -107,6 +120,24 @@ function GroupHistory({ id }: { id: string }) {
                   <p className="mt-1 whitespace-pre-wrap">{m.text || (m.has_attachment ? "📎 załącznik" : "")}</p>
                   {m.text && m.has_attachment && <p className="mt-1 text-xs text-slate-500">📎 załącznik</p>}
                   {m.status === "deleted_suspected" && <p className="mt-1 text-xs text-red-700">Prawdopodobnie usunięta z grupy</p>}
+                  {isAdmin && m.status === "active" && (
+                    <div className="mt-1 text-right text-xs">
+                      {reprocess[m.id] === "queued" ? (
+                        <span role="status" className="text-slate-500">
+                          Wiadomość wróciła do analizy – nowe sprawy pojawią się za chwilę.
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={reprocess[m.id] === "pending"}
+                          onClick={() => void analyseAgain(m.id)}
+                          className="text-brand-700 underline disabled:opacity-50"
+                        >
+                          {reprocess[m.id] === "failed" ? "Nie udało się – spróbuj ponownie" : "Analizuj ponownie"}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </li>
             );

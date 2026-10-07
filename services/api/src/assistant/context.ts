@@ -38,7 +38,7 @@ function addDays(day: string, n: number): string {
 interface Names {
   groups: Map<string, string>;
   people: Map<string, string>;
-  children: { id: string; name: string; group_id: string | null }[];
+  children: { id: string; name: string; group_id: string | null; aliases: string[] }[];
 }
 
 async function loadNames(db: Db): Promise<Names> {
@@ -47,7 +47,9 @@ async function loadNames(db: Db): Promise<Names> {
     db.query<{ id: string; name: string }>(
       "select id, split_part(coalesce(nullif(trim(display_name), ''), split_part(email, '@', 1)), ' ', 1) as name from public.profiles",
     ),
-    db.query<{ id: string; name: string; group_id: string | null }>("select id, name, group_id from public.children order by name"),
+    db.query<{ id: string; name: string; group_id: string | null; aliases: string[] }>(
+      "select id, name, group_id, aliases from public.children order by name",
+    ),
   ]);
   return {
     groups: new Map(groups.rows.map((r) => [r.id, r.name])),
@@ -282,7 +284,15 @@ export async function loadViewContext(db: Db, view: AssistantView, now: Date): P
   const about = profile.rows[0]?.content.trim();
   if (about) parts.push(`## O przedszkolu\n${about}`);
   if (names.children.length) {
-    parts.push(section("Dzieci rodziny", names.children.map((c) => `- ${c.name}${c.group_id ? ` (grupa ${names.groups.get(c.group_id) ?? "?"})` : ""}`)));
+    parts.push(
+      section(
+        "Dzieci rodziny",
+        names.children.map(
+          (c) =>
+            `- ${c.name}${c.aliases.length ? ` (też: ${c.aliases.join(", ")})` : ""}${c.group_id ? ` (grupa ${names.groups.get(c.group_id) ?? "?"})` : ""}`,
+        ),
+      ),
+    );
   }
   return parts.length ? { ...context, data: `${parts.join("\n\n")}\n\n${context.data}` } : context;
 }
