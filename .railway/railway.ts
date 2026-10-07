@@ -122,6 +122,7 @@ export default defineRailway(() => {
     "packages/shared/src/chatExport.ts",
     "packages/shared/src/assistant.ts",
     "packages/shared/src/prompts.ts",
+    "packages/shared/src/contacts.ts",
   ]);
   const pwa = service(NAME("pwa"), {
     ...pwaBase,

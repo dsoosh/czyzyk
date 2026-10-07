@@ -25,6 +25,10 @@
     "./prompts": {
       "types": "./dist/prompts.d.ts",
       "default": "./dist/prompts.js"
+    },
+    "./contacts": {
+      "types": "./dist/contacts.d.ts",
+      "default": "./dist/contacts.js"
     }
   },
   "scripts": {

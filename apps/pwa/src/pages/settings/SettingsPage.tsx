@@ -1,6 +1,7 @@
 import { androidBridge } from "../../lib/androidApp";
 import { CalendarSubscription } from "./CalendarSubscription";
 import { ChildrenSection } from "./ChildrenSection";
+import { MyPhoneSection } from "./MyPhoneSection";
 import { PushSettingsSection } from "./PushSettingsSection";
 
 export function SettingsPage() {
@@ -9,6 +10,7 @@ export function SettingsPage() {
       <h1 className="font-display text-4xl font-bold text-ink">Ustawienia</h1>
       <PhoneSettingsButton />
       <ChildrenSection />
+      <MyPhoneSection />
       <PushSettingsSection />
       <CalendarSubscription />
     </div>

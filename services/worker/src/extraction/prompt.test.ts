@@ -29,6 +29,10 @@ const batch: ExtractionBatch = {
   ],
   family: ["Darek", "Ola"],
   promptTemplate: null,
+  contactRoles: [
+    { author_key: "pani ania", role: "ciocia", label: null },
+    { author_key: "+48535111213", role: "rodzina", label: "Darek" },
+  ],
 };
 
 describe("buildExtractionPrompt", () => {
@@ -59,6 +63,22 @@ describe("buildExtractionPrompt", () => {
   it("shows bring item events by alias, never by id", () => {
     expect(prompt.user).toContain('"event":"E1"');
     expect(prompt.user).not.toContain('"e1"');
+  });
+
+  it("tags authors with the roles the family gave them and marks mentions of the family", () => {
+    const tagged = buildExtractionPrompt(
+      {
+        ...batch,
+        newMessages: [
+          { id: "m4", author: "+48 535 111 213", sentAt: new Date("2026-10-07T16:06:00Z"), text: "Przyniesiemy", hasAttachment: false },
+          { id: "m5", author: "Mama Zosi", sentAt: new Date("2026-10-07T16:07:00Z"), text: "@48535111213 a kasztany?", hasAttachment: false },
+        ],
+      },
+      new Date("2026-10-07T17:00:00Z"),
+    );
+    expect(tagged.user).toContain('| "Pani Ania" [ciocia]: "Dzień dobry');
+    expect(tagged.user).toContain('| "+48 535 111 213" [nasza rodzina]: "Przyniesiemy"');
+    expect(tagged.user).toContain('| "Mama Zosi" [do nas]: "@48535111213 a kasztany?"');
   });
 
   it("escapes tags inside message text", () => {

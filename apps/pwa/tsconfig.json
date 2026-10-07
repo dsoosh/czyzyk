@@ -31,6 +31,9 @@
       ],
       "@czyzyk/shared/prompts": [
         "../../packages/shared/src/prompts.ts"
+      ],
+      "@czyzyk/shared/contacts": [
+        "../../packages/shared/src/contacts.ts"
       ]
     }
   },
