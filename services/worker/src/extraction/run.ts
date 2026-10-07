@@ -2,6 +2,7 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { applyOperations, type ApplySummary } from "./apply.js";
 import { loadBatch } from "./batch.js";
+import { checkPendingDocuments, type DocumentChecker } from "./documents.js";
 import type { ExtractionModel } from "./model.js";
 import { buildExtractionPrompt } from "./prompt.js";
 import { resolveOperations } from "./resolve.js";
@@ -10,6 +11,8 @@ import { warsawDate } from "./time.js";
 export interface ExtractionDeps {
   db: pg.Pool;
   model: ExtractionModel;
+  /** Server-side check of document images (document-import); without it images are removed. */
+  documents?: DocumentChecker;
   logger: Logger;
   now: () => Date;
   confidenceThreshold: number;
@@ -44,6 +47,8 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
     if (!rows[0]?.locked) return { status: "locked" };
 
     try {
+      // Document images are checked before any of them reaches the extraction prompt.
+      await checkPendingDocuments(client, deps.documents, groupId, deps.logger);
       const now = deps.now();
       const batch = await loadBatch(client, groupId, warsawDate(now), deps.contextMessages);
       if (!batch || batch.newMessages.length === 0) return { status: "nothing_to_do" };

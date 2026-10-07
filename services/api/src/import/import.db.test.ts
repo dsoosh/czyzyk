@@ -76,7 +76,6 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.client.query("delete from messages; delete from sync_log; delete from wa_groups");
-  await db.client.query("delete from attachments");
   const { rows } = await db.client.query("insert into wa_groups (wa_name, tracked) values ('Motylki 2026/27', true) returning id");
   groupId = rows[0].id;
 });
@@ -85,14 +84,7 @@ describe("POST /import/chat", () => {
   it("importuje wiadomości jako export, starsze niż okres ekstrakcji jako przetworzone", async () => {
     const res = await post({ group_id: groupId, text: EXPORT, extract_days: 30 });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
-      messages: 3,
-      inserted: 3,
-      duplicates: 0,
-      for_extraction: 2,
-      skipped_lines: 1,
-      documents: { accepted: 0, duplicates: 0, rejected: 0 },
-    });
+    expect(res.json()).toEqual({ messages: 3, inserted: 3, duplicates: 0, for_extraction: 2, skipped_lines: 1 });
     const { rows } = await db.client.query(
       "select author, text, source, has_attachment, processed_at is null as pending from messages order by sent_at",
     );
@@ -148,89 +140,5 @@ describe("POST /import/chat", () => {
     const res = await post({ group_id: groupId, text: lines.join("\n"), extract_days: 0 });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ messages: 6000, inserted: 6000, for_extraction: 0 });
-  });
-});
-
-describe("POST /import/chat z dokumentami z telefonu", () => {
-  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]).toString("base64");
-  const PLAN = { file_name: "IMG-20261007-WA0003.jpg", screening: "image", text: "Plan na październik: 15.10 teatrzyk", image: JPEG };
-
-  it("łączy dokument z wiadomością po nazwie pliku, obraz czeka na kontrolę serwera", async () => {
-    const res = await post({ group_id: groupId, text: EXPORT, extract_days: 30, documents: [PLAN] });
-    expect(res.json().documents).toEqual({ accepted: 1, duplicates: 0, rejected: 0 });
-    const { rows } = await db.client.query(
-      `select m.text, a.file_name, a.screening, a.doc_text, a.doc_status, a.mime, length(a.sha256) as sha, octet_length(f.bytes) as bytes
-         from attachments a join messages m on m.id = a.message_id left join attachment_files f on f.attachment_id = a.id`,
-    );
-    expect(rows).toEqual([
-      {
-        text: "Plan na październik",
-        file_name: "IMG-20261007-WA0003.jpg",
-        screening: "image",
-        doc_text: "Plan na październik: 15.10 teatrzyk",
-        doc_status: "pending",
-        mime: "image/jpeg",
-        sha: 64,
-        bytes: 8,
-      },
-    ]);
-  });
-
-  it("sam tekst jest od razu gotowy; ponowny import nie dubluje dokumentu", async () => {
-    const doc = { file_name: "IMG-20261007-WA0003.jpg", screening: "text_only", text: "Bal jesienny 24.10" };
-    expect((await post({ group_id: groupId, text: EXPORT, extract_days: 30, documents: [doc] })).json().documents).toEqual({
-      accepted: 1,
-      duplicates: 0,
-      rejected: 0,
-    });
-    expect((await post({ group_id: groupId, text: EXPORT, extract_days: 30, documents: [doc] })).json().documents).toEqual({
-      accepted: 0,
-      duplicates: 1,
-      rejected: 0,
-    });
-    const { rows } = await db.client.query("select doc_status, screening from attachments");
-    expect(rows).toEqual([{ doc_status: "ready", screening: "text_only" }]);
-    expect((await db.client.query("select count(*)::int as n from attachment_files")).rows[0].n).toBe(0);
-  });
-
-  it("odrzuca dokument bez wiadomości i obraz, który nie jest JPEG-iem", async () => {
-    const res = await post({
-      group_id: groupId,
-      text: EXPORT,
-      extract_days: 30,
-      documents: [
-        { ...PLAN, file_name: "IMG-20261099-WA0001.jpg" },
-        { ...PLAN, image: Buffer.from("<svg/>").toString("base64") },
-      ],
-    });
-    expect(res.json().documents).toEqual({ accepted: 0, duplicates: 0, rejected: 2 });
-    expect((await db.client.query("select count(*)::int as n from attachment_files")).rows[0].n).toBe(0);
-  });
-
-  it("odrzuca niespójne dokumenty (obraz bez decyzji image, withheld)", async () => {
-    for (const doc of [
-      { ...PLAN, screening: "text_only" },
-      { ...PLAN, screening: "withheld" },
-      { file_name: "IMG-20261007-WA0003.jpg", screening: "image", text: "x" },
-      { ...PLAN, file_name: "../etc/passwd" },
-    ]) {
-      expect((await post({ group_id: groupId, text: EXPORT, extract_days: 30, documents: [doc] })).statusCode).toBe(400);
-    }
-  });
-
-  it("nowy dokument przy przetworzonej wiadomości wraca ją do ekstrakcji", async () => {
-    await post({ group_id: groupId, text: EXPORT, extract_days: 30 });
-    await db.client.query("update messages set processed_at = now()");
-    await post({ group_id: groupId, text: EXPORT, extract_days: 30, documents: [PLAN] });
-    const { rows } = await db.client.query("select text from messages where processed_at is null");
-    expect(rows).toEqual([{ text: "Plan na październik" }]);
-  });
-
-  it("dziennik i logi bez treści dokumentu", async () => {
-    await post({ group_id: groupId, text: EXPORT, extract_days: 30, documents: [PLAN] });
-    const { rows } = await db.client.query("select details from sync_log");
-    expect(rows[0].details.documents).toEqual({ accepted: 1, duplicates: 0, rejected: 0 });
-    const all = JSON.stringify(rows) + logs.join("");
-    for (const secret of ["teatrzyk", "IMG-20261007", JPEG]) expect(all).not.toContain(secret);
   });
 });

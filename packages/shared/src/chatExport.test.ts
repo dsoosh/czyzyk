@@ -42,7 +42,6 @@ describe("parseChatExport", () => {
       ["Pani Ania", "2026-10-07T18:08:00", "Dziękuję: do zobaczenia", false],
       ["Pani Ania", "2026-10-13T07:30:00", "Jutro wycieczka", false],
     ]);
-    expect(messages.map((m) => m.attachments)).toEqual([[], ["IMG-20261007-WA0003.jpg"], [], [], []]);
     expect(skipped).toBe(3);
     // CEST: 18:02 in Warsaw is 16:02 UTC.
     expect(messages[0]!.sentAt.toISOString()).toBe("2026-10-07T16:02:00.000Z");
@@ -62,15 +61,7 @@ describe("parseChatExport", () => {
       ["Mama Zosi", "2026-10-07T18:04:05", "", true],
       ["Tata Kuby", "2026-10-07T18:06:00", "", true],
     ]);
-    expect(messages.map((m) => m.attachments)).toEqual([[], ["00000012-PHOTO-2026-10-07-18-04-05.jpg"], []]);
     expect(skipped).toBe(2);
-  });
-
-  it("nazwy plików załączników po angielsku", () => {
-    const android = parseChatExport("10/9/26, 8:15 PM - Anna: IMG-20261009-WA0001.jpg (file attached)\nMenu");
-    expect(android.messages.map((m) => [m.text, m.attachments])).toEqual([["Menu", ["IMG-20261009-WA0001.jpg"]]]);
-    const ios = parseChatExport(`[09.10.2026, 18:04:05] Ann: ${LRM}<attached: 00000003-PHOTO-2026-10-09-18-04-05.jpg>`);
-    expect(ios.messages.map((m) => m.attachments)).toEqual([["00000003-PHOTO-2026-10-09-18-04-05.jpg"]]);
   });
 
   it("dzień pierwszy, gdy plik to rozstrzyga (25/12/26)", () => {

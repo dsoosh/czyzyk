@@ -4,6 +4,7 @@ import { PgBoss } from "pg-boss";
 import type { Logger } from "pino";
 import type { WorkerConfig } from "./config.js";
 import type { ExtractionModel } from "./extraction/model.js";
+import type { DocumentChecker } from "./extraction/documents.js";
 import { runGroupExtraction, type ExtractionDeps } from "./extraction/run.js";
 import { listenForMessages } from "./extraction/listen.js";
 import { findDueGroups } from "./extraction/scheduler.js";
@@ -41,6 +42,8 @@ export async function startWorker(
   logger: Logger,
   deps: {
     model: ExtractionModel;
+    /** Server-side check of document images (document-import). */
+    documents?: DocumentChecker;
     now?: () => Date;
     scanSchedule?: string | null;
     /** Web Push (formerly the separate cron service); absent = push off. */
@@ -70,6 +73,7 @@ export async function startWorker(
   const extractionDeps: ExtractionDeps = {
     db: pool,
     model: deps.model,
+    documents: deps.documents,
     logger,
     now,
     confidenceThreshold: config.EXTRACTION_CONFIDENCE_THRESHOLD,

@@ -206,3 +206,74 @@ describe("POST /ingest/notification", () => {
     expect(all).not.toMatch(/Sekretna|Joanna|Kowalska|Bearer|[0-9a-f]{64}/);
   });
 });
+
+describe("POST /ingest/document", () => {
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]).toString("base64");
+  const doc = (key: string, overrides: Record<string, unknown> = {}) => ({
+    idempotency_key: key,
+    file_name: "IMG-20261007-WA0003.jpg",
+    screening: "image",
+    text: "Jadłospis na październik",
+    image: JPEG,
+    ...overrides,
+  });
+
+  async function photoMessage() {
+    const m = message({ text: "📷 Zdjęcie", has_attachment: true });
+    await app().inject({ method: "POST", url: "/ingest/notification", headers: auth(), payload: m });
+    return m.idempotency_key;
+  }
+
+  it("dołącza dokument do wiadomości; obraz czeka na kontrolę serwera, wiadomość wraca do analizy", async () => {
+    const key = await photoMessage();
+    await db.client.query("update messages set processed_at = now()");
+    const res = await app().inject({ method: "POST", url: "/ingest/document", headers: auth(), payload: doc(key) });
+    expect(res.statusCode).toBe(201);
+    const { rows } = await db.client.query(
+      `select a.file_name, a.screening, a.doc_text, a.doc_status, length(a.sha256) as sha, octet_length(f.bytes) as bytes,
+              m.processed_at is null as pending
+         from attachments a join messages m on m.id = a.message_id left join attachment_files f on f.attachment_id = a.id`,
+    );
+    expect(rows).toEqual([
+      { file_name: "IMG-20261007-WA0003.jpg", screening: "image", doc_text: "Jadłospis na październik", doc_status: "pending", sha: 64, bytes: 8, pending: true },
+    ]);
+    // The same photo again (also under another name) is a duplicate.
+    expect((await app().inject({ method: "POST", url: "/ingest/document", headers: auth(), payload: doc(key) })).json()).toEqual({ duplicate: true });
+    expect(
+      (await app().inject({ method: "POST", url: "/ingest/document", headers: auth(), payload: doc(key, { file_name: "kopia.jpg" }) })).statusCode,
+    ).toBe(200);
+  });
+
+  it("sam tekst z telefonu jest od razu gotowy, bez obrazu", async () => {
+    const key = await photoMessage();
+    const res = await app().inject({
+      method: "POST",
+      url: "/ingest/document",
+      headers: auth(),
+      payload: doc(key, { screening: "text_only", image: undefined, text: "Bal jesienny 24.10" }),
+    });
+    expect(res.statusCode).toBe(201);
+    expect((await db.client.query("select doc_status, screening from attachments")).rows).toEqual([{ doc_status: "ready", screening: "text_only" }]);
+    expect((await db.client.query("select count(*)::int as n from attachment_files")).rows[0].n).toBe(0);
+  });
+
+  it("404 dla nieznanej wiadomości, 400 dla obrazu innego niż JPEG i niespójnych danych, 401 bez tokenu", async () => {
+    const key = await photoMessage();
+    const post = (payload: unknown, headers = auth()) => app().inject({ method: "POST", url: "/ingest/document", headers, payload: payload as object });
+    expect((await post(doc(randomUUID()))).statusCode).toBe(404);
+    expect((await post(doc(key, { image: Buffer.from("<svg/>").toString("base64") }))).statusCode).toBe(400);
+    expect((await post(doc(key, { screening: "withheld" }))).statusCode).toBe(400);
+    expect((await post(doc(key, { screening: "text_only" }))).statusCode).toBe(400);
+    expect((await post(doc(key, { file_name: "../x.jpg" }))).statusCode).toBe(400);
+    expect((await post(doc(key), {})).statusCode).toBe(401);
+    expect((await db.client.query("select count(*)::int as n from attachments")).rows[0].n).toBe(0);
+  });
+
+  it("logi i dziennik bez treści dokumentu", async () => {
+    const key = await photoMessage();
+    await app().inject({ method: "POST", url: "/ingest/document", headers: auth(), payload: doc(key) });
+    const { rows } = await db.client.query("select details from sync_log where kind = 'document'");
+    expect(rows[0].details).toMatchObject({ screening: "image", bytes: 8 });
+    expect(JSON.stringify(rows) + logs.join("")).not.toMatch(/Jadłospis|IMG-2026|\/9j/);
+  });
+});

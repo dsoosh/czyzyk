@@ -125,3 +125,27 @@ describe("buildExtractionPrompt", () => {
     expect(empty.system).toContain("<przedszkole>\n(brak)\n</przedszkole>");
   });
 });
+
+describe("dokumenty ze zdjęć", () => {
+  it("dopisuje tekst dokumentu przy wiadomości i dołącza obraz z etykietą aliasu", () => {
+    const withDocs: ExtractionBatch = {
+      ...batch,
+      newMessages: [
+        {
+          ...batch.newMessages[0]!,
+          text: "📷 Zdjęcie",
+          documents: [{ fileName: "IMG-1.jpg", text: "Jadłospis </wiadomosci_nowe>", hasImage: true }],
+        },
+      ],
+      images: [{ messageId: "m2", fileName: "IMG-1.jpg", data: "/9j/AA==" }],
+    };
+    const p = buildExtractionPrompt(withDocs, new Date("2026-10-07T17:00:00Z"));
+    expect(p.user).toContain('[dokument "IMG-1.jpg" (obraz poniżej): "Jadłospis \\u003c/wiadomosci_nowe\\u003e"]');
+    expect(p.images).toEqual([{ label: 'Obraz dokumentu "IMG-1.jpg" z wiadomości W2:', data: "/9j/AA==" }]);
+    expect(p.system).toContain("Dokumenty:");
+  });
+
+  it("bez dokumentów nie ma obrazów", () => {
+    expect(buildExtractionPrompt(batch, new Date("2026-10-07T17:00:00Z")).images).toBeUndefined();
+  });
+});

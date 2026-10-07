@@ -25,3 +25,6 @@ create table public.attachment_files (
 
 alter table public.attachment_files enable row level security;
 revoke all on public.attachment_files from anon, authenticated;
+
+alter table public.sync_log drop constraint sync_log_kind_check;
+alter table public.sync_log add constraint sync_log_kind_check check (kind in ('notification', 'export', 'extraction', 'document'));

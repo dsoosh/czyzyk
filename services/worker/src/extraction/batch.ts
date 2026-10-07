@@ -8,7 +8,28 @@ export interface BatchMessage {
   sentAt: Date;
   text: string;
   hasAttachment: boolean;
+  /** Documents the phone found among the message's photos (document-import), checked by the server. */
+  documents?: BatchDocument[];
 }
+
+export interface BatchDocument {
+  fileName: string;
+  /** Text read on the phone; null when there was none. */
+  text: string | null;
+  /** The image itself goes to the model (only for new messages). */
+  hasImage: boolean;
+}
+
+/** A document image given to the model next to the new messages. */
+export interface BatchImage {
+  messageId: string;
+  fileName: string;
+  /** JPEG, base64. */
+  data: string;
+}
+
+/** Images per extraction call: documents are few, this only bounds a burst. */
+export const MAX_BATCH_IMAGES = 5;
 
 export interface ExistingItem<T extends ItemType = ItemType> {
   id: string;
@@ -50,6 +71,8 @@ export interface ExtractionBatch {
   promptTemplate: string | null;
   /** Roles of message authors set by the family (contact-roles). */
   contactRoles: ContactRoleRow[];
+  /** Document images of the new messages (document-import). */
+  images?: BatchImage[];
 }
 
 type Queryable = Pick<pg.PoolClient, "query">;
@@ -200,11 +223,38 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
   const { rows: prompt } = await db.query<{ template: string }>("select template from public.llm_prompts where key = 'extraction'");
   const { rows: contactRoles } = await db.query<ContactRoleRow>("select author_key, role, label from public.contact_roles");
 
+  const contextMessages = earlier.map(toMessage);
+  const laterMessages = later.map(toMessage);
+  const all = [...contextMessages, ...newMessages, ...laterMessages];
+  const { rows: docs } = await db.query<{ message_id: string; file_name: string; doc_text: string | null; has_image: boolean }>(
+    `select a.message_id, a.file_name, a.doc_text, f.attachment_id is not null as has_image
+       from public.attachments a left join public.attachment_files f on f.attachment_id = a.id
+      where a.message_id = any($1::uuid[]) and a.doc_status = 'ready'
+      order by a.created_at, a.id`,
+    [all.map((m) => m.id)],
+  );
+  const { rows: images } = await db.query<{ message_id: string; file_name: string; data: string }>(
+    `select a.message_id, a.file_name, encode(f.bytes, 'base64') as data
+       from public.attachments a join public.attachment_files f on f.attachment_id = a.id
+      where a.message_id = any($1::uuid[]) and a.doc_status = 'ready'
+      order by a.created_at, a.id
+      limit $2`,
+    [newMessages.map((m) => m.id), MAX_BATCH_IMAGES],
+  );
+  const sent = new Set(images.map((i) => `${i.message_id}/${i.file_name}`));
+  for (const m of all) {
+    const own = docs.filter((d) => d.message_id === m.id);
+    if (own.length) {
+      m.documents = own.map((d) => ({ fileName: d.file_name, text: d.doc_text, hasImage: sent.has(`${m.id}/${d.file_name}`) }));
+    }
+  }
+
   return {
     group,
     newMessages,
-    contextMessages: earlier.map(toMessage),
-    laterMessages: later.map(toMessage),
+    contextMessages,
+    laterMessages,
+    images: images.map((i) => ({ messageId: i.message_id, fileName: i.file_name, data: i.data })),
     items,
     children,
     kindergarten: profile[0]?.content ?? "",

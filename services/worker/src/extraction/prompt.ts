@@ -20,9 +20,17 @@ export interface Aliases {
   items: Map<string, { id: string; type: ItemType }>;
 }
 
+/** A document image shown to the model after the text, labelled with its message alias. */
+export interface PromptImage {
+  label: string;
+  /** JPEG, base64. */
+  data: string;
+}
+
 export interface ExtractionPrompt {
   system: string;
   user: string;
+  images?: PromptImage[];
   aliases: Aliases;
   /** Ids of the messages this prompt processes (marked processed on success). */
   newMessageIds: string[];
@@ -71,9 +79,17 @@ function authorTags(m: BatchMessage, roles: readonly ContactRoleRow[]): string {
   return tags.filter(Boolean).map((t) => ` ${t}`).join("");
 }
 
+/** Longest document text put into the prompt (document-import). */
+const MAX_DOCUMENT_TEXT = 4000;
+
 function renderMessage(alias: string, m: BatchMessage, roles: readonly ContactRoleRow[]): string {
   const attachment = m.hasAttachment ? " [załącznik]" : "";
-  return `${alias} | ${warsawStamp(m.sentAt)} | ${quote(m.author)}${authorTags(m, roles)}: ${quote(m.text)}${attachment}`;
+  const documents = (m.documents ?? []).map((d) => {
+    const text = d.text ? `: ${quote(d.text.slice(0, MAX_DOCUMENT_TEXT))}` : "";
+    const image = d.hasImage ? " (obraz poniżej)" : "";
+    return ` [dokument ${quote(d.fileName)}${image}${text}]`;
+  });
+  return `${alias} | ${warsawStamp(m.sentAt)} | ${quote(m.author)}${authorTags(m, roles)}: ${quote(m.text)}${attachment}${documents.join("")}`;
 }
 
 function renderItem(alias: string, item: ExistingItem, eventAliasById: Map<string, string>): string {
@@ -129,5 +145,17 @@ export function buildExtractionPrompt(batch: ExtractionBatch, now: Date): Extrac
     `Przeanalizuj nowe wiadomości i wywołaj narzędzie ${EXTRACTION_TOOL_NAME}.`,
   ].join("\n");
 
-  return { system: extractionSystemPrompt(batch), user, aliases, newMessageIds: batch.newMessages.map((m) => m.id) };
+  const aliasById = new Map([...aliases.messages].map(([alias, id]) => [id, alias]));
+  const images = (batch.images ?? []).map((i) => ({
+    label: `Obraz dokumentu ${quote(i.fileName)} z wiadomości ${aliasById.get(i.messageId) ?? "?"}:`,
+    data: i.data,
+  }));
+
+  return {
+    system: extractionSystemPrompt(batch),
+    user,
+    ...(images.length ? { images } : {}),
+    aliases,
+    newMessageIds: batch.newMessages.map((m) => m.id),
+  };
 }
