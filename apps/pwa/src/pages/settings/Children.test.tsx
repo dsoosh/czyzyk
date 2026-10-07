@@ -157,3 +157,21 @@ describe("Ustawienia telefonu (aplikacja Android)", () => {
     }
   });
 });
+
+describe("Oznaczenie aplikacji Czyżyk Connect", () => {
+  it("w aplikacji Android nazwa ma dopisek Connect, w PWA nie", async () => {
+    const { unmount } = renderAt("/ustawienia", { tables: { wa_groups: [], children: [] } });
+    await screen.findByRole("heading", { name: "Ustawienia" });
+    expect(screen.queryByText("Connect")).not.toBeInTheDocument();
+    unmount();
+
+    (window as { CzyzykAndroid?: unknown }).CzyzykAndroid = { openPhoneSettings: vi.fn() };
+    try {
+      renderAt("/ustawienia", { tables: { wa_groups: [], children: [] } });
+      await screen.findByRole("heading", { name: "Ustawienia" });
+      expect(screen.getByText("Connect")).toBeInTheDocument();
+    } finally {
+      delete (window as { CzyzykAndroid?: unknown }).CzyzykAndroid;
+    }
+  });
+});

@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, useOutletContext } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
+import { androidBridge } from "../lib/androidApp";
 import { fetchReviewCount } from "../lib/review";
 import { useLoader, useOnForeground } from "../lib/useLoader";
 import { useMediaQuery, WIDE_SCREEN } from "../lib/useMediaQuery";
@@ -76,13 +77,17 @@ function ReviewBadge({ pending }: { pending: number }) {
   );
 }
 
-function Brand() {
+/** Inside the Android app the name says "Connect", so it is never mistaken for the PWA installed from Chrome. */
+function Brand({ connect }: { connect: boolean }) {
   return (
     <>
       <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm">
         <Logo className="h-8 w-9" />
       </span>
-      <span className="ml-1 flex-1 font-display text-[32px] leading-none font-bold text-ink">Czyżyk</span>
+      <span className="ml-1 flex flex-1 items-baseline gap-2 font-display text-[32px] leading-none font-bold text-ink">
+        Czyżyk
+        {connect && <span className="rounded-full bg-ink px-2 py-1 font-sans text-xs leading-none text-sand">Connect</span>}
+      </span>
     </>
   );
 }
@@ -96,6 +101,7 @@ export function Layout() {
   const pending = reviewCount.data ?? 0;
   const wide = useMediaQuery(WIDE_SCREEN);
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
+  const connect = androidBridge() != null;
   const outlet = <Outlet context={{ refreshReviewCount: reviewCount.reload } satisfies LayoutContext} />;
   const accountButtons = (
     <>
@@ -114,7 +120,7 @@ export function Layout() {
       <div className="mx-auto flex min-h-screen max-w-6xl gap-10 px-8">
         <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col gap-6 py-8">
           <div className="flex items-center gap-2">
-            <Brand />
+            <Brand connect={connect} />
           </div>
           <nav aria-label="Nawigacja" className="flex flex-col gap-1 rounded-[28px] bg-ink p-2 shadow-lg">
             {tabs.map((t) => (
@@ -138,7 +144,7 @@ export function Layout() {
   return (
     <div className="mx-auto flex min-h-screen max-w-lg flex-col">
       <header className="flex items-center gap-2 px-5 pt-5 pb-3">
-        <Brand />
+        <Brand connect={connect} />
         {accountButtons}
       </header>
       <main className="flex-1 px-5 pb-32">{outlet}</main>
