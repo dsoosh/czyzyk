@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth, useProfile } from "../../auth/AuthProvider";
+import { ActionSuggestions } from "../../components/ActionSuggestions";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
 import { childNames } from "../../lib/children";
 import { addDays, dayLabel, warsawDay } from "../../lib/dates";
@@ -14,6 +15,7 @@ export function ActionsPage() {
   const [today] = useState(() => warsawDay(new Date()));
   const { data, error, loading, reload } = useLoader(() => fetchActionList(client), [client]);
   const mark = useMarkDone("action_required", reload);
+  const [applied, setApplied] = useState<string | null>(null);
   useOnForeground(reload);
 
   if (error) return <LoadError message={error} onRetry={reload} />;
@@ -36,11 +38,19 @@ export function ActionsPage() {
                 do {dayLabel(a.due_date, today)}
               </span>
             )}
+            {a.resolution && <span className="font-semibold text-ink">„{a.resolution}”</span>}
             {a.resolved_at && <span>{doneLabel("załatwione", a.resolved_by, a.resolved_at, me, data.people, today)}</span>}
             <ChildTag names={childNames(data.children, a)} />
             <span>{groupLabel(data.groups, a.group_id)}</span>
             <SourceLink kind="action_required" id={a.id} />
           </Meta>
+          <ActionSuggestions
+            item={a}
+            onApplied={(message) => {
+              setApplied(message);
+              reload();
+            }}
+          />
         </div>
       </div>
     </Row>
@@ -50,6 +60,11 @@ export function ActionsPage() {
     <div className="space-y-6">
       <h1 className="font-display text-4xl font-bold text-ink">Wymaga odpowiedzi</h1>
       {mark.error && <p role="alert" className="text-red-700">{mark.error}</p>}
+      {applied && (
+        <p role="status" className="text-sm text-ink">
+          {applied}
+        </p>
+      )}
       <Section title="Otwarte" empty="Nic nie czeka na odpowiedź">
         {data.open.map(row)}
       </Section>

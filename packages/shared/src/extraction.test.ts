@@ -12,6 +12,27 @@ const create = {
 };
 
 describe("parseOperation", () => {
+  it("accepts suggested actions on action_required and keeps them absent in updates without them", () => {
+    const action = {
+      ...create,
+      type: "action_required",
+      ref: null,
+      data: {
+        question: "Czy Elena weźmie udział w szachach?",
+        due_date: null,
+        suggestions: [
+          { kind: "answer", label: "Tak, zapisujemy", description: null, due_date: null, amount_pln: null },
+          { kind: "answer", label: "Nie", description: null, due_date: null, amount_pln: null },
+        ],
+      },
+    };
+    const r = parseOperation(action);
+    expect(r.ok && r.value.op === "create" && (r.value.data as { suggestions: unknown[] }).suggestions).toHaveLength(2);
+    const update = parseOperation({ ...action, op: "update", target: "E1", data: { due_date: "2026-10-06" } });
+    expect(update.ok && "suggestions" in update.value.data!).toBe(false);
+    expect(parseOperation({ ...action, data: { ...action.data, suggestions: [{ kind: "zrob", label: "x" }] } })).toMatchObject({ ok: false });
+  });
+
   it("accepts a valid create", () => {
     const r = parseOperation(create);
     expect(r.ok && r.value.op === "create" && r.value.ref).toBe("nowe1");

@@ -74,6 +74,8 @@ function columns(type: ItemType, data: ItemData[ItemType], groupId: string, even
         ["group_id", "$", groupId],
         ["question", "$", d.question],
         ["due_date", "$::date", d.due_date],
+        // Absent in an update: the stored suggestions stay (action-suggestions).
+        ...(d.suggestions ? [["suggested_actions", "$::jsonb", JSON.stringify(d.suggestions)] as [string, string, unknown]] : []),
       ];
     }
     case "closure": {

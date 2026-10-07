@@ -330,4 +330,25 @@ describe("runGroupExtraction", () => {
     expect(prompts[0]!.system).toContain("niezaufane dane");
     await db.client.query("delete from llm_prompts");
   });
+
+  it("zapisuje proponowane akcje sprawy; aktualizacja bez nich ich nie kasuje", async () => {
+    await addMessage("Prośba o zakup i doniesienie sprayu przeciwko insektom", "2026-10-05T10:47:00Z");
+    const suggestions = [
+      { kind: "bring", label: "Do przyniesienia", description: "spray przeciwko insektom", due_date: null, amount_pln: null },
+      { kind: "done", label: "Zrobione", description: null, due_date: null, amount_pln: null },
+    ];
+    const first = scripted((p) => [
+      op({ op: "create", type: "action_required", ref: null, data: { question: "Zakup sprayu", due_date: null, suggestions }, source_messages: [lastAlias(p)] }),
+    ]);
+    await runGroupExtraction(deps(first.model), groupId);
+    expect((await db.client.query("select suggested_actions from action_required")).rows[0].suggested_actions).toEqual(suggestions);
+
+    await addMessage("Spray do środy", "2026-10-05T11:00:00Z");
+    const second = scripted((p) => [
+      op({ op: "update", type: "action_required", target: "E1", data: { due_date: "2026-10-07" }, source_messages: [lastAlias(p)] }),
+    ]);
+    await runGroupExtraction(deps(second.model), groupId);
+    const { rows } = await db.client.query("select to_char(due_date, 'YYYY-MM-DD') as due, suggested_actions from action_required");
+    expect(rows[0]).toEqual({ due: "2026-10-07", suggested_actions: suggestions });
+  });
 });

@@ -1,3 +1,4 @@
+import type { ActionSuggestion } from "@czyzyk/shared/extraction";
 import { fetchChildren, type Child } from "./children";
 import { addDays, startOfWarsawDay } from "./dates";
 import type { Db } from "./supabase";
@@ -50,6 +51,10 @@ export interface ActionRequired extends Provenance {
   due_date: string | null;
   resolved_by: string | null;
   resolved_at: string | null;
+  /** Actions proposed by extraction (action-suggestions); empty for older items. */
+  suggested_actions: ActionSuggestion[];
+  /** Label of the action that closed the item ("Tak, zapisujemy"), if any. */
+  resolution: string | null;
 }
 export interface Closure extends Provenance {
   date_from: string;
@@ -67,7 +72,7 @@ const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, sta
 export const EVENT_COLUMNS = `${PROVENANCE}, child_ids, title, starts_at, ends_at, all_day, location`;
 export const BRING_COLUMNS = `${PROVENANCE}, child_ids, event_id, description, due_date, packed_by, packed_at`;
 export const PAYMENT_COLUMNS = `${PROVENANCE}, child_ids, description, amount_pln, due_date, paid_by, paid_at`;
-export const ACTION_COLUMNS = `${PROVENANCE}, child_ids, question, due_date, resolved_by, resolved_at`;
+export const ACTION_COLUMNS = `${PROVENANCE}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution`;
 export const CLOSURE_COLUMNS = `${PROVENANCE}, date_from, date_to, reason`;
 
 export async function run<T>(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
