@@ -14,6 +14,8 @@
 
 - [x] 3.1 Czasy powiadomień o zdjęciach, `PhotoMatcher` (jednoznaczne okno), `ScreeningRule`, `PhotoLog`; weryfikacja: testy jednostkowe
 - [x] 3.2 ML Kit z modelami w APK, JPEG bez EXIF, `PhotoWorker` (MediaStore, wysyłka, ponowienia), opcja „Zdjęcia z grup” z uprawnieniem; weryfikacja: build release i testy w CI
+- [x] 3.4 Udostępnianie zdjęcia do Czyżyk Connect (`SharedPhotoTarget`, wybór grupy); weryfikacja: testy jednostkowe, build w CI
+- [x] 3.5 Podglądy z powiadomień obserwowanych grup z licznikami (eksperyment); weryfikacja: testy jednostkowe `PhotoLog` i parsera, build w CI
 - [ ] 3.3 Ręczny test na telefonie: zdjęcie jadłospisu w grupie testowej → dokument i sprawy; zdjęcie z ludźmi → nic nie wysłane; wynik odnotowany w PR
 
 ## 4. Dokumentacja

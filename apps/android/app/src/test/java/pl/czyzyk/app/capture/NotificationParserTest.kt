@@ -130,4 +130,15 @@ class NotificationParserTest {
         listOf("📷 Zdjęcie", "📷 Photo", "📷 Dzisiejsze zajęcia", "Zdjęcie", "Photo").forEach { assertTrue(it, NotificationParser.isPhotoPlaceholder(it)) }
         listOf("🎥 Film", "📄 plan.pdf", "Sticker", "Zdjęcia z wycieczki są super").forEach { assertFalse(it, NotificationParser.isPhotoPlaceholder(it)) }
     }
+
+    @Test
+    fun photoNoticeCarriesTheNotificationPreview() {
+        val preview = android.net.Uri.parse("content://com.whatsapp.provider.media/item/1")
+        val style = NotificationCompat.MessagingStyle(me).setConversationTitle("Motylki").setGroupConversation(true)
+        style.addMessage(
+            NotificationCompat.MessagingStyle.Message("📷 Zdjęcie", 1000, Person.Builder().setName("Pani Ania").build()).setData("image/jpeg", preview),
+        )
+        val n = NotificationCompat.Builder(context, "test").setSmallIcon(android.R.drawable.ic_dialog_info).setStyle(style).build()
+        assertEquals(preview, NotificationParser.photoNotices("com.whatsapp", n).single().imageUri)
+    }
 }

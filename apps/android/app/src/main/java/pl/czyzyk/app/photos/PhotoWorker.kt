@@ -29,6 +29,7 @@ class PhotoWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val log = Deps.photos(applicationContext)
         log.prune()
         if (canReadImages(applicationContext)) screenNewImages(log)
+        screenPreviews(log)
         return sendDocuments(pairing, log)
     }
 
@@ -36,7 +37,6 @@ class PhotoWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         val now = System.currentTimeMillis()
         val images = whatsAppImages(applicationContext, now - PhotoLog.KEEP_MILLIS).filterNot { log.isHandled(it.id) }
         if (images.isEmpty()) return
-        val state = Deps.state(applicationContext)
         val screener = DocumentScreener(applicationContext.contentResolver)
         try {
             for (image in images.take(MAX_IMAGES_PER_RUN)) {
@@ -47,18 +47,33 @@ class PhotoWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                     PhotoMatch.Ambiguous -> log.markHandled(image.id)
                     is PhotoMatch.Message -> {
                         val uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, image.id)
-                        val screened = screener.screen(uri)
-                        if (screened.screening == Screening.WITHHELD) {
-                            state.incrementPhotosWithheld()
-                        } else {
-                            val path = screened.jpeg?.let { bytes ->
-                                File(documentsDir(applicationContext), "${image.id}.jpg").apply { writeBytes(bytes) }.absolutePath
-                            }
-                            log.enqueueDocument(match.idempotencyKey, image.name, screened.screening, screened.text, path)
-                        }
+                        log.markMatched(match.idempotencyKey)
+                        keep(applicationContext, log, screener.screen(uri), match.idempotencyKey, image.name, "${image.id}")
                         log.markHandled(image.id)
                     }
                 }
+            }
+        } finally {
+            screener.close()
+        }
+    }
+
+    /**
+     * Notification previews of tracked photos (groups with chat privacy never save the file):
+     * screened like files once WhatsApp had time to save the photo itself, which wins.
+     */
+    private fun screenPreviews(log: PhotoLog) {
+        val ready = log.previewsBefore(System.currentTimeMillis() - PREVIEW_WAIT_MILLIS)
+        if (ready.isEmpty()) return
+        val screener = DocumentScreener(applicationContext.contentResolver)
+        try {
+            for ((key, path) in ready) {
+                val file = File(path)
+                if (!log.isMatched(key) && file.exists()) {
+                    keep(applicationContext, log, screener.screen(android.net.Uri.fromFile(file)), key, "podglad-${key.take(8)}.jpg", "p-$key")
+                }
+                file.delete()
+                log.removePreview(key)
             }
         } finally {
             screener.close()
@@ -106,6 +121,18 @@ class PhotoWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         private const val MAX_IMAGES_PER_RUN = 100
         private const val MAX_ATTEMPTS = 30
         private const val NOTICE_GRACE_MILLIS = 60 * 60 * 1000L
+        /** A saved photo is preferred; its preview is used only when no file came in this time. */
+        private const val PREVIEW_WAIT_MILLIS = 60 * 1000L
+
+        /** Queues a screened photo for upload; a withheld one only counts. */
+        fun keep(context: Context, log: PhotoLog, screened: ScreenedPhoto, idempotencyKey: String, fileName: String, fileId: String) {
+            if (screened.screening == Screening.WITHHELD) {
+                Deps.state(context).incrementPhotosWithheld()
+                return
+            }
+            val path = screened.jpeg?.let { bytes -> File(documentsDir(context), "$fileId.jpg").apply { writeBytes(bytes) }.absolutePath }
+            log.enqueueDocument(idempotencyKey, fileName, screened.screening, screened.text, path)
+        }
 
         fun canReadImages(context: Context): Boolean = ContextCompat.checkSelfPermission(context, imagePermission()) == PackageManager.PERMISSION_GRANTED
 

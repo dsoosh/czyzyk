@@ -62,7 +62,12 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
+import pl.czyzyk.app.photos.DocumentScreener
+import pl.czyzyk.app.photos.PhotoNote
 import pl.czyzyk.app.photos.PhotoWorker
+import pl.czyzyk.app.photos.ScreenedPhoto
+import pl.czyzyk.app.photos.Screening
+import pl.czyzyk.app.photos.SharedPhotoTarget
 import pl.czyzyk.app.update.ApkInstaller
 import pl.czyzyk.app.update.Updates
 import pl.czyzyk.app.web.PwaWebView
@@ -93,6 +98,8 @@ class MainActivity : ComponentActivity() {
     private val sharedChat = AtomicReference<SharedChat?>(null)
     private var update by mutableStateOf<Updates.Outcome.Ready?>(null)
     private var updateDialogDismissed by mutableStateOf(false)
+    // Photos shared by hand while several tracked groups sent photos: the user picks the group.
+    private var photoChoice by mutableStateOf<PhotoChoice?>(null)
     private var checkingUpdate by mutableStateOf(false)
 
     // <input type="file"> in the PWA (e.g. Admin → Import of a chat export).
@@ -197,6 +204,16 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Root() {
+        photoChoice?.let { choice ->
+            PhotoChoiceDialog(
+                options = choice.options,
+                onPick = { note ->
+                    photoChoice = null
+                    keepSharedPhotos(choice.photos, note)
+                },
+                onCancel = { photoChoice = null },
+            )
+        }
         update?.takeUnless { updateDialogDismissed }?.let { ready ->
             UpdateDialog(
                 versionName = ready.update.versionName,
@@ -234,7 +251,12 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_SEND || intent?.action == Intent.ACTION_SEND_MULTIPLE) {
-            receiveSharedExport(intent)
+            val uris = sharedUris(intent)
+            if (uris.isNotEmpty() && uris.all { contentResolver.getType(it)?.startsWith("image/") == true }) {
+                receiveSharedPhotos(uris)
+            } else {
+                receiveSharedExport(intent)
+            }
             return
         }
         val link = intent?.data?.toString() ?: return
@@ -279,15 +301,73 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun sharedItems(intent: Intent): List<SharedChatReader.Item> {
-        val uris = if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
+    private fun sharedUris(intent: Intent): List<Uri> =
+        if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
             IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
         } else {
             listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
         }
+
+    private fun displayName(uri: Uri): String? =
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+
+    /**
+     * Photos shared by hand from WhatsApp (groups with chat privacy never save them): screened
+     * here on the phone and attached to the newest photo message of a tracked group, or of the
+     * group the user picks when several sent photos recently (document-import).
+     */
+    private fun receiveSharedPhotos(uris: List<Uri>) {
+        val state = Deps.state(this)
+        if (Deps.store(this).pairing == null || !state.photosEnabled) {
+            screen = Screen.Phone
+            Toast.makeText(this, "Włącz „Zdjęcia z grup” w ustawieniach telefonu i spróbuj ponownie.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val now = System.currentTimeMillis()
+        val target = SharedPhotoTarget.choose(Deps.photos(this).trackedNotesSince(now - SharedPhotoTarget.WINDOW_MILLIS), now)
+        if (target == SharedPhotoTarget.None) {
+            Toast.makeText(this, "Nie widzę zdjęcia z obserwowanej grupy z ostatnich godzin – nie wiem, do której wiadomości je dołączyć.", Toast.LENGTH_LONG).show()
+            return
+        }
+        Toast.makeText(this, "Sprawdzam zdjęcie na telefonie…", Toast.LENGTH_SHORT).show()
+        thread(name = "shared-photos") {
+            val screener = DocumentScreener(contentResolver)
+            val screened = try {
+                uris.map { uri -> (displayName(uri) ?: "udostepnione-${uri.lastPathSegment}.jpg") to screener.screen(uri) }
+            } finally {
+                screener.close()
+            }
+            runOnUiThread {
+                when (target) {
+                    is SharedPhotoTarget.Single -> keepSharedPhotos(screened, target.note)
+                    is SharedPhotoTarget.Choose -> photoChoice = PhotoChoice(screened, target.options)
+                    SharedPhotoTarget.None -> Unit
+                }
+            }
+        }
+    }
+
+    private fun keepSharedPhotos(screened: List<Pair<String, ScreenedPhoto>>, note: PhotoNote) {
+        val log = Deps.photos(this)
+        screened.forEachIndexed { i, (name, photo) ->
+            PhotoWorker.keep(this, log, photo, note.trackedKey ?: return@forEachIndexed, name, "s-${System.currentTimeMillis()}-$i")
+        }
+        Work.enqueuePhotos(this)
+        val sent = screened.count { it.second.screening == Screening.IMAGE }
+        val textOnly = screened.count { it.second.screening == Screening.TEXT_ONLY }
+        val message = when {
+            sent > 0 -> "Wysyłam dokument do grupy ${note.groupName}."
+            textOnly > 0 -> "Na zdjęciu są ludzie – wysyłam tylko odczytany tekst (${note.groupName})."
+            else -> "To nie wygląda na dokument – zdjęcie zostaje na telefonie."
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    private fun sharedItems(intent: Intent): List<SharedChatReader.Item> {
+        val uris = sharedUris(intent)
         return uris.map { uri ->
-            val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+            val name = displayName(uri)
                 ?: uri.lastPathSegment
                 ?: "czat"
             SharedChatReader.Item(name, contentResolver.getType(uri)) {
@@ -327,6 +407,29 @@ class MainActivity : ComponentActivity() {
         refreshTick++
         Toast.makeText(this, "Połączono z serwerem", Toast.LENGTH_SHORT).show()
         return true
+    }
+}
+
+private class PhotoChoice(val photos: List<Pair<String, ScreenedPhoto>>, val options: List<PhotoNote>)
+
+@Composable
+private fun PhotoChoiceDialog(options: List<PhotoNote>, onPick: (PhotoNote) -> Unit, onCancel: () -> Unit) {
+    MaterialTheme {
+        AlertDialog(
+            onDismissRequest = onCancel,
+            title = { Text("Z której grupy jest to zdjęcie?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    options.forEach { note ->
+                        TextButton(onClick = { onPick(note) }) {
+                            Text("${note.groupName} – zdjęcie z ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.seenAt))}")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onCancel) { Text("Anuluj") } },
+        )
     }
 }
 
@@ -399,6 +502,10 @@ private data class Status(
     val photosPermission: Boolean,
     val documentsSent: Int,
     val photosWithheld: Int,
+    val trackedPhotos: Int,
+    val previewsAttached: Int,
+    val previewsRead: Int,
+    val previewMaxSide: Int,
 )
 
 private fun readStatus(context: Context): Status {
@@ -422,6 +529,10 @@ private fun readStatus(context: Context): Status {
         photosPermission = PhotoWorker.canReadImages(context),
         documentsSent = state.documentsSent,
         photosWithheld = state.photosWithheld,
+        trackedPhotos = state.trackedPhotos,
+        previewsAttached = state.previewsAttached,
+        previewsRead = state.previewsRead,
+        previewMaxSide = state.previewMaxSide,
     )
 }
 
@@ -573,10 +684,7 @@ private fun QueueCard(status: Status) {
 private fun PhotosCard(status: Status, onChanged: () -> Unit) {
     val context = LocalContext.current
     val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            Deps.state(context).photosEnabled = true
-            Work.enqueuePhotos(context)
-        }
+        if (granted) Work.enqueuePhotos(context)
         onChanged()
     }
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -584,38 +692,40 @@ private fun PhotosCard(status: Status, onChanged: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Zdjęcia z grup", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 Switch(
-                    checked = status.photosEnabled && status.photosPermission,
+                    checked = status.photosEnabled,
                     onCheckedChange = { on ->
-                        if (!on) {
-                            Deps.state(context).photosEnabled = false
-                            onChanged()
-                        } else if (status.photosPermission) {
-                            Deps.state(context).photosEnabled = true
-                            Work.enqueuePhotos(context)
-                            onChanged()
-                        } else {
-                            askPermission.launch(PhotoWorker.imagePermission())
-                        }
+                        Deps.state(context).photosEnabled = on
+                        if (on && !status.photosPermission) askPermission.launch(PhotoWorker.imagePermission())
+                        if (on) Work.enqueuePhotos(context)
+                        onChanged()
                     },
                 )
             }
             Text(
-                "Telefon sprawdza zdjęcia z obserwowanych grup (z folderu WhatsApp Images) i wysyła tylko dokumenty: " +
-                    "plany, jadłospisy, ogłoszenia. Zdjęcia, na których telefon wykryje ludzi, nie opuszczają telefonu – " +
-                    "z plakatu z dziećmi idzie najwyżej odczytany tekst. Sprawdzanie działa na telefonie, bez internetu.",
+                "Telefon sprawdza zdjęcia z obserwowanych grup i wysyła tylko dokumenty: plany, jadłospisy, ogłoszenia. " +
+                    "Zdjęcia, na których telefon wykryje ludzi, nie opuszczają telefonu – z plakatu z dziećmi idzie najwyżej " +
+                    "odczytany tekst. Sprawdzanie działa na telefonie, bez internetu.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (status.photosEnabled && !status.photosPermission) {
-                StatusLine(false, "Brak dostępu do zdjęć – zezwól na wszystkie zdjęcia")
-                OutlinedButton(onClick = {
-                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
-                }) { Text("Otwórz uprawnienia aplikacji") }
-            }
             if (status.photosEnabled) {
+                StatusLine(
+                    status.photosPermission,
+                    if (status.photosPermission) "Automatycznie: zdjęcia z folderu WhatsApp Images" else "Bez dostępu do zdjęć – działa tylko udostępnianie",
+                )
+                if (!status.photosPermission) {
+                    OutlinedButton(onClick = {
+                        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
+                    }) { Text("Zezwól na wszystkie zdjęcia") }
+                }
+                Text(
+                    "Grupy z zaawansowaną ochroną prywatności nie zapisują zdjęć: otwórz zdjęcie w WhatsAppie → Udostępnij → Czyżyk Connect.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Text("Wysłane dokumenty: ${status.documentsSent}")
                 Text("Zdjęcia zostawione na telefonie: ${status.photosWithheld}")
                 Text(
-                    "WhatsApp musi pobierać zdjęcia automatycznie (Ustawienia → Pamięć i dane → Automatyczne pobieranie).",
+                    "Podglądy w powiadomieniach (test): zdjęć ${status.trackedPhotos}, z podglądem ${status.previewsAttached}, " +
+                        "odczytane ${status.previewsRead}" + if (status.previewMaxSide > 0) ", największy ${status.previewMaxSide} px" else "",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

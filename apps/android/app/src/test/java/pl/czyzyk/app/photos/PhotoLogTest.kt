@@ -48,4 +48,24 @@ class PhotoLogTest {
         assertTrue(log.pendingDocuments().isEmpty())
         log.close()
     }
+
+    @Test
+    fun previewsWaitAndMatchedMessagesAreRemembered() {
+        val log = PhotoLog(context, "previews.db")
+        assertTrue(log.addNote(PhotoNote("k1", now, "k1", "Motylki")))
+        assertFalse(log.addNote(PhotoNote("k1", now, "k1", "Motylki")))
+        assertTrue(log.addPreview("k1", "/files/previews/k1.img", now))
+        assertFalse(log.addPreview("k1", "/files/previews/k1.img", now))
+        assertTrue(log.hasPreview("k1"))
+        assertTrue(log.previewsBefore(now - 1).isEmpty())
+        assertEquals(listOf("k1" to "/files/previews/k1.img"), log.previewsBefore(now))
+        log.removePreview("k1")
+        assertFalse(log.hasPreview("k1"))
+
+        assertFalse(log.isMatched("k1"))
+        log.markMatched("k1", now)
+        assertTrue(log.isMatched("k1"))
+        assertEquals(listOf(PhotoNote("k1", now, "k1", "Motylki")), log.trackedNotesSince(now - 1))
+        log.close()
+    }
 }

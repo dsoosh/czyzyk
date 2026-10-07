@@ -82,6 +82,21 @@ class AppState(private val prefs: SharedPreferences) {
     @Synchronized fun incrementDocumentsSent() = prefs.edit().putInt(KEY_DOCUMENTS_SENT, documentsSent + 1).apply()
     @Synchronized fun incrementPhotosWithheld() = prefs.edit().putInt(KEY_PHOTOS_WITHHELD, photosWithheld + 1).apply()
 
+    /**
+     * Notification previews (experiment): photos seen in tracked groups, how many came with a
+     * preview, how many the app could read, and the shorter side of the largest one in px.
+     */
+    val trackedPhotos: Int get() = prefs.getInt(KEY_TRACKED_PHOTOS, 0)
+    val previewsAttached: Int get() = prefs.getInt(KEY_PREVIEWS_ATTACHED, 0)
+    val previewsRead: Int get() = prefs.getInt(KEY_PREVIEWS_READ, 0)
+    val previewMaxSide: Int get() = prefs.getInt(KEY_PREVIEW_MAX_SIDE, 0)
+    @Synchronized fun incrementTrackedPhotos() = prefs.edit().putInt(KEY_TRACKED_PHOTOS, trackedPhotos + 1).apply()
+    @Synchronized fun incrementPreviewsAttached() = prefs.edit().putInt(KEY_PREVIEWS_ATTACHED, previewsAttached + 1).apply()
+    @Synchronized fun recordPreviewRead(shorterSide: Int) = prefs.edit()
+        .putInt(KEY_PREVIEWS_READ, previewsRead + 1)
+        .putInt(KEY_PREVIEW_MAX_SIDE, maxOf(previewMaxSide, shorterSide))
+        .apply()
+
     var lastDeliveredAt: Long
         get() = prefs.getLong(KEY_LAST_DELIVERED, 0)
         set(v) = prefs.edit().putLong(KEY_LAST_DELIVERED, v).apply()
@@ -91,6 +106,10 @@ class AppState(private val prefs: SharedPreferences) {
         private const val KEY_PHOTOS = "photos_enabled"
         private const val KEY_DOCUMENTS_SENT = "documents_sent"
         private const val KEY_PHOTOS_WITHHELD = "photos_withheld"
+        private const val KEY_TRACKED_PHOTOS = "tracked_photos"
+        private const val KEY_PREVIEWS_ATTACHED = "previews_attached"
+        private const val KEY_PREVIEWS_READ = "previews_read"
+        private const val KEY_PREVIEW_MAX_SIDE = "preview_max_side"
         private const val KEY_TRACKED = "tracked_groups"
         private const val KEY_TRACKED_AT = "tracked_groups_at"
         private const val KEY_TTL = "config_ttl"

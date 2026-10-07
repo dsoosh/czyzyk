@@ -1,6 +1,7 @@
 package pl.czyzyk.app.capture
 
 import android.app.Notification
+import android.net.Uri
 import androidx.core.app.NotificationCompat
 
 /** One message read from a WhatsApp notification. */
@@ -26,6 +27,8 @@ data class PhotoNotice(
     /** Group name, or null for a private chat. */
     val groupName: String?,
     val sentAtMillis: Long,
+    /** Preview of the photo WhatsApp attached to the notification, if any (may not be readable). */
+    val imageUri: Uri? = null,
 )
 
 sealed interface ParseResult {
@@ -99,6 +102,7 @@ object NotificationParser {
                 key = Uuid5.of(Uuid5.MESSAGES, listOf(packageName, chat, author, m.timestamp, text).joinToString("\u0000")).toString(),
                 groupName = if (group && !title.isNullOrEmpty()) title else null,
                 sentAtMillis = m.timestamp,
+                imageUri = m.dataUri?.takeIf { m.dataMimeType?.startsWith("image/") == true },
             )
         }
     }

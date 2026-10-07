@@ -27,6 +27,7 @@ class PhotoLog(context: Context, name: String? = DB_NAME) : SQLiteOpenHelper(con
         db.execSQL("create table notes (key text primary key, seen_at integer not null, tracked_key text, group_name text)")
         db.execSQL("create index notes_seen_idx on notes (seen_at)")
         db.execSQL("create table handled (media_id integer primary key, handled_at integer not null)")
+        createV2(db)
         db.execSQL(
             """
             create table outbox (
@@ -44,17 +45,63 @@ class PhotoLog(context: Context, name: String? = DB_NAME) : SQLiteOpenHelper(con
         )
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) createV2(db)
+    }
+
+    /** Version 2: notification previews of tracked photos, and messages that already got a file. */
+    private fun createV2(db: SQLiteDatabase) {
+        db.execSQL("create table if not exists previews (key text primary key, path text not null, seen_at integer not null)")
+        db.execSQL("create table if not exists matched (key text primary key, matched_at integer not null)")
+    }
+
+    /** A tracked photo's notification preview, copied to private storage (null when already known). */
+    fun addPreview(key: String, path: String, now: Long = System.currentTimeMillis()): Boolean {
+        val values = ContentValues().apply {
+            put("key", key)
+            put("path", path)
+            put("seen_at", now)
+        }
+        return writableDatabase.insertWithOnConflict("previews", null, values, SQLiteDatabase.CONFLICT_IGNORE) != -1L
+    }
+
+    fun hasPreview(key: String): Boolean =
+        readableDatabase.rawQuery("select 1 from previews where key = ?", arrayOf(key)).use { it.moveToFirst() }
+
+    /** Previews seen before [before], oldest first: (key, path). */
+    fun previewsBefore(before: Long): List<Pair<String, String>> =
+        readableDatabase.rawQuery("select key, path from previews where seen_at <= ? order by seen_at", arrayOf(before.toString())).use { c ->
+            buildList { while (c.moveToNext()) add(c.getString(0) to c.getString(1)) }
+        }
+
+    fun removePreview(key: String) {
+        writableDatabase.delete("previews", "key = ?", arrayOf(key))
+    }
+
+    /** The message got its photo from "WhatsApp Images"; its preview is not needed. */
+    fun markMatched(key: String, now: Long = System.currentTimeMillis()) {
+        val values = ContentValues().apply {
+            put("key", key)
+            put("matched_at", now)
+        }
+        writableDatabase.insertWithOnConflict("matched", null, values, SQLiteDatabase.CONFLICT_IGNORE)
+    }
+
+    fun isMatched(key: String): Boolean =
+        readableDatabase.rawQuery("select 1 from matched where key = ?", arrayOf(key)).use { it.moveToFirst() }
+
+    /** Tracked photo notices since [since] (for a photo shared by hand). */
+    fun trackedNotesSince(since: Long): List<PhotoNote> = notesBetween(since, Long.MAX_VALUE).filter { it.trackedKey != null }
 
     /** The first sighting counts: a re-shown notification keeps its original time. */
-    fun addNote(note: PhotoNote) {
+    fun addNote(note: PhotoNote): Boolean {
         val values = ContentValues().apply {
             put("key", note.key)
             put("seen_at", note.seenAt)
             put("tracked_key", note.trackedKey)
             put("group_name", note.groupName)
         }
-        writableDatabase.insertWithOnConflict("notes", null, values, SQLiteDatabase.CONFLICT_IGNORE)
+        return writableDatabase.insertWithOnConflict("notes", null, values, SQLiteDatabase.CONFLICT_IGNORE) != -1L
     }
 
     fun notesBetween(from: Long, to: Long): List<PhotoNote> =
@@ -125,11 +172,12 @@ class PhotoLog(context: Context, name: String? = DB_NAME) : SQLiteOpenHelper(con
     fun prune(now: Long = System.currentTimeMillis()) {
         writableDatabase.delete("notes", "seen_at < ?", arrayOf((now - KEEP_MILLIS).toString()))
         writableDatabase.delete("handled", "handled_at < ?", arrayOf((now - KEEP_MILLIS * 7).toString()))
+        writableDatabase.delete("matched", "matched_at < ?", arrayOf((now - KEEP_MILLIS).toString()))
     }
 
     companion object {
         const val DB_NAME = "photos.db"
-        private const val VERSION = 1
+        private const val VERSION = 2
         /** WhatsApp images older than this are not looked at. */
         const val KEEP_MILLIS = 2 * 24 * 60 * 60 * 1000L
 
