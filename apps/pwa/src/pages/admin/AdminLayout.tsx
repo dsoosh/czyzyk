@@ -33,6 +33,9 @@ export function AdminLayout() {
         <NavLink to="/admin/prompty" className={tab}>
           Prompty
         </NavLink>
+        <NavLink to="/admin/llm" className={tab}>
+          LLM
+        </NavLink>
       </nav>
       <Outlet context={context} />
     </div>

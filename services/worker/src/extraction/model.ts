@@ -9,6 +9,8 @@ export interface ExtractionModelResult {
 }
 
 export interface ExtractionModel {
+  /** Model name from configuration, for the admin's LLM call log. */
+  readonly name?: string;
   extract(prompt: ModelPrompt): Promise<ExtractionModelResult>;
 }
 
@@ -43,6 +45,10 @@ export class AnthropicExtractionModel implements ExtractionModel {
     private readonly client: Anthropic,
     private readonly model: string,
   ) {}
+
+  get name(): string {
+    return this.model;
+  }
 
   async extract(prompt: ModelPrompt): Promise<ExtractionModelResult> {
     const response = await this.client.messages.create({

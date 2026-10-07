@@ -3,6 +3,7 @@ import type { Logger } from "pino";
 import { applyOperations, type ApplySummary } from "./apply.js";
 import { loadBatch } from "./batch.js";
 import { checkPendingDocuments, type DocumentChecker } from "./documents.js";
+import { errorLabel, logLlmCall } from "./llmLog.js";
 import type { ExtractionModel } from "./model.js";
 import { buildExtractionPrompt } from "./prompt.js";
 import { resolveOperations } from "./resolve.js";
@@ -48,22 +49,40 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
 
     try {
       // Document images are checked before any of them reaches the extraction prompt.
-      await checkPendingDocuments(client, deps.documents, groupId, deps.logger);
+      await checkPendingDocuments(deps.db, deps.documents, groupId, deps.logger);
       const now = deps.now();
       const batch = await loadBatch(client, groupId, warsawDate(now), deps.contextMessages);
       if (!batch || batch.newMessages.length === 0) return { status: "nothing_to_do" };
 
       const prompt = buildExtractionPrompt(batch, now);
+      const request = {
+        system: prompt.system,
+        user: prompt.user,
+        ...(prompt.images?.length ? { images: prompt.images.map((i) => i.label) } : {}),
+      };
+      const log = (entry: { response?: unknown; error?: string; usage?: unknown }) =>
+        logLlmCall(deps.db, deps.logger, {
+          kind: "extraction",
+          groupId,
+          model: deps.model.name ?? null,
+          request,
+          ...entry,
+          durationMs: Date.now() - started,
+        });
+      const started = Date.now();
       let result;
       try {
         result = await deps.model.extract(prompt);
       } catch (error) {
         const name = error instanceof Error ? error.name : "Error";
         const reason = (error as { reason?: string; status?: number }).reason ?? (error as { status?: number }).status;
+        await log({ error: errorLabel(error) });
         await logSync(client, "error", { group_id: groupId, messages: prompt.newMessageIds.length, error: name, reason });
         deps.logger.warn({ groupId, error: name, reason }, "extraction failed");
         throw error;
       }
+
+      await log({ response: { operations: result.operations }, usage: result.usage });
 
       const { accepted, rejected } = resolveOperations(result.operations, prompt.aliases);
       await client.query("begin");

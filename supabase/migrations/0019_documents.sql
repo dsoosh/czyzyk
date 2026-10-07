@@ -28,3 +28,7 @@ revoke all on public.attachment_files from anon, authenticated;
 
 alter table public.sync_log drop constraint sync_log_kind_check;
 alter table public.sync_log add constraint sync_log_kind_check check (kind in ('notification', 'export', 'extraction', 'document'));
+
+-- The server-side check of document images is an LLM call too (llm-call-log).
+alter table public.llm_calls drop constraint llm_calls_kind_check;
+alter table public.llm_calls add constraint llm_calls_kind_check check (kind in ('extraction', 'document'));

@@ -7,6 +7,7 @@ import { DevicesPage } from "./pages/admin/DevicesPage";
 import { GroupsPage } from "./pages/admin/GroupsPage";
 import { ImportPage } from "./pages/admin/ImportPage";
 import { KindergartenPage } from "./pages/admin/KindergartenPage";
+import { LlmCallsPage } from "./pages/admin/LlmCallsPage";
 import { PromptsPage } from "./pages/admin/PromptsPage";
 import { ContactsPage } from "./pages/admin/ContactsPage";
 import { ReviewPage } from "./pages/admin/ReviewPage";
@@ -71,6 +72,7 @@ export function App() {
                 <Route path="przedszkole" element={<KindergartenPage />} />
                 <Route path="kontakty" element={<ContactsPage />} />
                 <Route path="prompty" element={<PromptsPage />} />
+                <Route path="llm" element={<LlmCallsPage />} />
               </Route>
             )}
             <Route path="*" element={<Navigate to="/" replace />} />

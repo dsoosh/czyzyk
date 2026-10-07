@@ -22,7 +22,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  for (const t of ["bring_items", "events", "payments", "action_required", "closures", "facts", "messages", "sync_log", "children", "wa_groups"]) {
+  for (const t of ["bring_items", "events", "payments", "action_required", "closures", "facts", "messages", "sync_log", "llm_calls", "children", "wa_groups"]) {
     await db.client.query(`delete from ${t}`);
   }
   const { rows } = await db.client.query("insert into wa_groups (wa_name, display_name, tracked) values ('Motylki 2026/27', 'Motylki', true) returning id");
@@ -200,6 +200,45 @@ describe("runGroupExtraction", () => {
     expect((await db.client.query("select count(*)::int as n from messages where processed_at is null")).rows[0].n).toBe(1);
     const { rows } = await db.client.query("select status, details from sync_log");
     expect(rows[0]).toMatchObject({ status: "error", details: { error: "InternalServerError", reason: 529 } });
+  });
+
+  it("zapisuje wywołanie modelu w dzienniku admina (zapytanie, operacje, tokeny) i usuwa stare wpisy", async () => {
+    await db.client.query(
+      `insert into llm_calls (kind, request, created_at) values ('extraction', '{}', now() - interval '15 days')`,
+    );
+    await addMessage("W piątek bal", "2026-10-07T10:00:00Z");
+    const model: ExtractionModel = {
+      name: "model-z-konfiguracji",
+      async extract() {
+        return { operations: [], usage: { input_tokens: 120, output_tokens: 8 } };
+      },
+    };
+    await runGroupExtraction(deps(model), groupId);
+    const { rows } = await db.client.query("select kind, group_id, model, request, response, error, usage, duration_ms from llm_calls");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: "extraction",
+      group_id: groupId,
+      model: "model-z-konfiguracji",
+      response: { operations: [] },
+      error: null,
+      usage: { input_tokens: 120, output_tokens: 8 },
+    });
+    expect(rows[0].request.user).toContain("W piątek bal");
+    expect(rows[0].request.system).toContain("wiadomości z grupy WhatsApp");
+    expect(rows[0].duration_ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it("nieudane wywołanie też trafia do dziennika admina", async () => {
+    await addMessage("W piątek bal", "2026-10-07T10:00:00Z");
+    const failing: ExtractionModel = {
+      async extract() {
+        throw Object.assign(new Error("bad"), { name: "ExtractionError", reason: "no_tool_call" });
+      },
+    };
+    await expect(runGroupExtraction(deps(failing), groupId)).rejects.toThrow("bad");
+    const { rows } = await db.client.query("select error, response from llm_calls");
+    expect(rows).toEqual([{ error: "ExtractionError: no_tool_call", response: null }]);
   });
 
   it("nie uruchamia dwóch ekstrakcji tej samej grupy naraz", async () => {
@@ -420,6 +459,11 @@ describe("dokumenty ze zdjęć", () => {
     expect(prompts[0]!.images).toEqual([{ label: 'Obraz dokumentu "IMG-1.jpg" z wiadomości W1:', data: JPEG.toString("base64") }]);
     const { rows } = await db.client.query("select doc_status, description from attachments");
     expect(rows).toEqual([{ doc_status: "ready", description: "Jadłospis na tydzień." }]);
+    const { rows: calls } = await db.client.query("select kind, request->'images' as images, response from llm_calls order by created_at, kind");
+    expect(calls).toEqual([
+      { kind: "document", images: ["Zdjęcie dokumentu"], response: { containsPeople: false, description: "Jadłospis na tydzień." } },
+      { kind: "extraction", images: ['Obraz dokumentu "IMG-1.jpg" z wiadomości W1:'], response: { operations: [] } },
+    ]);
   });
 
   it("kontrola zapasowa widzi ludzi: obraz usunięty, do modelu idzie tylko tekst", async () => {
