@@ -19,6 +19,11 @@ android {
         versionCode = env("CZYZYK_VERSION_CODE")?.toInt() ?: 1
         versionName = env("CZYZYK_VERSION_NAME") ?: "0.1.0-dev"
         // GitHub repository whose releases the app updates itself from.
+        // Phones only: ML Kit's bundled models add ~30 MB of native code per ABI, and an x86 build
+        // would push the APK past the updater's size limit (UpdateInfo.MAX_APK_BYTES).
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
         buildConfigField("String", "UPDATE_REPO", "\"${providers.gradleProperty("czyzyk.updateRepo").getOrElse("dsoosh/czyzyk")}\"")
     }
 
@@ -54,6 +59,13 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    packaging {
+        // Compressed native libraries: a much smaller download; extracted once at install.
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     testOptions {

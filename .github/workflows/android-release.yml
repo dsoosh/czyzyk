@@ -95,6 +95,11 @@ jobs:
           tag="android-v$CZYZYK_VERSION_CODE"
           sha=$(sha256sum "$out/czyzyk-connect.apk" | cut -d' ' -f1)
           size=$(stat -c%s "$out/czyzyk-connect.apk")
+          # Installed apps reject larger updates (UpdateInfo.MAX_APK_BYTES = 100 MiB).
+          if [ "$size" -gt 104857600 ]; then
+            echo "::error::APK has $size bytes, more than the 100 MiB the updater accepts"
+            exit 1
+          fi
           printf '{"versionCode":%d,"versionName":"%s","tag":"%s","sha256":"%s","size":%d}\n' \
             "$CZYZYK_VERSION_CODE" "$CZYZYK_VERSION_NAME" "$tag" "$sha" "$size" > "$out/version.json"
           cat "$out/version.json"
