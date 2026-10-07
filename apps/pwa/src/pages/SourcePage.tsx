@@ -2,11 +2,10 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { LoadError, Loading } from "../components/ui";
-import { dayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
+import { dayLabel, warsawDay, warsawTime } from "../lib/dates";
 import {
   confidenceLabel,
   fetchSource,
-  formatAmount,
   itemTitle,
   ITEM_TABLES,
   type ContextMessage,
@@ -15,6 +14,7 @@ import {
   type SourceData,
 } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
+import { FIELD_LABELS, formatValue, OP_LABELS } from "../lib/changes";
 
 const KIND_LABELS: Record<ItemKind, string> = {
   event: "Wydarzenie",
@@ -123,41 +123,6 @@ export function SourcePage() {
       )}
     </article>
   );
-}
-
-const FIELD_LABELS: Record<string, string> = {
-  title: "Nazwa",
-  start: "Początek",
-  end: "Koniec",
-  all_day: "Cały dzień",
-  location: "Miejsce",
-  whole_kindergarten: "Całe przedszkole",
-  description: "Opis",
-  due_date: "Termin",
-  amount_pln: "Kwota",
-  question: "Pytanie",
-  date_from: "Od",
-  date_to: "Do",
-  reason: "Powód",
-  category: "Kategoria",
-  label: "Nazwa",
-  value: "Wartość",
-  children: "Dzieci",
-};
-
-const OP_LABELS: Record<ItemChange["op"], string> = { create: "Utworzono", update: "Zmieniono", cancel: "Odwołano" };
-
-/** A stored value as the family reads it: dates and times in Polish, yes/no, amounts. */
-function formatValue(field: string, value: unknown): string {
-  if (value == null || value === "") return "—";
-  if (typeof value === "boolean") return value ? "tak" : "nie";
-  if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
-  if (field === "amount_pln") return formatAmount(value as number);
-  if (typeof value === "string") {
-    const m = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/.exec(value);
-    if (m) return m[2] ? `${shortDate(m[1]!)} ${m[2]}` : shortDate(m[1]!);
-  }
-  return String(value);
 }
 
 function ChangeEntry({ change, sources, today }: { change: ItemChange; sources: ContextMessage[]; today: string }) {
