@@ -104,3 +104,22 @@ describe("ponowna analiza wiadomości", () => {
     ).rejects.toThrow(/Nie ma takiej wiadomości/);
   });
 });
+
+describe("kolory dzieci", () => {
+  it("nowe dziecko dostaje pierwszy wolny kolor; wybrany kolor jest unikalny; bez koloru zostaje dotychczasowy", async () => {
+    await db.client.query("delete from children");
+    const [a] = await asOla("select * from save_child(null, 'Ala', null)");
+    const [b] = await asOla("select * from save_child(null, 'Bartek', null, '{}', 'rose')");
+    const [c] = await asOla("select * from save_child(null, 'Celina', null)");
+    expect([a.color, b.color, c.color]).toEqual(["lime", "rose", "sky"]);
+
+    await expect(asOla("select * from save_child($1, 'Ala', null, '{}', 'rose')", [a.id])).rejects.toMatchObject({ code: "23505" });
+    await expect(asOla("select * from save_child($1, 'Ala', null, '{}', 'zielony')", [a.id])).rejects.toMatchObject({ code: "22023" });
+
+    const [recoloured] = await asOla("select * from save_child($1, 'Ala', null, '{}', 'violet')", [a.id]);
+    expect(recoloured.color).toBe("violet");
+    const [renamed] = await asOla("select * from save_child($1, 'Alicja', null)", [a.id]);
+    expect(renamed).toMatchObject({ name: "Alicja", color: "violet" });
+  });
+});
+

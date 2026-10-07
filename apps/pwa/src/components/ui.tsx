@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { CHILD_COLORS, childColor, type Child } from "../lib/children";
 import type { ItemKind } from "../lib/items";
 
 export function SourceLink({ kind, id }: { kind: ItemKind; id: string }) {
@@ -98,11 +99,21 @@ export function DoneToggle({
 }
 
 /** Names of the children an item concerns, as a small pill (nothing when none). */
-export function ChildTag({ names }: { names: string[] }) {
-  if (names.length === 0) return null;
+/** One tag per child, each in the child's own colour (child-colors). */
+export function ChildTag({ kids, all }: { kids: Child[]; all: Child[] }) {
+  if (kids.length === 0) return null;
   return (
-    <span aria-label={`Dziecko: ${names.join(", ")}`} className="rounded-full bg-lime/45 px-2 py-0.5 text-xs font-semibold text-ink">
-      {names.join(", ")}
+    <span aria-label={`Dziecko: ${kids.map((c) => c.name).join(", ")}`} className="inline-flex flex-wrap gap-1">
+      {kids.map((c) => (
+        <span
+          key={c.id}
+          data-color={childColor(all, c)}
+          style={{ backgroundColor: CHILD_COLORS[childColor(all, c)].bg }}
+          className="rounded-full px-2 py-0.5 text-xs font-semibold text-ink"
+        >
+          {c.name}
+        </span>
+      ))}
     </span>
   );
 }

@@ -147,7 +147,8 @@ export const rawOperationSchema = z.discriminatedUnion("op", [
   z.object({
     op: z.literal("create"),
     ...baseOperation,
-    ref: z.string().regex(/^nowe\d+$/).nullable().describe("Lokalny identyfikator do odwołań w tej samej odpowiedzi"),
+    // Optional: models often leave it out when nothing refers to the item (a payment next to a new event).
+    ref: z.string().regex(/^nowe\d+$/).nullish().describe("Lokalny identyfikator do odwołań w tej samej odpowiedzi (tylko gdy coś się do niego odwołuje)"),
     data: anyItemData.describe("Pełne dane elementu zgodne z jego typem"),
     children: childrenField,
   }),
@@ -187,7 +188,7 @@ export function parseOperation(input: unknown): { ok: true; value: ParsedOperati
   if (o.op === "create") {
     const data = schema.safeParse(o.data);
     if (!data.success) return { ok: false, error: `data: ${formatIssues(data.error)}` };
-    return { ok: true, value: { op: "create", ref: o.ref, data: data.data, children: o.children, ...common } };
+    return { ok: true, value: { op: "create", ref: o.ref ?? null, data: data.data, children: o.children, ...common } };
   }
   const data = schema.partial().safeParse(o.data);
   if (!data.success) return { ok: false, error: `data: ${formatIssues(data.error)}` };

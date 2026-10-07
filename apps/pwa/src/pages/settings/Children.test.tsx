@@ -108,8 +108,8 @@ describe("Ustawienia → Dzieci", () => {
 
 describe("imię dziecka przy elementach", () => {
   const children = [
-    { id: "c1", name: "Zosia", group_id: "g1", aliases: [] },
-    { id: "c2", name: "Antek", group_id: "g2", aliases: [] },
+    { id: "c1", name: "Zosia", group_id: "g1", aliases: [], color: "rose" as const },
+    { id: "c2", name: "Antek", group_id: "g2", aliases: [], color: null },
   ];
 
   it("childNames: wprost przypisane, inaczej dzieci z grupy, nic dla całego przedszkola", () => {
@@ -136,6 +136,9 @@ describe("imię dziecka przy elementach", () => {
     const bring = await screen.findByRole("region", { name: "W najbliższych dniach" });
     expect(within(bring).getByLabelText("Dziecko: Antek")).toBeInTheDocument();
     expect(within(bring).getByLabelText("Dziecko: Zosia")).toBeInTheDocument();
+    // Each child in its own colour; a child without one gets the first free colour.
+    expect(within(bring).getByText("Zosia")).toHaveAttribute("data-color", "rose");
+    expect(within(bring).getByText("Antek")).toHaveAttribute("data-color", "lime");
   });
 });
 
@@ -175,3 +178,21 @@ describe("Oznaczenie aplikacji Czyżyk Connect", () => {
     }
   });
 });
+
+describe("kolor dziecka", () => {
+  it("wybór koloru: zajęte kolory są niedostępne, wybrany idzie do zapisu", async () => {
+    const children = [
+      { id: "c1", name: "Zosia", group_id: "g1", aliases: [], color: "rose" },
+      { id: "c2", name: "Antek", group_id: "g2", aliases: [], color: "sky" },
+    ];
+    const { rpc } = renderAt("/ustawienia", { tables: { wa_groups: groups, children }, rpc: { save_child: saveChild } });
+    const form = await screen.findByRole("form", { name: "Zosia" });
+    const colors = within(form).getByRole("radiogroup", { name: "Kolor" });
+    expect(within(colors).getByRole("radio", { name: "Różowy" })).toHaveAttribute("aria-checked", "true");
+    expect(within(colors).getByRole("radio", { name: "Błękitny (zajęty)" })).toBeDisabled();
+    await userEvent.click(within(colors).getByRole("radio", { name: "Fioletowy" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Zapisz" }));
+    expect(rpc).toHaveBeenCalledWith("save_child", { p_id: "c1", p_name: "Zosia", p_group_id: "g1", p_aliases: [], p_color: "violet" });
+  });
+});
+

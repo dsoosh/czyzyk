@@ -2,7 +2,7 @@ import { Link } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
 import { ActionSuggestions } from "../components/ActionSuggestions";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
-import { childNames } from "../lib/children";
+import { childrenOf } from "../lib/children";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
 import { eventKey, repeatLabel } from "../lib/recurrence";
 import { fetchToday, formatAmount, groupLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
@@ -44,7 +44,7 @@ function bringRows(
           <Meta>
             {withDay && b.due_date && <span className="font-semibold text-ink">{dayLabel(b.due_date, today)}</span>}
             {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
-            <ChildTag names={childNames(data.children, b)} />
+            <ChildTag kids={childrenOf(data.children, b)} all={data.children} />
             <span>{groupLabel(data.groups, b.group_id)}</span>
             <SourceLink kind="bring_item" id={b.id} />
           </Meta>
@@ -123,7 +123,7 @@ export function TodayPage() {
                   <span className="font-semibold text-ink">{dayLabel(day, today)}</span>
                   <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
                   {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
-                  <ChildTag names={childNames(data.children, e)} />
+                  <ChildTag kids={childrenOf(data.children, e)} all={data.children} />
                   <span>{g(e.group_id)}</span>
                   <SourceLink kind="event" id={e.id} />
                 </Meta>
@@ -145,7 +145,7 @@ export function TodayPage() {
                         {overdue ? "po terminie: " : "do "}
                         {dayLabel(p.due_date!, today)}
                       </span>
-                      <ChildTag names={childNames(data.children, p)} />
+                      <ChildTag kids={childrenOf(data.children, p)} all={data.children} />
                       <span>{g(p.group_id)}</span>
                       <SourceLink kind="payment" id={p.id} />
                     </Meta>
@@ -167,7 +167,7 @@ export function TodayPage() {
                     do {dayLabel(a.due_date, today)}
                   </span>
                 )}
-                <ChildTag names={childNames(data.children, a)} />
+                <ChildTag kids={childrenOf(data.children, a)} all={data.children} />
                 <span>{g(a.group_id)}</span>
                 <SourceLink kind="action_required" id={a.id} />
               </Meta>

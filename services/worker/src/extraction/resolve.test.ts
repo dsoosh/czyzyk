@@ -41,6 +41,20 @@ describe("resolveOperations", () => {
     expect(accepted[1]).toMatchObject({ index: 1, op: "create", type: "event", ref: "nowe1" });
   });
 
+  it("przyjmuje operacje bez ref (odpowiedź modelu z wycieczką: wydarzenie, płatność, rzecz)", () => {
+    const { ref: _p, ...payment } = {
+      ...event(),
+      type: "payment",
+      data: { due_date: "2026-10-14", amount_pln: 60, description: "Wycieczka" },
+      children: [],
+    };
+    const { ref: _b, ...bringItem } = { ...bring("nowe1"), event: "nowe1" };
+    const { accepted, rejected } = resolveOperations([event(), payment, bringItem], aliases);
+    expect(rejected).toEqual([]);
+    expect(accepted.map((a) => a.type)).toEqual(["event", "payment", "bring_item"]);
+    expect(accepted[2]).toMatchObject({ eventRef: { kind: "new", ref: "nowe1" } });
+  });
+
   it("links to an existing event by alias", () => {
     const { accepted } = resolveOperations([bring("E1")], aliases);
     expect(accepted[0]).toMatchObject({ eventRef: { kind: "existing", id: "e1" } });
