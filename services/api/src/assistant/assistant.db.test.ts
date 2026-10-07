@@ -253,6 +253,16 @@ describe("loadViewContext", () => {
     expect(data.indexOf("wiadomość 0")).toBeLessThan(data.indexOf("Wycieczka"));
   });
 
+  it("historia grupy: role autorów nadane przez rodzinę", async () => {
+    await db.client.query("insert into contact_roles (author_key, role, label) values ('pani ania', 'ciocia', 'Ciocia Ania')");
+    try {
+      const { data } = await loadViewContext(pool, { kind: "group", id: motylki }, NOW);
+      expect(data).toContain("[2026-10-07 19:00] Pani Ania [ciocia: Ciocia Ania]: Wycieczka do ZOO");
+    } finally {
+      await db.client.query("delete from contact_roles");
+    }
+  });
+
   it("historia grupy nieśledzonej jest niedostępna", async () => {
     const { data } = await loadViewContext(pool, { kind: "group", id: sasiedzi }, NOW);
     expect(data).toBe("Nie znaleziono śledzonej grupy.");

@@ -60,6 +60,7 @@ Zasady:
 11. children (dla event, bring_item, payment, action_required): imiona dzieci z listy <dzieci>, gdy wiadomość dotyczy konkretnego dziecka lub dzieci (np. „Zosia przynosi kasztany”, „Antek i Ola idą na basen”). Dziecko rozpoznawaj po imieniu i po jego innych formach z listy (pełne imię, zdrobnienia), także w odmianie. Wpisuj zawsze główne imię z listy, nie formę z wiadomości. Gdy element dotyczy wszystkich dzieci grupy albo nie wiadomo którego dziecka – pusta lista. Nie wpisuj imion spoza listy.
 12. Lista imion (np. wypunktowana) przy prośbie lub informacji oznacza, że dotyczy ona tylko wymienionych dzieci. Jeśli jest na niej dziecko z listy <dzieci> (w dowolnej formie imienia), utwórz element i wpisz je w children. Jeśli lista <dzieci> nie jest pusta, a żadnego z tych dzieci nie ma wśród wymienionych imion, nie twórz elementu – sprawa nie dotyczy rodziny.
 13. Rzecz do przyniesienia bez podanego dnia (np. „prośba o zakup i doniesienie”, „proszę przynieść”) ma due_date = najbliższy dzień roboczy (poniedziałek–piątek) po dacie wysłania wiadomości.
+14. Oznaczenia przy autorze wiadomości (nadane przez rodzinę): [ciocia] lub [dyrekcja] – nauczycielka, opiekunka lub prowadzący (informacja wiarygodna); [rodzic] – inny rodzic; [nasza rodzina] – ktoś z naszej rodziny: z jego wiadomości nie twórz zadań dla nas, ale traktuj je jako kontekst (np. odpowiedź lub deklaracja, że coś już zrobiliśmy); [do nas] – wiadomość skierowana do naszej rodziny (wzmianka), zwykle dotyczy naszego dziecka.
 
 <przedszkole>
 {{przedszkole}}
@@ -79,6 +80,7 @@ Zasady:
 - Odpowiadaj po polsku, krótko i konkretnie (zwykle 1–4 zdania albo krótka lista). Bez nagłówków i tabel.
 - Opieraj się wyłącznie na bloku <dane> i wcześniejszej rozmowie. Jeśli odpowiedzi tam nie ma, napisz wprost, że w danych tego ekranu nie ma tej informacji, i zasugeruj, gdzie w aplikacji może być (np. kalendarz, listy, historia grupy). Nie zgaduj dat, kwot ani godzin.
 - Podając terminy, używaj dnia tygodnia i daty; względem dzisiejszej daty możesz mówić „jutro”, „w piątek”.
+- Przy autorach wiadomości mogą być oznaczenia nadane przez rodzinę: [ciocia], [dyrekcja], [rodzic], [nasza rodzina] (wiadomości napisane przez kogoś z rodziny) i [do nas] (wiadomość skierowana do rodziny).
 
 O przedszkolu (opis napisany przez rodzinę):
 <przedszkole>

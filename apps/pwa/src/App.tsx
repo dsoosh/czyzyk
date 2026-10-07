@@ -8,6 +8,7 @@ import { GroupsPage } from "./pages/admin/GroupsPage";
 import { ImportPage } from "./pages/admin/ImportPage";
 import { KindergartenPage } from "./pages/admin/KindergartenPage";
 import { PromptsPage } from "./pages/admin/PromptsPage";
+import { ContactsPage } from "./pages/admin/ContactsPage";
 import { ReviewPage } from "./pages/admin/ReviewPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { ChatsPage } from "./pages/chats/ChatsPage";
@@ -68,6 +69,7 @@ export function App() {
                 <Route path="przeglad" element={<ReviewPage />} />
                 <Route path="import" element={<ImportPage />} />
                 <Route path="przedszkole" element={<KindergartenPage />} />
+                <Route path="kontakty" element={<ContactsPage />} />
                 <Route path="prompty" element={<PromptsPage />} />
               </Route>
             )}

@@ -9,11 +9,13 @@ export const sharedExtraction = fileURLToPath(new URL("../../packages/shared/src
 export const sharedChatExport = fileURLToPath(new URL("../../packages/shared/src/chatExport.ts", import.meta.url));
 export const sharedAssistant = fileURLToPath(new URL("../../packages/shared/src/assistant.ts", import.meta.url));
 export const sharedPrompts = fileURLToPath(new URL("../../packages/shared/src/prompts.ts", import.meta.url));
+export const sharedContacts = fileURLToPath(new URL("../../packages/shared/src/contacts.ts", import.meta.url));
 export const sharedAliases = {
   "@czyzyk/shared/extraction": sharedExtraction,
   "@czyzyk/shared/chat-export": sharedChatExport,
   "@czyzyk/shared/assistant": sharedAssistant,
   "@czyzyk/shared/prompts": sharedPrompts,
+  "@czyzyk/shared/contacts": sharedContacts,
 };
 
 export default defineConfig({

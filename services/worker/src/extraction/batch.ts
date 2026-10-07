@@ -1,3 +1,4 @@
+import type { ContactRoleRow } from "@czyzyk/shared";
 import type { ItemData, ItemType } from "@czyzyk/shared";
 import type pg from "pg";
 
@@ -42,6 +43,8 @@ export interface ExtractionBatch {
   family: string[];
   /** The admin's extraction prompt template, or null for the default (llm-prompts). */
   promptTemplate: string | null;
+  /** Roles of message authors set by the family (contact-roles). */
+  contactRoles: ContactRoleRow[];
 }
 
 type Queryable = Pick<pg.PoolClient, "query">;
@@ -134,7 +137,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
   );
   const newMessages = fresh.map(toMessage);
   if (newMessages.length === 0) {
-    return { group, newMessages, contextMessages: [], items: [], children: [], kindergarten: "", family: [], promptTemplate: null };
+    return { group, newMessages, contextMessages: [], items: [], children: [], kindergarten: "", family: [], promptTemplate: null, contactRoles: [] };
   }
 
   const { rows: earlier } = await db.query(
@@ -171,6 +174,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
        from public.profiles order by 1`,
   );
   const { rows: prompt } = await db.query<{ template: string }>("select template from public.llm_prompts where key = 'extraction'");
+  const { rows: contactRoles } = await db.query<ContactRoleRow>("select author_key, role, label from public.contact_roles");
 
   return {
     group,
@@ -181,5 +185,6 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     kindergarten: profile[0]?.content ?? "",
     family: family.map((f) => f.name),
     promptTemplate: prompt[0]?.template ?? null,
+    contactRoles,
   };
 }

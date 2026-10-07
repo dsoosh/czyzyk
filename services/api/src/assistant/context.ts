@@ -1,4 +1,11 @@
-import { buildSystemPrompt, type AssistantView } from "@czyzyk/shared";
+import {
+  buildSystemPrompt,
+  CONTACT_ROLE_LABELS,
+  mentionsFamily,
+  roleOf,
+  type AssistantView,
+  type ContactRoleRow,
+} from "@czyzyk/shared";
 import type pg from "pg";
 
 type Db = Pick<pg.Pool, "query">;
@@ -39,10 +46,12 @@ interface Names {
   groups: Map<string, string>;
   people: Map<string, string>;
   children: { id: string; name: string; group_id: string | null; aliases: string[] }[];
+  /** Roles of message authors set by the family (contact-roles). */
+  roles: ContactRoleRow[];
 }
 
 async function loadNames(db: Db): Promise<Names> {
-  const [groups, people, children] = await Promise.all([
+  const [groups, people, children, roles] = await Promise.all([
     db.query<{ id: string; name: string }>("select id, coalesce(display_name, wa_name) as name from public.wa_groups"),
     db.query<{ id: string; name: string }>(
       "select id, split_part(coalesce(nullif(trim(display_name), ''), split_part(email, '@', 1)), ' ', 1) as name from public.profiles",
@@ -50,11 +59,13 @@ async function loadNames(db: Db): Promise<Names> {
     db.query<{ id: string; name: string; group_id: string | null; aliases: string[] }>(
       "select id, name, group_id, aliases from public.children order by name",
     ),
+    db.query<ContactRoleRow>("select author_key, role, label from public.contact_roles"),
   ]);
   return {
     groups: new Map(groups.rows.map((r) => [r.id, r.name])),
     people: new Map(people.rows.map((r) => [r.id, r.name])),
     children: children.rows,
+    roles: roles.rows,
   };
 }
 
@@ -210,7 +221,12 @@ function messageLine(m: MessageRow, names: Names, sources?: Set<string>): string
     sources?.has(m.id) ? "[wiadomość źródłowa]" : "",
   ].filter(Boolean);
   const group = sources ? ` (${names.groups.get(m.group_id) ?? "?"})` : "";
-  return `[${m.sent_local}]${group} ${m.author}: ${m.text}${flags.length ? ` ${flags.join(" ")}` : ""}`;
+  const role = roleOf(names.roles, m.author);
+  const tags = [
+    role ? `[${CONTACT_ROLE_LABELS[role.role]}${role.label ? `: ${role.label}` : ""}]` : "",
+    role?.role !== "rodzina" && mentionsFamily(names.roles, m.text) ? "[do nas]" : "",
+  ].filter(Boolean);
+  return `[${m.sent_local}]${group} ${m.author}${tags.length ? ` ${tags.join(" ")}` : ""}: ${m.text}${flags.length ? ` ${flags.join(" ")}` : ""}`;
 }
 
 /** Messages of the source's group around the first source message (before and after). */

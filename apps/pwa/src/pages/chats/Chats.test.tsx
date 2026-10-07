@@ -95,6 +95,30 @@ describe("Czaty", () => {
     expect(screen.queryByRole("button", { name: "Analizuj ponownie" })).not.toBeInTheDocument();
   });
 
+  it("oznacza role autorów, wiadomości rodziny i wzmianki o rodzinie", async () => {
+    renderAt("/czaty/g2", {
+      tables: {
+        wa_groups: groups,
+        contact_roles: [
+          { author_key: "przewodnicząca", role: "dyrekcja", label: null, profile_id: null },
+          { author_key: "+48535111213", role: "rodzina", label: "Darek", profile_id: null },
+        ],
+        messages: [
+          { id: "x1", group_id: "g2", author: "Przewodnicząca", sent_at: "2026-10-07T18:00:00.000Z", text: "Zebranie", has_attachment: false, status: "active" },
+          { id: "x2", group_id: "g2", author: "+48 535 111 213", sent_at: "2026-10-07T18:01:00.000Z", text: "Będę", has_attachment: false, status: "active" },
+          { id: "x3", group_id: "g2", author: "Mama Zosi", sent_at: "2026-10-07T18:02:00.000Z", text: "@48535111213 weźmiesz klucze?", has_attachment: false, status: "active" },
+        ],
+      },
+    });
+    const first = (await screen.findByText("Zebranie")).closest("li")!;
+    expect(await within(first).findByText("dyrekcja")).toBeInTheDocument();
+    const own = screen.getByText("Będę").closest("li")!;
+    expect(within(own).getByText("Darek")).toBeInTheDocument();
+    const mention = screen.getByText("@48535111213 weźmiesz klucze?").closest("li")!;
+    expect(within(mention).getByText("do Was")).toBeInTheDocument();
+    expect(within(own).queryByText("do Was")).not.toBeInTheDocument();
+  });
+
   it("menu ma zakładkę Czaty", async () => {
     renderAt("/czaty", { tables: { wa_groups: groups, messages } });
     expect(await screen.findByRole("link", { name: "Czaty" })).toHaveAttribute("href", "/czaty");

@@ -1,8 +1,10 @@
+import { CONTACT_ROLE_LABELS, mentionsFamily, roleOf } from "@czyzyk/shared/contacts";
 import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { useAuth, useProfile } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
 import { dayLabel, warsawDay, warsawTime } from "../../lib/dates";
+import { fetchContactRoles } from "../../lib/contacts";
 import { fetchGroupHistory, HISTORY_PAGE, reprocessMessage } from "../../lib/history";
 import { useLoader, useOnForeground } from "../../lib/useLoader";
 
@@ -25,6 +27,8 @@ function GroupHistory({ id }: { id: string }) {
     () => fetchGroupHistory(client, id, limit, query),
     [client, id, limit, query],
   );
+  // Roles the family gave authors (contact-roles); history works without them.
+  const roles = useLoader(() => fetchContactRoles(client).catch(() => []), [client]).data ?? [];
   useOnForeground(reload);
 
   const analyseAgain = async (messageId: string) => {
@@ -105,6 +109,8 @@ function GroupHistory({ id }: { id: string }) {
           {data.messages.map((m, i) => {
             const day = warsawDay(m.sent_at);
             const newDay = i === 0 || warsawDay(data.messages[i - 1]!.sent_at) !== day;
+            const role = roleOf(roles, m.author);
+            const toFamily = role?.role !== "rodzina" && mentionsFamily(roles, m.text);
             return (
               <li key={m.id} className="space-y-2">
                 {newDay && (
@@ -112,9 +118,17 @@ function GroupHistory({ id }: { id: string }) {
                     {dayLabel(day, today)}
                   </p>
                 )}
-                <div className="rounded-2xl bg-white p-3 shadow-sm">
+                <div className={`rounded-2xl p-3 shadow-sm ${role?.role === "rodzina" ? "bg-sun/25" : toFamily ? "bg-air/40" : "bg-white"}`}>
                   <div className="flex justify-between gap-2 text-xs text-slate-500">
-                    <span className="font-semibold text-slate-700">{m.author}</span>
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-semibold text-slate-700">{m.author}</span>
+                      {role && (
+                        <span title={role.label ?? undefined} className="rounded-full bg-sand px-2 py-0.5 font-semibold text-ink">
+                          {role.label ?? CONTACT_ROLE_LABELS[role.role]}
+                        </span>
+                      )}
+                      {toFamily && <span className="rounded-full bg-water/20 px-2 py-0.5 font-semibold text-brand-700">do Was</span>}
+                    </span>
                     <span>{warsawTime(m.sent_at)}</span>
                   </div>
                   <p className="mt-1 whitespace-pre-wrap">{m.text || (m.has_attachment ? "📎 załącznik" : "")}</p>

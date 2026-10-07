@@ -1,4 +1,12 @@
-import { buildSystemPrompt, EXTRACTION_TOOL_NAME, type ItemType } from "@czyzyk/shared";
+import {
+  buildSystemPrompt,
+  CONTACT_ROLE_LABELS,
+  EXTRACTION_TOOL_NAME,
+  mentionsFamily,
+  roleOf,
+  type ContactRoleRow,
+  type ItemType,
+} from "@czyzyk/shared";
 
 export { EXTRACTION_TOOL_NAME };
 import type { BatchMessage, ExistingItem, ExtractionBatch } from "./batch.js";
@@ -56,9 +64,16 @@ function escapeTags(json: string): string {
   return json.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 }
 
-function renderMessage(alias: string, m: BatchMessage): string {
+/** " [ciocia]", " [nasza rodzina] [do nas]" – roles the family gave authors (contact-roles). */
+function authorTags(m: BatchMessage, roles: readonly ContactRoleRow[]): string {
+  const role = roleOf(roles, m.author)?.role;
+  const tags = [role ? `[${CONTACT_ROLE_LABELS[role]}]` : null, role !== "rodzina" && mentionsFamily(roles, m.text) ? "[do nas]" : null];
+  return tags.filter(Boolean).map((t) => ` ${t}`).join("");
+}
+
+function renderMessage(alias: string, m: BatchMessage, roles: readonly ContactRoleRow[]): string {
   const attachment = m.hasAttachment ? " [załącznik]" : "";
-  return `${alias} | ${warsawStamp(m.sentAt)} | ${quote(m.author)}: ${quote(m.text)}${attachment}`;
+  return `${alias} | ${warsawStamp(m.sentAt)} | ${quote(m.author)}${authorTags(m, roles)}: ${quote(m.text)}${attachment}`;
 }
 
 function renderItem(alias: string, item: ExistingItem, eventAliasById: Map<string, string>): string {
@@ -88,8 +103,8 @@ export function buildExtractionPrompt(batch: ExtractionBatch, now: Date): Extrac
     return [alias, item] as const;
   });
 
-  const contextLines = batch.contextMessages.map((m) => renderMessage(messageAlias(m), m));
-  const newLines = batch.newMessages.map((m) => renderMessage(messageAlias(m), m));
+  const contextLines = batch.contextMessages.map((m) => renderMessage(messageAlias(m), m, batch.contactRoles));
+  const newLines = batch.newMessages.map((m) => renderMessage(messageAlias(m), m, batch.contactRoles));
 
   const user = [
     `Dzisiaj: ${warsawDayLong(now)} (strefa Europe/Warsaw).`,
