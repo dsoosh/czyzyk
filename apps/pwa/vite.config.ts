@@ -8,10 +8,12 @@ import { VitePWA } from "vite-plugin-pwa";
 export const sharedExtraction = fileURLToPath(new URL("../../packages/shared/src/extraction.ts", import.meta.url));
 export const sharedChatExport = fileURLToPath(new URL("../../packages/shared/src/chatExport.ts", import.meta.url));
 export const sharedAssistant = fileURLToPath(new URL("../../packages/shared/src/assistant.ts", import.meta.url));
+export const sharedPrompts = fileURLToPath(new URL("../../packages/shared/src/prompts.ts", import.meta.url));
 export const sharedAliases = {
   "@czyzyk/shared/extraction": sharedExtraction,
   "@czyzyk/shared/chat-export": sharedChatExport,
   "@czyzyk/shared/assistant": sharedAssistant,
+  "@czyzyk/shared/prompts": sharedPrompts,
 };
 
 export default defineConfig({

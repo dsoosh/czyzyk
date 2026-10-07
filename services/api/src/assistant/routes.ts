@@ -4,9 +4,9 @@ import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import type { SessionVerifier } from "../push/session.js";
 import type { DailyLimiter, RateLimiter } from "../rateLimit.js";
-import { loadViewContext, warsawDate } from "./context.js";
+import { loadAssistantSystem, loadViewContext, warsawDate } from "./context.js";
 import type { AssistantModel } from "./model.js";
-import { ASSISTANT_SYSTEM, buildAssistantMessages } from "./prompt.js";
+import { buildAssistantMessages } from "./prompt.js";
 
 export const NO_ANSWER = "Nie mogę odpowiedzieć na to pytanie.";
 
@@ -55,8 +55,8 @@ export async function assistantRoutes(
     if (!opts.perUser.hit(`assistant:${userId}`)) return reply.code(429).send({ error: "rate_limited" });
     if (!opts.daily.hit(userId, warsawDate(at))) return reply.code(429).send({ error: "daily_limit" });
 
-    const context = await loadViewContext(db, view, at);
-    const result = await opts.model.answer({ system: ASSISTANT_SYSTEM, messages: buildAssistantMessages(context, question, history, at) });
+    const [context, system] = await Promise.all([loadViewContext(db, view, at), loadAssistantSystem(db, userId)]);
+    const result = await opts.model.answer({ system, messages: buildAssistantMessages(context, question, history, at) });
 
     request.log.info(
       { view: view.kind, answered: result.text !== null, inputTokens: result.usage.input_tokens, outputTokens: result.usage.output_tokens },

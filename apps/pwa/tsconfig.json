@@ -28,6 +28,9 @@
       ],
       "@czyzyk/shared/assistant": [
         "../../packages/shared/src/assistant.ts"
+      ],
+      "@czyzyk/shared/prompts": [
+        "../../packages/shared/src/prompts.ts"
       ]
     }
   },

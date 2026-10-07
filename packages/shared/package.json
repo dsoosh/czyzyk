@@ -21,6 +21,10 @@
     "./assistant": {
       "types": "./dist/assistant.d.ts",
       "default": "./dist/assistant.js"
+    },
+    "./prompts": {
+      "types": "./dist/prompts.d.ts",
+      "default": "./dist/prompts.js"
     }
   },
   "scripts": {

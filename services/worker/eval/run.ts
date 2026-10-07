@@ -39,7 +39,7 @@ export function batchFor(c: EvalCase): { batch: ExtractionBatch; now: Date } {
   }));
   const last = Math.max(...newMessages.map((m) => m.sentAt.getTime()));
   return {
-    batch: { group: { id: "group", name: "Motylki" }, newMessages, contextMessages: [], items, children: c.children ?? [], kindergarten: "" },
+    batch: { group: { id: "group", name: "Motylki" }, newMessages, contextMessages: [], items, children: c.children ?? [], kindergarten: "", family: [], promptTemplate: null },
     now: new Date(last + 30 * 60_000),
   };
 }

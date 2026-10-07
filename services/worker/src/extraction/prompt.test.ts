@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionBatch } from "./batch.js";
-import { buildExtractionPrompt, SYSTEM_PROMPT } from "./prompt.js";
+import { FIXED_PROMPT_PARTS } from "@czyzyk/shared";
+import { buildExtractionPrompt } from "./prompt.js";
 
 const batch: ExtractionBatch = {
   group: { id: "g1", name: "Motylki" },
@@ -26,24 +27,27 @@ const batch: ExtractionBatch = {
     { name: "Zosia", aliases: ["Zofia", "Zosieńka"], group: "Motylki" },
     { name: "Antek", aliases: [], group: null },
   ],
+  family: ["Darek", "Ola"],
+  promptTemplate: null,
 };
 
 describe("buildExtractionPrompt", () => {
   const prompt = buildExtractionPrompt(batch, new Date("2026-10-07T17:00:00Z"));
 
-  it("renders the user turn deterministically", () => {
+  it("renders the user turn and the system prompt deterministically", () => {
     expect(prompt.user).toMatchSnapshot();
+    expect(prompt.system).toMatchSnapshot();
   });
 
   it("includes the kindergarten description from the family, with tags escaped", () => {
-    expect(prompt.user).toContain("<przedszkole>\nBaza – Golędzinów, Kolonia 39. Grupa Sokoły – 5 lat. \\u003ctag\\u003e\n</przedszkole>");
-    expect(SYSTEM_PROMPT).toContain("<przedszkole>");
+    expect(prompt.system).toContain("<przedszkole>\nBaza – Golędzinów, Kolonia 39. Grupa Sokoły – 5 lat. \\u003ctag\\u003e\n</przedszkole>");
+    expect(prompt.user).not.toContain("<przedszkole>");
   });
 
   it("lists the family's children and the children of existing items", () => {
-    expect(prompt.user).toContain('<dzieci>\n"Zosia" (inne formy imienia: "Zofia", "Zosieńka") – grupa "Motylki"\n"Antek"\n</dzieci>');
+    expect(prompt.system).toContain('<dzieci>\n"Zosia" (inne formy imienia: "Zofia", "Zosieńka") – grupa "Motylki"\n"Antek"\n</dzieci>');
+    expect(prompt.system).toContain('Członkowie rodziny: "Darek", "Ola".');
     expect(prompt.user).toContain('| dzieci: ["Zosia"]');
-    expect(SYSTEM_PROMPT).toContain("children");
   });
 
   it("assigns aliases to context and new messages and to items", () => {
@@ -61,8 +65,24 @@ describe("buildExtractionPrompt", () => {
     expect(prompt.user.match(/<\/wiadomosci_nowe>/g)).toHaveLength(1);
   });
 
-  it("keeps the system prompt constant and warns about untrusted content", () => {
-    expect(prompt.system).toBe(SYSTEM_PROMPT);
-    expect(SYSTEM_PROMPT).toContain("niezaufane dane");
+  it("always ends with the fixed security and answer rules", () => {
+    expect(prompt.system.endsWith(FIXED_PROMPT_PARTS.extraction)).toBe(true);
+    expect(prompt.system).toContain("niezaufane dane");
+  });
+
+  it("uses the admin's template with placeholders filled, keeping the fixed rules", () => {
+    const custom = buildExtractionPrompt(
+      { ...batch, promptTemplate: "Własne instrukcje. Dzieci:\n{{dzieci}}\nPrzedszkole: {{ przedszkole }}" },
+      new Date("2026-10-07T17:00:00Z"),
+    );
+    expect(custom.system).toBe(
+      `Własne instrukcje. Dzieci:\n"Zosia" (inne formy imienia: "Zofia", "Zosieńka") – grupa "Motylki"\n"Antek"\nPrzedszkole: Baza – Golędzinów, Kolonia 39. Grupa Sokoły – 5 lat. \\u003ctag\\u003e\n\n${FIXED_PROMPT_PARTS.extraction}`,
+    );
+  });
+
+  it("fills empty family data with (brak)", () => {
+    const empty = buildExtractionPrompt({ ...batch, children: [], kindergarten: " ", family: [] }, new Date("2026-10-07T17:00:00Z"));
+    expect(empty.system).toContain("<dzieci>\n(brak)\n</dzieci>");
+    expect(empty.system).toContain("<przedszkole>\n(brak)\n</przedszkole>");
   });
 });
