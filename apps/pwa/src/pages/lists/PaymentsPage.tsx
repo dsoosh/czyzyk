@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth, useProfile } from "../../auth/AuthProvider";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
-import { childNames } from "../../lib/children";
+import { childrenOf } from "../../lib/children";
 import { dayLabel, warsawDay } from "../../lib/dates";
 import { formatAmount, groupLabel, type Payment } from "../../lib/items";
 import { doneLabel, fetchPaymentList, sortOpenPayments } from "../../lib/tracking";
@@ -39,7 +39,7 @@ export function PaymentsPage() {
               {overdue && <span className="rounded bg-red-100 px-1.5 font-semibold text-red-700">po terminie</span>}
               {p.due_date && <span className={overdue ? "text-red-700" : ""}>do {dayLabel(p.due_date, today)}</span>}
               <span>{p.paid_at ? doneLabel("zapłacone", p.paid_by, p.paid_at, me, data.people, today) : "do zapłaty"}</span>
-              <ChildTag names={childNames(data.children, p)} />
+              <ChildTag kids={childrenOf(data.children, p)} all={data.children} />
             <span>{groupLabel(data.groups, p.group_id)}</span>
               <SourceLink kind="payment" id={p.id} />
             </Meta>

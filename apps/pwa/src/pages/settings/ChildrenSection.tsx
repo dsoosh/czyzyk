@@ -1,7 +1,17 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
-import { deleteChild, fetchChildren, parseAliases, saveChild, type Child } from "../../lib/children";
+import {
+  CHILD_COLOR_KEYS,
+  CHILD_COLORS,
+  childColor,
+  deleteChild,
+  fetchChildren,
+  parseAliases,
+  saveChild,
+  type Child,
+  type ChildColor,
+} from "../../lib/children";
 import { run, type Group } from "../../lib/items";
 import { useLoader } from "../../lib/useLoader";
 
@@ -11,6 +21,8 @@ interface Draft {
   group_id: string | null;
   /** Other forms of the name, comma-separated as typed. */
   aliases: string;
+  /** Chosen colour; null = keep the stored one (or the first free one for a new child). */
+  color: ChildColor | null;
 }
 
 async function load(db: ReturnType<typeof useAuth>["client"]) {
@@ -45,13 +57,14 @@ export function ChildrenSection() {
             {data.children.map((c) => (
               // Keyed by the saved values: after a save the form shows them as stored (trimmed forms).
               <li key={`${c.id}:${c.name}:${c.group_id}:${c.aliases.join("|")}`}>
-                <ChildForm child={c} groups={data.groups} onSaved={reload} />
+                <ChildForm child={c} all={data.children} groups={data.groups} onSaved={reload} />
               </li>
             ))}
             {adding && (
               <li>
                 <ChildForm
                   child={null}
+                  all={data.children}
                   groups={data.groups}
                   onSaved={() => {
                     setAdding(false);
@@ -75,11 +88,14 @@ export function ChildrenSection() {
 
 function ChildForm({
   child,
+  all,
   groups,
   onSaved,
   onCancel,
 }: {
   child: Child | null;
+  /** Every child, for the colours already taken. */
+  all: Child[];
   groups: Group[];
   onSaved: () => void;
   onCancel?: () => void;
@@ -90,6 +106,7 @@ function ChildForm({
     name: child?.name ?? "",
     group_id: child?.group_id ?? null,
     aliases: child?.aliases.join(", ") ?? "",
+    color: null,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +114,10 @@ function ChildForm({
     !child ||
     draft.name.trim() !== child.name ||
     draft.group_id !== child.group_id ||
-    parseAliases(draft.aliases).join("\n") !== child.aliases.join("\n");
+    parseAliases(draft.aliases).join("\n") !== child.aliases.join("\n") ||
+    (draft.color !== null && draft.color !== child.color);
+  const takenByOthers = new Set(all.filter((c) => c.id !== child?.id).map((c) => childColor(all, c)));
+  const shown: ChildColor = draft.color ?? (child ? childColor(all, child) : (CHILD_COLOR_KEYS.find((k) => !takenByOthers.has(k)) ?? "lime"));
   const label = child ? child.name : "Nowe dziecko";
 
   const act = async (fn: () => Promise<unknown>) => {
@@ -111,7 +131,9 @@ function ChildForm({
       setError(
         /należy już do innego dziecka/.test(message)
           ? message.replace(/^Error: /, "").replace("Forma", "Imię lub forma")
-          : /duplicate|children_name_key/i.test(message)
+          : /Ten kolor|children_color_key/i.test(message)
+            ? "Ten kolor ma już inne dziecko."
+            : /duplicate|children_name_key/i.test(message)
             ? "Jest już dziecko o tym imieniu."
             : /Najwyżej 10|40 znaków/.test(message)
               ? message.replace(/^Error: /, "")
@@ -162,6 +184,25 @@ function ChildForm({
         aria-label="Inne formy imienia"
         className="w-full rounded-full border border-sand-400 px-4 py-2"
       />
+      <div role="radiogroup" aria-label="Kolor" className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted">Kolor:</span>
+        {CHILD_COLOR_KEYS.map((key) => {
+          const taken = takenByOthers.has(key);
+          return (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={shown === key}
+              aria-label={taken ? `${CHILD_COLORS[key].label} (zajęty)` : CHILD_COLORS[key].label}
+              disabled={taken}
+              onClick={() => setDraft({ ...draft, color: key })}
+              style={{ backgroundColor: CHILD_COLORS[key].bg }}
+              className={`h-7 w-7 rounded-full border-2 disabled:opacity-25 ${shown === key ? "border-ink" : "border-transparent"}`}
+            />
+          );
+        })}
+      </div>
       <div className="flex gap-2">
         <button
           type="submit"

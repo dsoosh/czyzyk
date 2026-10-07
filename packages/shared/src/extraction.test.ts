@@ -38,6 +38,13 @@ describe("parseOperation", () => {
     expect(r.ok && r.value.op === "create" && r.value.ref).toBe("nowe1");
   });
 
+  it("ref jest opcjonalny: płatność bez ref obok nowego wydarzenia nie przepada", () => {
+    const { ref: _ref, ...withoutRef } = create;
+    const payment = { ...withoutRef, type: "payment", data: { description: "Wycieczka", amount_pln: 60, due_date: "2026-10-14" }, children: [] };
+    const r = parseOperation(payment);
+    expect(r.ok && r.value.op === "create" && r.value.ref).toBeNull();
+  });
+
   it("validates data against the declared type", () => {
     const r = parseOperation({ ...create, type: "payment" });
     expect(r).toMatchObject({ ok: false });
