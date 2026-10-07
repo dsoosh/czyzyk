@@ -33,6 +33,11 @@ export interface ExtractionBatch {
   newMessages: BatchMessage[];
   /** Earlier, already processed messages, oldest first. */
   contextMessages: BatchMessage[];
+  /**
+   * Already processed messages written after the first new one, oldest first – non-empty when
+   * an older message is analysed again (replies and corrections that came after it).
+   */
+  laterMessages: BatchMessage[];
   /** Current and future items of this group and of the whole kindergarten. */
   items: ExistingItem[];
   /** Children of the family, so the model can tell which child a message is about. */
@@ -138,7 +143,18 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
   );
   const newMessages = fresh.map(toMessage);
   if (newMessages.length === 0) {
-    return { group, newMessages, contextMessages: [], items: [], children: [], kindergarten: "", family: [], promptTemplate: null, contactRoles: [] };
+    return {
+      group,
+      newMessages,
+      contextMessages: [],
+      laterMessages: [],
+      items: [],
+      children: [],
+      kindergarten: "",
+      family: [],
+      promptTemplate: null,
+      contactRoles: [],
+    };
   }
 
   const { rows: earlier } = await db.query(
@@ -148,6 +164,13 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
         order by sent_at desc, id desc
         limit $3
      ) m order by sent_at, id`,
+    [groupId, newMessages[0]!.sentAt, contextSize],
+  );
+  const { rows: later } = await db.query(
+    `select id, author, sent_at, text, has_attachment from public.messages
+      where group_id = $1 and processed_at is not null and status = 'active' and sent_at > $2
+      order by sent_at, id
+      limit $3`,
     [groupId, newMessages[0]!.sentAt, contextSize],
   );
 
@@ -181,6 +204,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     group,
     newMessages,
     contextMessages: earlier.map(toMessage),
+    laterMessages: later.map(toMessage),
     items,
     children,
     kindergarten: profile[0]?.content ?? "",
