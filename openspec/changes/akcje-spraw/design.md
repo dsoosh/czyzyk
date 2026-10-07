@@ -8,6 +8,9 @@ Rodzaje (`bring`, `payment`, `event`, `answer`, `done`, `not_applicable`) są st
 ### D2. Wykonanie w bazie
 `apply_action_suggestion(id, index)` (każdy z rodziny) bierze propozycję zapisaną przy sprawie – klient wskazuje tylko numer. Przeniesienie tworzy element z grupą, dziećmi, wiadomościami źródłowymi i pewnością sprawy (`rationale`: „Z „Wymaga odpowiedzi”: …”), a sprawę zamyka z `resolution` = etykieta. Wszystko w jednej transakcji z blokadą wiersza.
 
+### D2a. Termin rzeczy przeniesionej ze sprawy
+Akcję wybiera się „teraz”, więc rzecz do przyniesienia z minionym lub pustym terminem dostaje najbliższy dzień roboczy (Europe/Warsaw) – inaczej trafiałaby w przeszłość i nie było jej na ekranie „Dziś”. Wynik RPC podaje datę, a PWA pokazuje ją w potwierdzeniu („Dodano do rzeczy do przyniesienia na jutro.”).
+
 ### D3. Propozycje nie giną przy aktualizacji
 Pole `suggestions` jest opcjonalne bez wartości domyślnej: aktualizacja sprawy bez nowych propozycji zostawia zapisane (domyślna pusta lista wyczyściłaby je przy każdej zmianie terminu).
 
