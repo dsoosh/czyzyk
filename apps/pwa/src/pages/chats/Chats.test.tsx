@@ -81,6 +81,20 @@ describe("Czaty", () => {
     expect(await screen.findByText("<b>zebranie</b>")).toBeInTheDocument();
   });
 
+  it("admin wysyła wiadomość do ponownej analizy; zwykły członek rodziny nie widzi przycisku", async () => {
+    const { rpc } = renderAt("/czaty/g2", { admin: true, tables: { wa_groups: groups, messages }, rpc: { admin_reprocess_message: () => null } });
+    const message = (await screen.findByText("Zebranie w czwartek")).closest("li")!;
+    await userEvent.click(within(message).getByRole("button", { name: "Analizuj ponownie" }));
+    expect(rpc).toHaveBeenCalledWith("admin_reprocess_message", { p_id: "r1" });
+    expect(await within(message).findByRole("status")).toHaveTextContent("Wiadomość wróciła do analizy");
+  });
+
+  it("bez uprawnień admina nie ma przycisku ponownej analizy", async () => {
+    renderAt("/czaty/g2", { tables: { wa_groups: groups, messages } });
+    await screen.findByText("Zebranie w czwartek");
+    expect(screen.queryByRole("button", { name: "Analizuj ponownie" })).not.toBeInTheDocument();
+  });
+
   it("menu ma zakładkę Czaty", async () => {
     renderAt("/czaty", { tables: { wa_groups: groups, messages } });
     expect(await screen.findByRole("link", { name: "Czaty" })).toHaveAttribute("href", "/czaty");

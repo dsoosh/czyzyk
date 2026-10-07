@@ -277,7 +277,7 @@ describe("runGroupExtraction", () => {
 
   it("przypisuje dzieci z listy (bez względu na wielkość liter), pomija nieznane, update zmienia przypisanie", async () => {
     const { rows: kids } = await db.client.query<{ id: string; name: string }>(
-      "insert into children (name, group_id) values ('Zosia', $1), ('Antek', null) returning id, name",
+      "insert into children (name, group_id, aliases) values ('Zosia', $1, '{Zofia}'), ('Antek', null, '{}') returning id, name",
       [groupId],
     );
     const zosia = kids.find((c) => c.name === "Zosia")!.id;
@@ -294,7 +294,7 @@ describe("runGroupExtraction", () => {
       }),
     ]);
     await runGroupExtraction(deps(first.model), groupId);
-    expect(first.prompts[0]!.user).toContain('"Zosia" – grupa "Motylki"');
+    expect(first.prompts[0]!.user).toContain('"Zosia" (inne formy imienia: "Zofia") – grupa "Motylki"');
     // Starting kindergarten description from migration 0011.
     expect(first.prompts[0]!.user).toMatch(/<przedszkole>\n[^]*Golędzinów, Kolonia 39[^]*<\/przedszkole>/);
     const { rows: created } = await db.client.query("select id, child_ids from bring_items");
@@ -308,5 +308,14 @@ describe("runGroupExtraction", () => {
     expect(second.prompts[0]!.user).toContain('| dzieci: ["Zosia"]');
     const { rows: updated } = await db.client.query("select child_ids, description from bring_items");
     expect(updated).toEqual([{ child_ids: [antek], description: "kasztany" }]);
+
+    // The model may write another form of the name; it still points at the child.
+    await addMessage("Jednak Zofia też niesie kasztany", "2026-10-07T16:40:00Z");
+    const third = scripted((p) => [
+      op({ op: "update", type: "bring_item", target: "E1", data: {}, children: ["Antek", "Zofia"], source_messages: [lastAlias(p)] }),
+    ]);
+    await runGroupExtraction(deps(third.model), groupId);
+    const { rows: both } = await db.client.query("select child_ids from bring_items");
+    expect([...both[0].child_ids].sort()).toEqual([antek, zosia].sort());
   });
 });

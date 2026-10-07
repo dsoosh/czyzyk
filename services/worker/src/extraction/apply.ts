@@ -138,11 +138,16 @@ function checkData(type: ItemType, data: unknown): ItemData[ItemType] {
 
 class ApplyRejection extends Error {}
 
-/** Child names as the model wrote them → ids; unknown names are dropped, the item still counts. */
+/**
+ * Child names as the model wrote them → ids, by name or another form of it ("Elcia");
+ * unknown names are dropped, the item still counts.
+ */
 async function childIds(client: pg.PoolClient, names: string[]): Promise<string[]> {
   if (names.length === 0) return [];
   const { rows } = await client.query<{ id: string }>(
-    `select id from public.children where lower(btrim(name)) = any(select lower(btrim(n)) from unnest($1::text[]) n) order by name`,
+    `select id from public.children
+      where public.child_name_forms(name, aliases) && array(select lower(btrim(n)) from unnest($1::text[]) n)
+      order by name`,
     [names],
   );
   return rows.map((r) => r.id);

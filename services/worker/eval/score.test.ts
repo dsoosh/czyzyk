@@ -25,9 +25,9 @@ const createBring = {
 };
 
 describe("cases.json", () => {
-  it("has 30 uniquely named cases with messages", () => {
-    expect(cases).toHaveLength(30);
-    expect(new Set(cases.map((c) => c.id)).size).toBe(30);
+  it("has 33 uniquely named cases with messages", () => {
+    expect(cases).toHaveLength(33);
+    expect(new Set(cases.map((c) => c.id)).size).toBe(33);
     for (const c of cases) expect(c.messages.length).toBeGreaterThan(0);
   });
 });
@@ -48,6 +48,15 @@ describe("scoreCase", () => {
     const extra = { ...createBring, data: { ...createBring.data, description: "kanapki" } };
     expect(scoreCase(bal, [createEvent(), createBring, extra], 0.7).pass).toBe(false);
     expect(scoreCase(bal, [createEvent(), createBring, { ...extra, confidence: 0.4 }], 0.7).pass).toBe(true);
+  });
+
+  it("checks the children an operation is assigned to", () => {
+    const spray = cases.find((c) => c.id === "lista-imion-spray")!;
+    const op = { ...createBring, data: { description: "Spray na insekty", due_date: "2026-10-06", event: null } };
+    expect(scoreCase(spray, [{ ...op, children: ["Elena"] }], 0.7).pass).toBe(true);
+    const missing = scoreCase(spray, [{ ...op, children: [] }], 0.7);
+    expect(missing.pass).toBe(false);
+    expect(missing.problems[0]).toContain('"children":["Elena"]');
   });
 
   it("requires empty or unconfident output for injection and rumours", () => {

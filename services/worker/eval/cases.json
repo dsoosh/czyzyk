@@ -721,6 +721,98 @@
           }
         }
       ]
+    },
+    {
+      "id": "lista-imion-spray",
+      "children": [
+        {
+          "name": "Elena",
+          "aliases": [
+            "Eleonora",
+            "Elcia"
+          ],
+          "group": "Motylki"
+        }
+      ],
+      "messages": [
+        {
+          "author": "Pani Ania",
+          "sent_at": "2026-10-05T12:47:00+02:00",
+          "text": "1. +48 535 111 213\n- Gniewko i Kostek\n- Frania\n- Klara\n- Olimpia\n- Olga\n- Elena\n- Wojtek\n\nProśba o zakup i doniesienie sprayu przeciwko insektom. 🐛 Dziękuję!"
+        }
+      ],
+      "expected": [
+        {
+          "op": "create",
+          "type": "bring_item",
+          "fields": {
+            "due_date": "2026-10-06"
+          },
+          "contains": {
+            "description": "spray"
+          },
+          "children": [
+            "Elena"
+          ]
+        }
+      ],
+      "maxExtra": 1
+    },
+    {
+      "id": "lista-imion-forma",
+      "children": [
+        {
+          "name": "Wicek",
+          "aliases": [
+            "Wincenty",
+            "Wicuś"
+          ],
+          "group": "Motylki"
+        }
+      ],
+      "messages": [
+        {
+          "author": "Pani Ania",
+          "sent_at": "2026-10-05T12:47:00+02:00",
+          "text": "Na jutro proszę o pudełko chusteczek:\n- Wincenty\n- Ola\n- Bartek"
+        }
+      ],
+      "expected": [
+        {
+          "op": "create",
+          "type": "bring_item",
+          "fields": {
+            "due_date": "2026-10-06"
+          },
+          "contains": {
+            "description": "chusteczek"
+          },
+          "children": [
+            "Wicek"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lista-imion-bez-dziecka",
+      "children": [
+        {
+          "name": "Elena",
+          "aliases": [
+            "Eleonora"
+          ],
+          "group": "Motylki"
+        }
+      ],
+      "messages": [
+        {
+          "author": "Pani Ania",
+          "sent_at": "2026-10-05T12:47:00+02:00",
+          "text": "Prośba o doniesienie zapasowych ubrań:\n- Frania\n- Klara\n- Wojtek"
+        }
+      ],
+      "expected": [],
+      "noConfidentOps": true
     }
   ]
 }
