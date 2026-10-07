@@ -234,8 +234,9 @@ describe("loadViewContext", () => {
     expect(data).not.toContain("Bal");
   });
 
-  it("dziś: jutrzejsze rzeczy, niezapłacone płatności, dni wolne w 14 dni", async () => {
+  it("dziś: rzeczy i wydarzenia na 7 dni, niezapłacone płatności, dni wolne w 14 dni", async () => {
     const { data } = await loadViewContext(pool, { kind: "today" }, NOW);
+    expect(data).toContain("Do przyniesienia (2026-10-08 – 2026-10-15)");
     expect(data).toContain("Do przyniesienia: przebranie");
     expect(data).toContain("Płatność: teatrzyk; 12,50 zł; termin poniedziałek 2026-10-12; niezapłacone");
     expect(data).toContain("dzień nauczyciela");

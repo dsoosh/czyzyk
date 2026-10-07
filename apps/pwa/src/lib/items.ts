@@ -95,7 +95,10 @@ export function groupLabel(names: Map<string, string>, groupId: string | null): 
 }
 
 export interface TodayData {
-  bringTomorrow: BringItem[];
+  /** Due today: packed in the morning. */
+  bringToday: BringItem[];
+  /** Due tomorrow to 7 days ahead, by date. */
+  bringWeek: BringItem[];
   events: EventItem[];
   payments: Payment[];
   actions: ActionRequired[];
@@ -107,10 +110,16 @@ export interface TodayData {
 
 /** Everything the home screen shows; only active items (needs_review stays hidden). */
 export async function fetchToday(db: Db, today: string): Promise<TodayData> {
-  const tomorrow = addDays(today, 1);
-  const [bringTomorrow, events, payments, actions, closures, groups, people, children] = await Promise.all([
+  const [bring, events, payments, actions, closures, groups, people, children] = await Promise.all([
     run<BringItem[]>(
-      db.from("bring_items").select(BRING_COLUMNS).eq("status", "active").eq("due_date", tomorrow).order("description"),
+      db
+        .from("bring_items")
+        .select(BRING_COLUMNS)
+        .eq("status", "active")
+        .gte("due_date", today)
+        .lte("due_date", addDays(today, 7))
+        .order("due_date")
+        .order("description"),
     ),
     run<EventItem[]>(
       db
@@ -147,7 +156,17 @@ export async function fetchToday(db: Db, today: string): Promise<TodayData> {
     fetchPeople(db),
     fetchChildren(db),
   ]);
-  return { bringTomorrow, events, payments, actions, closures, groups, people, children };
+  return {
+    bringToday: bring.filter((b) => b.due_date === today),
+    bringWeek: bring.filter((b) => b.due_date !== today),
+    events,
+    payments,
+    actions,
+    closures,
+    groups,
+    people,
+    children,
+  };
 }
 
 export interface CalendarData {

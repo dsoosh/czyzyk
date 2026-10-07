@@ -12,10 +12,13 @@ afterEach(() => vi.useRealTimers());
 const section = (name: string) => screen.getByRole("region", { name });
 
 describe("Dziś i jutro", () => {
-  it("jutro bal: rzecz w „Na jutro przynieść”, wydarzenie z etykietą „jutro”", async () => {
+  it("jutro bal: rzecz w „W najbliższych dniach” z etykietą „jutro”, wydarzenie z etykietą „jutro”", async () => {
     renderAt("/", { tables: { wa_groups: f.groups, events: [f.event()], bring_items: [f.bring()] } });
     await screen.findByRole("heading", { name: "Dziś i jutro" });
-    expect(within(section("Na jutro przynieść")).getByText("przebranie")).toBeInTheDocument();
+    const week = section("W najbliższych dniach");
+    expect(within(week).getByText("przebranie")).toBeInTheDocument();
+    expect(within(week).getByText("jutro")).toBeInTheDocument();
+    expect(within(section("Na dziś przynieść")).getByText("Na dziś nic do przyniesienia")).toBeInTheDocument();
     const events = section("Wydarzenia");
     expect(within(events).getByText("Bal")).toBeInTheDocument();
     expect(within(events).getByText("jutro")).toBeInTheDocument();
@@ -40,9 +43,40 @@ describe("Dziś i jutro", () => {
 
   it("pokazuje puste stany wszystkich sekcji", async () => {
     renderAt("/", { tables: { wa_groups: f.groups } });
-    expect(await screen.findByText("Na jutro nic do przyniesienia")).toBeInTheDocument();
+    expect(await screen.findByText("Na dziś nic do przyniesienia")).toBeInTheDocument();
+    expect(screen.getByText("W najbliższych dniach nic do przyniesienia")).toBeInTheDocument();
     expect(screen.getByText("Brak wydarzeń w najbliższym tygodniu")).toBeInTheDocument();
     expect(screen.getByText("Nic nie czeka na odpowiedź")).toBeInTheDocument();
+  });
+
+  it("rzeczy: dziś osobno, tydzień od jutra po dacie, bez dalszych terminów", async () => {
+    renderAt("/", {
+      tables: {
+        wa_groups: f.groups,
+        bring_items: [
+          f.bring({ id: "b1", description: "kalosze", due_date: "2026-10-10" }),
+          f.bring({ id: "b2", description: "przebranie", due_date: "2026-10-09" }),
+          f.bring({ id: "b3", description: "kanapki", due_date: "2026-10-08" }),
+          f.bring({ id: "b4", description: "kasztany", due_date: "2026-10-15" }),
+          f.bring({ id: "b5", description: "dynia", due_date: "2026-10-16" }),
+          f.bring({ id: "b6", description: "zeszłotygodniowe", due_date: "2026-10-07" }),
+        ],
+      },
+    });
+    const today = await screen.findByRole("region", { name: "Na dziś przynieść" });
+    expect(within(today).getByText("kanapki")).toBeInTheDocument();
+    expect(within(today).queryByText("przebranie")).not.toBeInTheDocument();
+    const week = section("W najbliższych dniach");
+    expect(within(week).getByText("przebranie").compareDocumentPosition(within(week).getByText("kalosze"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(within(week).getByText("kalosze").compareDocumentPosition(within(week).getByText("kasztany"))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(within(week).getAllByRole("checkbox")).toHaveLength(3);
+    expect(within(week).getByText("czw 15.10")).toBeInTheDocument();
+    expect(screen.queryByText("dynia")).not.toBeInTheDocument();
+    expect(screen.queryByText("zeszłotygodniowe")).not.toBeInTheDocument();
   });
 
   it("pokazuje baner zbliżającego się dnia wolnego, ale nie odległego", async () => {
@@ -74,19 +108,21 @@ describe("Dziś i jutro", () => {
 
     vi.setSystemTime(new Date("2026-10-09T07:00:00+02:00"));
     await act(async () => document.dispatchEvent(new Event("visibilitychange")));
-    expect(await screen.findByText("kalosze")).toBeInTheDocument();
-    expect(screen.queryByText("przebranie")).not.toBeInTheDocument();
+    // Packed in the morning: yesterday's "tomorrow" is now today's list.
+    expect(await within(section("Na dziś przynieść")).findByText("przebranie")).toBeInTheDocument();
+    expect(within(section("W najbliższych dniach")).getByText("kalosze")).toBeInTheDocument();
+    expect(within(section("W najbliższych dniach")).getByText("jutro")).toBeInTheDocument();
     expect(from.mock.calls.length).toBeGreaterThan(calls);
   });
 });
 
-describe("Checklista „Na jutro przynieść”", () => {
+describe("Checklista rzeczy do przyniesienia", () => {
   it("stuknięcie wywołuje mark_packed, przekreśla rzecz i podpisuje „spakowane przez Ciebie”", async () => {
     const { rpc } = renderAt("/", { tables: { wa_groups: f.groups, bring_items: [f.bring()] } });
     const box = await screen.findByRole("checkbox", { name: "przebranie" });
     await act(async () => fireEvent.click(box));
     expect(rpc).toHaveBeenCalledWith("mark_packed", { p_id: "b1", p_done: true });
-    const list = section("Na jutro przynieść");
+    const list = section("W najbliższych dniach");
     expect(await within(list).findByText("spakowane przez Ciebie, 16:00")).toBeInTheDocument();
     expect(within(list).getByText("przebranie")).toHaveClass("line-through");
   });
