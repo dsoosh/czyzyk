@@ -147,6 +147,36 @@ describe("runGroupExtraction", () => {
     expect((await db.client.query("select op, changes from item_changes")).rows).toEqual([{ op: "cancel", changes: null }]);
   });
 
+  it("stałe zajęcia: jedno wydarzenie powtarzane we wtorki, widoczne w kolejnych analizach", async () => {
+    await addMessage("Od przyszłego tygodnia basen w każdy wtorek o 9:00 do końca stycznia", "2026-10-07T10:00:00Z");
+    const create = scripted((p) => [
+      op({
+        op: "create",
+        type: "event",
+        ref: null,
+        data: {
+          title: "Basen",
+          start: "2026-10-13T09:00",
+          end: null,
+          all_day: false,
+          location: null,
+          whole_kindergarten: false,
+          repeat: { weekdays: [2], until: "2027-01-31" },
+        },
+        source_messages: [lastAlias(p)],
+      }),
+    ]);
+    await runGroupExtraction(deps(create.model), groupId);
+    const { rows } = await db.client.query("select repeat_weekdays, to_char(repeat_until, 'YYYY-MM-DD') as until from events");
+    expect(rows).toEqual([{ repeat_weekdays: [2], until: "2027-01-31" }]);
+
+    // Months later the event is still in the context, with its repetition.
+    await addMessage("Przypominam o czepkach", "2026-12-01T10:00:00Z");
+    const later = scripted(() => []);
+    await runGroupExtraction(deps(later.model, "2026-12-01T12:00:00Z"), groupId);
+    expect(later.prompts[0]!.user).toContain('"repeat":{"until":"2027-01-31","weekdays":[2]}');
+  });
+
   it("nowe wydarzenie zapisuje wpis „utworzono” z danymi; aktualizacja bez zmian nie zapisuje nic", async () => {
     await addMessage("W piątek bal o 10:00", "2026-10-07T10:00:00Z");
     const create = scripted((p) => [

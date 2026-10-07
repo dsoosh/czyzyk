@@ -14,6 +14,7 @@ import {
 } from "../lib/dates";
 import { fetchCalendar, groupLabel, type CalendarData, type Closure, type EventItem } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
+import { eventKey, repeatLabel } from "../lib/recurrence";
 
 type View = "list" | "month";
 
@@ -50,12 +51,13 @@ function DayItems({ entries, groups }: { entries: DayEntries; groups: Map<string
         </li>
       ))}
       {entries.events.map((e) => (
-        <li key={e.id} className="flex flex-col gap-1 p-4">
+        <li key={eventKey(e)} className="flex flex-col gap-1 p-4">
           <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-medium hover:underline">
             {e.title}
           </Link>
           <Meta>
             <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
+            {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
             {e.location && <span>{e.location}</span>}
             <span>{groupLabel(groups, e.group_id)}</span>
             <SourceLink kind="event" id={e.id} />

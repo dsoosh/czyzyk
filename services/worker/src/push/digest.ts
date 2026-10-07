@@ -22,11 +22,10 @@ export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string):
       [tomorrow],
     ),
     db.query<{ title: string; all_day: boolean; time: string }>(
-      `select title, all_day, to_char(starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time from public.events
-        where status = 'active'
-          and starts_at >= ($1::date)::timestamp at time zone 'Europe/Warsaw'
-          and starts_at < ($1::date + 1)::timestamp at time zone 'Europe/Warsaw'
-        order by starts_at, title`,
+      `select e.title, e.all_day, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
+         from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
+        where e.status = 'active'
+        order by o.starts_at, e.title`,
       [tomorrow],
     ),
     db.query<{ description: string }>(
@@ -99,11 +98,10 @@ export async function buildMorning(db: Pick<pg.Pool, "query">, today: string): P
       [today],
     ),
     db.query<{ title: string; all_day: boolean; time: string }>(
-      `select title, all_day, to_char(starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time from public.events
-        where status = 'active'
-          and starts_at >= ($1::date)::timestamp at time zone 'Europe/Warsaw'
-          and starts_at < ($1::date + 1)::timestamp at time zone 'Europe/Warsaw'
-        order by starts_at, title`,
+      `select e.title, e.all_day, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
+         from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
+        where e.status = 'active'
+        order by o.starts_at, e.title`,
       [today],
     ),
     db.query<{ description: string }>(

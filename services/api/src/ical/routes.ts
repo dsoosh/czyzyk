@@ -13,20 +13,24 @@ const HISTORY_DAYS = 90;
  * provider: title, time, place and group name. Never message text or authors.
  */
 const FEED_SQL = `
-  select e.id, e.updated_at as stamp, e.title as summary, e.location, e.all_day,
+  select case when e.repeat_weekdays is null then e.id::text
+              else e.id::text || '-' || to_char(o.starts_at at time zone 'Europe/Warsaw', 'YYYYMMDD') end as id,
+         e.updated_at as stamp, e.title as summary, e.location, e.all_day,
          coalesce(g.display_name, g.wa_name) as group_name,
-         case when e.all_day then to_char(e.starts_at at time zone 'Europe/Warsaw', 'YYYYMMDD')
-              else to_char(e.starts_at at time zone 'Europe/Warsaw', 'YYYYMMDD"T"HH24MISS') end as start_local,
-         case when e.all_day then to_char((coalesce(e.ends_at, e.starts_at) at time zone 'Europe/Warsaw')::date + 1, 'YYYYMMDD')
-              when e.ends_at is null then null
-              else to_char(e.ends_at at time zone 'Europe/Warsaw', 'YYYYMMDD"T"HH24MISS') end as end_local,
+         case when e.all_day then to_char(o.starts_at at time zone 'Europe/Warsaw', 'YYYYMMDD')
+              else to_char(o.starts_at at time zone 'Europe/Warsaw', 'YYYYMMDD"T"HH24MISS') end as start_local,
+         case when e.all_day then to_char((coalesce(o.ends_at, o.starts_at) at time zone 'Europe/Warsaw')::date + 1, 'YYYYMMDD')
+              when o.ends_at is null then null
+              else to_char(o.ends_at at time zone 'Europe/Warsaw', 'YYYYMMDD"T"HH24MISS') end as end_local,
          'event' as kind
-    from public.events e
+    -- Recurring events (recurring-events) become one entry per occurrence, closure days skipped.
+    from public.event_occurrences((now() at time zone 'Europe/Warsaw')::date - $1::int, (now() at time zone 'Europe/Warsaw')::date + 365) o
+    join public.events e on e.id = o.id
     left join public.wa_groups g on g.id = e.group_id
    where e.status = 'active'
-     and coalesce(e.ends_at, e.starts_at) >= now() - make_interval(days => $1)
+     and coalesce(o.ends_at, o.starts_at) >= now() - make_interval(days => $1)
   union all
-  select c.id, c.updated_at, coalesce('Przedszkole nieczynne: ' || c.reason, 'Przedszkole nieczynne'), null, true,
+  select c.id::text, c.updated_at, coalesce('Przedszkole nieczynne: ' || c.reason, 'Przedszkole nieczynne'), null, true,
          coalesce(g.display_name, g.wa_name),
          to_char(c.date_from, 'YYYYMMDD'),
          to_char(c.date_to + 1, 'YYYYMMDD'),

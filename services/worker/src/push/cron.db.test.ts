@@ -103,6 +103,18 @@ describe("Poranny skrót i przypomnienia o terminach", () => {
     ]);
   });
 
+  it("stałe zajęcia trafiają do porannego skrótu w swoje dni, z pominięciem dnia wolnego", async () => {
+    await db.client.query(
+      "insert into events (title, starts_at, all_day, repeat_weekdays) values ('Basen', '2026-10-06 09:00+02', false, '{2,4}')",
+    );
+    await db.client.query("insert into closures (date_from, date_to) values ('2026-10-15', '2026-10-15')");
+    const { sender, sent } = fakeSender();
+    await morning(sender, at("2026-10-13T06:45:00")); // Tuesday
+    await morning(sender, at("2026-10-14T06:45:00")); // Wednesday: nothing
+    await morning(sender, at("2026-10-15T06:45:00")); // Thursday, closed
+    expect([...new Set(sent.map((s) => s.payload.body))]).toEqual(["Dziś: Basen 09:00", "Dziś: przedszkole nieczynne"]);
+  });
+
   it("nic na dziś i brak terminów: nic nie jest wysyłane", async () => {
     await db.client.query("insert into payments (description, due_date) values ('za tydzień', '2026-10-15')");
     const { sender, sent } = fakeSender();

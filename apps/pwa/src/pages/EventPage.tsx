@@ -4,6 +4,7 @@ import { LoadError, Loading, SourceLink } from "../components/ui";
 import { longDayLabel, warsawDay, warsawTime } from "../lib/dates";
 import { fetchEvent, groupLabel } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
+import { repeatLabel } from "../lib/recurrence";
 
 export function EventPage() {
   const { id = "" } = useParams();
@@ -28,7 +29,7 @@ export function EventPage() {
       {event.status === "cancelled" && <p className="font-semibold text-red-700">Odwołane</p>}
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-2xl bg-white p-4 shadow-sm">
         <dt className="text-slate-500">Termin</dt>
-        <dd>{when}</dd>
+        <dd>{repeatLabel(event) ? `${repeatLabel(event)}, od ${when}` : when}</dd>
         {event.location && (
           <>
             <dt className="text-slate-500">Miejsce</dt>

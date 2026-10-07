@@ -93,7 +93,9 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
                   else to_char(t.ends_at at time zone 'Europe/Warsaw', 'YYYY-MM-DD"T"HH24:MI') end,
       'all_day', t.all_day,
       'location', t.location,
-      'whole_kindergarten', t.group_id is null) as data,
+      'whole_kindergarten', t.group_id is null,
+      'repeat', case when t.repeat_weekdays is null then null
+                     else jsonb_build_object('weekdays', to_jsonb(t.repeat_weekdays), 'until', to_char(t.repeat_until, 'YYYY-MM-DD')) end) as data,
       coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children
     from public.events t`,
   bring_item: `select t.id, t.status, jsonb_build_object(
@@ -127,7 +129,9 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
 
 /** Which items are still relevant for the model ($1 = group id, $2 = today in Warsaw). */
 const ITEM_FILTERS: Record<ItemType, string> = {
-  event: "coalesce(t.ends_at, t.starts_at) >= ($2::date)::timestamp at time zone 'Europe/Warsaw'",
+  // Recurring events stay in context while they repeat (recurring-events).
+  event: `(coalesce(t.ends_at, t.starts_at) >= ($2::date)::timestamp at time zone 'Europe/Warsaw'
+           or (t.repeat_weekdays is not null and (t.repeat_until is null or t.repeat_until >= $2::date)))`,
   bring_item: "(t.due_date is null or t.due_date >= $2::date)",
   payment: "(t.paid_at is null or t.due_date >= $2::date)",
   action_required: "(t.resolved_at is null or t.due_date >= $2::date)",

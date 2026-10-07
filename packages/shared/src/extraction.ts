@@ -23,6 +23,19 @@ export const eventDataSchema = z
     all_day: z.boolean(),
     location: z.string().trim().max(200).nullable(),
     whole_kindergarten: z.boolean().describe("true, gdy dotyczy całego przedszkola, a nie tylko tej grupy"),
+    repeat: z
+      .object({
+        weekdays: z
+          .array(z.number().int().min(1).max(7))
+          .min(1)
+          .max(7)
+          .describe("Dni tygodnia: 1 = poniedziałek … 7 = niedziela"),
+        until: localDate.nullable().describe("Ostatni dzień powtarzania albo null (do odwołania)"),
+      })
+      .strict()
+      .nullable()
+      .optional()
+      .describe("Tylko dla stałych zajęć w określone dni tygodnia (np. basen w każdy wtorek); inaczej null"),
   })
   .strict();
 
