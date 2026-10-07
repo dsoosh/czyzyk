@@ -5,7 +5,7 @@ System SHALL po każdej zmianie aplikacji Android na gałęzi `main` budować AP
 
 #### Scenario: Merge zmiany w aplikacji
 - **WHEN** do `main` trafia zmiana w `apps/android`, a sekrety podpisu są ustawione
-- **THEN** powstaje wydanie `android-v<numer>` z `czyzyk.apk` i `version.json`, oznaczone jako najnowsze
+- **THEN** powstaje wydanie `android-v<numer>` z `czyzyk-connect.apk` i `version.json`, oznaczone jako najnowsze
 
 #### Scenario: Brak sekretów
 - **WHEN** sekrety podpisu nie są ustawione

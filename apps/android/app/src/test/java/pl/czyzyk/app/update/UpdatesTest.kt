@@ -78,7 +78,7 @@ class UpdatesTest {
         assertEquals(1042L, ready.update.versionCode)
         assertTrue(apk.contentEquals(ready.apk.readBytes()))
         assertEquals("/dsoosh/czyzyk/releases/latest/download/version.json", server.takeRequest().path)
-        assertEquals("/dsoosh/czyzyk/releases/download/android-v1042/czyzyk.apk", server.takeRequest().path)
+        assertEquals("/dsoosh/czyzyk/releases/download/android-v1042/czyzyk-connect.apk", server.takeRequest().path)
         assertEquals(ready.update, state.readyUpdate)
         assertEquals(1000L, state.lastUpdateCheckAt)
         assertTrue(Updates.verify(ready, state, dir))

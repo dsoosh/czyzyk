@@ -3,7 +3,7 @@
 ## Decisions
 
 ### D1. Wydania GitHub jako źródło aktualizacji
-Repozytorium jest publiczne, więc telefon nie potrzebuje tokenu. Stały adres `https://github.com/<repo>/releases/latest/download/version.json` zwraca opis najnowszego wydania: `{versionCode, versionName, tag, sha256, size}`. APK telefon pobiera z `https://github.com/<repo>/releases/download/<tag>/czyzyk.apk` – adres składany z repozytorium wkompilowanego w aplikację (`BuildConfig.UPDATE_REPO`) i tagu `android-v<liczba>`, nigdy z dowolnego URL-a z pliku. Bez API GitHuba, więc bez limitów zapytań i bez parsowania dużych odpowiedzi.
+Repozytorium jest publiczne, więc telefon nie potrzebuje tokenu. Stały adres `https://github.com/<repo>/releases/latest/download/version.json` zwraca opis najnowszego wydania: `{versionCode, versionName, tag, sha256, size}`. APK telefon pobiera z `https://github.com/<repo>/releases/download/<tag>/czyzyk-connect.apk` – adres składany z repozytorium wkompilowanego w aplikację (`BuildConfig.UPDATE_REPO`) i tagu `android-v<liczba>`, nigdy z dowolnego URL-a z pliku. Bez API GitHuba, więc bez limitów zapytań i bez parsowania dużych odpowiedzi.
 
 ### D2. Podpis i numer wersji w CI
 Klucz podpisu (keystore) jest w sekretach GitHuba jako base64 i trafia na dysk runnera tylko na czas budowania. Gradle bierze podpis i wersję ze zmiennych środowiskowych (`CZYZYK_KEYSTORE_FILE`, `CZYZYK_KEYSTORE_PASSWORD`, `CZYZYK_KEY_ALIAS`, `CZYZYK_KEY_PASSWORD`, `CZYZYK_VERSION_CODE`, `CZYZYK_VERSION_NAME`); lokalnie i w PR-ach budują się bez nich. `versionCode = 1000 + 10 × numer przebiegu + próba` – rośnie z każdym wydaniem, a ponowne uruchomienie przebiegu nie koliduje z istniejącym tagiem. Bez sekretów workflow kończy się ostrzeżeniem, bez wydania.

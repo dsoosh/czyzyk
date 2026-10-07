@@ -40,9 +40,12 @@ class ReleaseSource(private val base: String) {
     val manifestUrl: String get() = "$base/releases/latest/download/version.json"
 
     /** The APK URL is built from the repository and the validated tag, never taken from the file. */
-    fun apkUrl(info: UpdateInfo): String = "$base/releases/download/${info.tag}/czyzyk.apk"
+    fun apkUrl(info: UpdateInfo): String = "$base/releases/download/${info.tag}/$APK_NAME"
 
     companion object {
+        /** Release asset name; android-release.yml publishes the APK under it. */
+        const val APK_NAME = "czyzyk-connect.apk"
+
         fun github(repo: String) = ReleaseSource("https://github.com/$repo")
     }
 }

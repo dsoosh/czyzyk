@@ -12,7 +12,8 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "pl.czyzyk.app"
+        // Separate from the PWA installed from the browser, which is also called "Czyżyk".
+        applicationId = "pl.czyzyk.connect"
         minSdk = 26
         targetSdk = 36
         versionCode = env("CZYZYK_VERSION_CODE")?.toInt() ?: 1

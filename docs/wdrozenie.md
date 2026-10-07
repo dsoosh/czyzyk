@@ -121,7 +121,7 @@ Migracje: stosują się same przy wdrożeniu (`0004_ingest.sql`), patrz sekcja 3
 
 ## 9. Telefon
 
-1. Pobierz `czyzyk.apk` z najnowszego wydania (GitHub → Releases; wymaga sekretów podpisu – `apps/android/README.md` → „Klucz podpisu”) i zainstaluj na telefonie z WhatsAppem (zezwól na instalację z nieznanych źródeł). Wydanie aktualizuje się samo; artefakt `czyzyk-debug-apk` z GitHub Actions nadaje się tylko do testów.
+1. Pobierz `czyzyk-connect.apk` z najnowszego wydania (GitHub → Releases; wymaga sekretów podpisu – `apps/android/README.md` → „Klucz podpisu”) i zainstaluj na telefonie z WhatsAppem (zezwól na instalację z nieznanych źródeł). Wydanie aktualizuje się samo; artefakt `czyzyk-debug-apk` z GitHub Actions nadaje się tylko do testów.
 2. W PWA: **Admin → Urządzenia → Dodaj telefon**. Zeskanuj kod QR w aplikacji Czyżyk albo otwórz link na telefonie. Token jest widoczny tylko raz.
 3. W aplikacji włącz **dostęp do powiadomień** i wyłącz **optymalizację baterii** (przyciski na ekranie głównym). Na Xiaomi/Samsungu zezwól dodatkowo na autostart.
 4. W WhatsAppie ustaw grupom przedszkolnym **cichy dźwięk** zamiast wyciszenia.

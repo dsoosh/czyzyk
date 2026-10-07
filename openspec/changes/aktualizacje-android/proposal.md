@@ -8,7 +8,7 @@ Zmiana poza kolejnością etapów, na prośbę użytkownika. **Gotowe, gdy:** me
 
 ## What Changes
 
-- CI: nowy workflow `Android release` – po zmianach w `apps/android` na `main` buduje APK release podpisany stałym kluczem z sekretów GitHuba, z rosnącym `versionCode`, i publikuje wydanie GitHub z `czyzyk.apk` i `version.json` (wersja, tag, SHA-256, rozmiar). Bez sekretów workflow tylko ostrzega.
+- CI: nowy workflow `Android release` – po zmianach w `apps/android` na `main` buduje APK release podpisany stałym kluczem z sekretów GitHuba, z rosnącym `versionCode`, i publikuje wydanie GitHub z `czyzyk-connect.apk` i `version.json` (wersja, tag, SHA-256, rozmiar). Bez sekretów workflow tylko ostrzega.
 - CI (`ci.yml`): budowanie wariantu release (R8) przy każdym PR.
 - Android: sprawdzanie `version.json` z najnowszego wydania przy otwarciu aplikacji (co najwyżej co 6 h) i raz dziennie w tle; pobranie APK z wydania o tym tagu, weryfikacja rozmiaru i SHA-256, instalacja przez `PackageInstaller` (bez pytania na Androidzie 12+, gdy aplikacja sama zainstalowała poprzednią wersję; inaczej okno „Zainstaluj”).
 - Ekran telefonu: karta „Aktualizacje” (wersja, stan, „Sprawdź teraz”, „Zainstaluj”, zgoda na instalowanie).

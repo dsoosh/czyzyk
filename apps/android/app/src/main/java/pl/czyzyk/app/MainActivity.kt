@@ -161,7 +161,7 @@ class MainActivity : ComponentActivity() {
     private fun installUpdate() {
         val ready = update ?: return
         if (!ApkInstaller.allowed(this)) {
-            Toast.makeText(this, "Zezwól Czyżykowi na instalowanie aplikacji, potem wróć i stuknij „Zainstaluj”.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Zezwól aplikacji Czyżyk Connect na instalowanie aplikacji, potem wróć i stuknij „Zainstaluj”.", Toast.LENGTH_LONG).show()
             startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
             return
         }
@@ -332,7 +332,7 @@ private fun UpdateDialog(versionName: String, onInstall: () -> Unit, onLater: ()
     MaterialTheme {
         AlertDialog(
             onDismissRequest = onLater,
-            title = { Text("Nowa wersja Czyżyka") },
+            title = { Text("Nowa wersja Czyżyk Connect") },
             text = { Text("Wersja $versionName jest pobrana i gotowa do instalacji. Aplikacja na chwilę się zamknie.") },
             confirmButton = { Button(onClick = onInstall) { Text("Zainstaluj") } },
             dismissButton = { TextButton(onClick = onLater) { Text("Później") } },
@@ -654,6 +654,6 @@ private fun TipsCard() {
 }
 
 object AppInfo {
-    const val NAME = "Czyżyk"
+    const val NAME = "Czyżyk Connect"
     const val TAGLINE = "Źródło danych dla asystenta przedszkolnego"
 }

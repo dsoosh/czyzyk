@@ -35,7 +35,7 @@ function TokenDialog({ name, token, onClose }: { name: string; token: string; on
       <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5">
         <h2 className="font-display text-3xl font-bold text-ink">Sparuj „{name}”</h2>
         <p className="text-sm text-slate-600">
-          Zeskanuj kod w aplikacji Czyżyk na telefonie albo otwórz link na telefonie. Token zobaczysz tylko teraz.
+          Zeskanuj kod w aplikacji Czyżyk Connect na telefonie albo otwórz link na telefonie. Token zobaczysz tylko teraz.
         </p>
         {qr && <img src={qr} alt="Kod QR parowania" className="mx-auto h-60 w-60" />}
         {link ? (
