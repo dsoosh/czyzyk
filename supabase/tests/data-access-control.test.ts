@@ -3,7 +3,7 @@ import { allowEmail, anon, as, createAuthUser, createTestDb, service, user, type
 
 const DOMAIN_TABLES = [
   "profiles", "wa_groups", "messages", "attachments", "events", "bring_items",
-  "payments", "action_required", "closures", "facts",
+  "payments", "action_required", "closures", "facts", "item_changes",
 ];
 const ADMIN_TABLES = ["allowed_emails", "devices", "sync_log", "push_alerts_sent", "llm_calls"];
 const PRIVATE_TABLES = ["chat_threads", "chat_messages", "push_subscriptions", "ical_tokens", "push_settings"];
@@ -44,6 +44,7 @@ beforeAll(async () => {
     [groupId, messageId],
   );
   eventId = e[0].id;
+  await c.query("insert into item_changes (item_type, item_id, op, changes) values ('event', $1, 'create', '{}')", [eventId]);
   await c.query("insert into bring_items (event_id, description, due_date) values ($1, 'przebranie', current_date)", [eventId]);
   await c.query("insert into payments (description, amount_pln) values ('teatrzyk', 10)");
   await c.query("insert into action_required (question) values ('Zgoda na wycieczkę')");

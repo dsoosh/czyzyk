@@ -23,7 +23,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  for (const t of ["bring_items", "events", "payments", "action_required", "closures", "facts", "messages", "sync_log", "llm_calls", "children", "wa_groups"]) {
+  for (const t of ["bring_items", "events", "payments", "action_required", "closures", "facts", "messages", "sync_log", "llm_calls", "item_changes", "children", "wa_groups"]) {
     await db.client.query(`delete from ${t}`);
   }
   const { rows } = await db.client.query("insert into wa_groups (wa_name, display_name, tracked) values ('Motylki 2026/27', 'Motylki', true) returning id");
@@ -120,6 +120,17 @@ describe("runGroupExtraction", () => {
     expect(rows).toHaveLength(1);
     expect(new Date(rows[0].starts_at).toISOString()).toBe("2026-10-16T22:00:00.000Z");
     expect(rows[0].source_message_ids.sort()).toEqual([old, now].sort());
+    // item-history: the change keeps the previous value and its source message.
+    const { rows: history } = await db.client.query("select item_id, op, changes, source_message_ids, rationale from item_changes");
+    expect(history).toEqual([
+      {
+        item_id: rows[0].id,
+        op: "update",
+        changes: { start: { from: "2026-10-10", to: "2026-10-17" } },
+        source_message_ids: [now],
+        rationale: "Uzasadnienie.",
+      },
+    ]);
   });
 
   it("odwołanie ustawia status cancelled", async () => {
@@ -133,6 +144,30 @@ describe("runGroupExtraction", () => {
     ]);
     expect(await runGroupExtraction(deps(model), groupId)).toMatchObject({ cancelled: 1 });
     expect((await db.client.query("select status from events")).rows[0].status).toBe("cancelled");
+    expect((await db.client.query("select op, changes from item_changes")).rows).toEqual([{ op: "cancel", changes: null }]);
+  });
+
+  it("nowe wydarzenie zapisuje wpis „utworzono” z danymi; aktualizacja bez zmian nie zapisuje nic", async () => {
+    await addMessage("W piątek bal o 10:00", "2026-10-07T10:00:00Z");
+    const create = scripted((p) => [
+      op({
+        op: "create",
+        type: "event",
+        ref: null,
+        data: { title: "Bal", start: "2026-10-09T10:00", end: null, all_day: false, location: null, whole_kindergarten: false },
+        source_messages: [lastAlias(p)],
+      }),
+    ]);
+    await runGroupExtraction(deps(create.model), groupId);
+    const { rows } = await db.client.query("select op, changes from item_changes");
+    expect(rows).toEqual([
+      { op: "create", changes: { title: "Bal", start: "2026-10-09T10:00", end: null, all_day: false, location: null, whole_kindergarten: false } },
+    ]);
+
+    await addMessage("Przypominam o balu", "2026-10-07T11:00:00Z");
+    const same = scripted((p) => [op({ op: "update", type: "event", target: "E1", data: { title: "Bal" }, source_messages: [lastAlias(p)] })]);
+    await runGroupExtraction(deps(same.model), groupId);
+    expect((await db.client.query("select count(*)::int as n from item_changes")).rows[0].n).toBe(1);
   });
 
   it("rozmowa bez treści organizacyjnej nie tworzy elementów, ale oznacza wiadomości", async () => {
