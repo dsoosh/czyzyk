@@ -133,6 +133,34 @@ class WorkersTest {
     }
 
     @Test
+    fun outboxDrainsDirectlyWithoutWorkManager() {
+        queue.enqueue(message("k1"))
+        queue.enqueue(message("k2"))
+        assertEquals(DrainResult.EMPTY, Outbox.drain(context))
+        assertEquals(0, queue.size())
+        assertEquals(listOf("k1", "k2"), api.sent.map { it.idempotencyKey })
+    }
+
+    @Test
+    fun outboxStopsAtNetworkErrorAndKeepsTheRest() {
+        queue.enqueue(message("k1"))
+        queue.enqueue(message("k2"))
+        api.results = mutableListOf(SendResult.Delivered, SendResult.Retry("SocketTimeoutException"))
+        assertEquals(DrainResult.RETRY, Outbox.drain(context))
+        assertEquals(1, queue.size())
+        assertEquals("k2", queue.oldest(1).single().message.idempotencyKey)
+    }
+
+    @Test
+    fun outboxOfRevokedDeviceSendsNothing() {
+        store.markRevoked()
+        queue.enqueue(message("k1"))
+        assertEquals(DrainResult.NOT_PAIRED, Outbox.drain(context))
+        assertEquals(1, queue.size())
+        assertEquals(0, api.sent.size)
+    }
+
+    @Test
     fun syncStoresTrackedGroupsAndReportsNewNames() = runTest {
         state.addPendingGroupReport("Sąsiedzi")
         assertEquals(ListenableWorker.Result.success(), runSync())

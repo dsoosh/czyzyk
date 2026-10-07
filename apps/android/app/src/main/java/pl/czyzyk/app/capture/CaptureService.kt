@@ -1,10 +1,13 @@
 package pl.czyzyk.app.capture
 
 import android.graphics.BitmapFactory
+import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import pl.czyzyk.app.photos.PhotoNote
 import pl.czyzyk.app.work.Deps
+import pl.czyzyk.app.work.DrainResult
+import pl.czyzyk.app.work.Outbox
 import pl.czyzyk.app.work.Work
 import java.io.File
 import kotlin.concurrent.thread
@@ -100,11 +103,33 @@ class CaptureService : NotificationListenerService() {
                 if (message.hasAttachment) state.incrementAttachments()
             }
         }
-        if (added > 0) Work.enqueueSend(this)
+        if (added > 0) sendNow()
         if (state.trackedGroupsStale()) Work.enqueueSync(this)
     }
 
+    /**
+     * Sends right away from the listener, which keeps running with the screen off; WorkManager
+     * would wait for a Doze maintenance window. Anything left (no network, 5xx) goes to the
+     * backoff of SendWorker.
+     */
+    private fun sendNow() {
+        val context = applicationContext
+        thread(name = "send-now") {
+            val wakeLock = context.getSystemService(PowerManager::class.java)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "czyzyk:send")
+                .apply { acquire(SEND_WAKE_LOCK_MILLIS) }
+            try {
+                val result = runCatching { Outbox.drain(context) }.getOrDefault(DrainResult.RETRY)
+                if (result == DrainResult.RETRY) Work.enqueueSend(context)
+            } finally {
+                if (wakeLock.isHeld) wakeLock.release()
+            }
+        }
+    }
+
     companion object {
+        /** Upper bound of one immediate send (a batch over a slow network). */
+        private const val SEND_WAKE_LOCK_MILLIS = 60 * 1000L
         /** Time for WhatsApp to download the photo before the check. */
         private const val PHOTO_DELAY_SECONDS = 90L
     }
