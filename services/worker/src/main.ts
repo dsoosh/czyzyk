@@ -3,6 +3,7 @@ import { pino } from "pino";
 import { loadWorkerConfig } from "./config.js";
 import { AnthropicDocumentChecker } from "./extraction/documents.js";
 import { AnthropicExtractionModel } from "./extraction/model.js";
+import { AnthropicTriageModel } from "./extraction/triage.js";
 import { pushConfig } from "./push/config.js";
 import { webPushSender } from "./push/send.js";
 import { startWorker } from "./worker.js";
@@ -14,6 +15,7 @@ const anthropic = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY, maxRetries: 
 const push = pushConfig(config);
 const worker = await startWorker(config, logger, {
   model: new AnthropicExtractionModel(anthropic, config.EXTRACTION_MODEL),
+  triage: config.TRIAGE_MODEL ? new AnthropicTriageModel(anthropic, config.TRIAGE_MODEL) : undefined,
   documents: new AnthropicDocumentChecker(anthropic, config.DOCUMENT_MODEL ?? config.EXTRACTION_MODEL),
   push: push && {
     sender: webPushSender({ subject: push.VAPID_SUBJECT, publicKey: push.VAPID_PUBLIC_KEY, privateKey: push.VAPID_PRIVATE_KEY }),

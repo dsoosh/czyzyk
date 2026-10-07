@@ -5,6 +5,18 @@ import { renderAt } from "../../test/render";
 
 const calls = [
   {
+    id: "t0",
+    kind: "triage",
+    group_id: "g1",
+    model: "tani",
+    request: { system: "Wstępnie oceniasz", user: "Dziękuję!" },
+    response: { relevant: false },
+    error: null,
+    usage: { input_tokens: 300, output_tokens: 20 },
+    duration_ms: 500,
+    created_at: "2026-10-07T16:07:00Z",
+  },
+  {
     id: "c0",
     kind: "document",
     group_id: "g1",
@@ -45,8 +57,11 @@ const calls = [
 describe("Admin → LLM", () => {
   it("pokazuje wywołania od najnowszych z zapytaniem, odpowiedzią i błędem", async () => {
     renderAt("/admin/llm", { admin: true, tables: { llm_calls: calls, wa_groups: [{ id: "g1", wa_name: "Motylki 2026/27", display_name: "Motylki" }] } });
-    const all = await screen.findAllByRole("listitem");
-    expect(all).toHaveLength(3);
+    const listed = await screen.findAllByRole("listitem");
+    expect(listed).toHaveLength(4);
+    expect(within(listed[0]!).getByText("wstępna ocena")).toBeInTheDocument();
+    expect(within(listed[0]!).getByText("pominięte")).toBeInTheDocument();
+    const all = listed.slice(1);
     expect(within(all[0]!).getByText("kontrola zdjęcia")).toBeInTheDocument();
     expect(within(all[0]!).getByText("widać ludzi – obraz usunięty")).toBeInTheDocument();
     const items = all.slice(1);

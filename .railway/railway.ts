@@ -104,6 +104,8 @@ export default defineRailway(() => {
       ANTHROPIC_API_KEY: preserve(),
       // Model names live in configuration, never in code (CLAUDE.md).
       EXTRACTION_MODEL: "claude-haiku-4-5",
+      // Short first look at a batch (message-triage); remove to keep only the free rules.
+      TRIAGE_MODEL: "claude-haiku-4-5",
       EXTRACTION_DELAY_SECONDS: "15",
       EXTRACTION_CONFIDENCE_THRESHOLD: "0.7",
       EXTRACTION_CONTEXT_MESSAGES: "50",

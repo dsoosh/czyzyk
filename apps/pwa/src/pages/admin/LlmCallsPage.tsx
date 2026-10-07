@@ -8,11 +8,11 @@ const PAGE = 50;
 
 interface LlmCall {
   id: string;
-  kind: "extraction" | "document";
+  kind: "extraction" | "document" | "triage";
   group_id: string | null;
   model: string | null;
   request: { system?: string; user?: string; images?: string[] };
-  response: { operations?: unknown[]; containsPeople?: boolean } | null;
+  response: { operations?: unknown[]; containsPeople?: boolean; relevant?: boolean } | null;
   error: string | null;
   usage: { input_tokens?: number; output_tokens?: number } | null;
   duration_ms: number | null;
@@ -60,7 +60,7 @@ export function LlmCallsPage() {
                     {shortDate(warsawDay(c.created_at))} {warsawTime(c.created_at)}
                   </span>
                   <span>{groupLabel(data.groups, c.group_id)}</span>
-                  {c.kind === "document" && <span className="text-xs text-slate-500">kontrola zdjęcia</span>}
+                  {c.kind !== "extraction" && <span className="text-xs text-slate-500">{KIND_LABELS[c.kind]}</span>}
                   {c.error ? (
                     <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">błąd</span>
                   ) : (
@@ -94,7 +94,10 @@ function Block({ title, text, open = false }: { title: string; text: string; ope
   );
 }
 
+const KIND_LABELS: Record<LlmCall["kind"], string> = { extraction: "analiza", document: "kontrola zdjęcia", triage: "wstępna ocena" };
+
 function resultLabel(c: LlmCall): string {
+  if (c.kind === "triage") return c.response?.relevant ? "do analizy" : "pominięte";
   if (c.kind === "document") return c.response?.containsPeople ? "widać ludzi – obraz usunięty" : "dokument bez ludzi";
   return operationsLabel(c.response?.operations?.length ?? 0);
 }

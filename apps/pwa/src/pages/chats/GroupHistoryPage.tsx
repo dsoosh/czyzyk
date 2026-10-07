@@ -8,6 +8,9 @@ import { fetchContactRoles } from "../../lib/contacts";
 import { fetchGroupHistory, HISTORY_PAGE, reprocessMessage } from "../../lib/history";
 import { useLoader, useOnForeground } from "../../lib/useLoader";
 
+/** Why a message skipped the full analysis (message-triage). */
+const TRIAGE_LABELS = { rules: "pominięte – pogawędka", model: "pominięte – wstępna ocena" } as const;
+
 /** History of one tracked group: newest messages, older ones on demand, text search. */
 export function GroupHistoryPage() {
   const { id = "" } = useParams();
@@ -135,7 +138,12 @@ function GroupHistory({ id }: { id: string }) {
                   {m.text && m.has_attachment && <p className="mt-1 text-xs text-slate-500">📎 załącznik</p>}
                   {m.status === "deleted_suspected" && <p className="mt-1 text-xs text-red-700">Prawdopodobnie usunięta z grupy</p>}
                   {isAdmin && m.status === "active" && (
-                    <div className="mt-1 text-right text-xs">
+                    <div className="mt-1 flex items-center justify-end gap-2 text-xs">
+                      {m.triage && reprocess[m.id] !== "queued" && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600" title="Ta wiadomość nie trafiła do pełnej analizy">
+                          {TRIAGE_LABELS[m.triage]}
+                        </span>
+                      )}
                       {reprocess[m.id] === "queued" ? (
                         <span role="status" className="text-slate-500">
                           Wiadomość wróciła do analizy – nowe sprawy pojawią się za chwilę.

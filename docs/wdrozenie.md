@@ -210,3 +210,7 @@ Czyżyk Connect może sprawdzać zdjęcia z obserwowanych grup i wysyłać tylko
 5. Liczniki „Wysłane dokumenty” i „Zdjęcia zostawione na telefonie” są na karcie **Zdjęcia z grup**; wywołania modelu widać w PWA w **Admin → LLM**.
 
 **Grupy z zaawansowaną ochroną prywatności czatu** nie zapisują zdjęć na telefonie. W takiej grupie otwórz zdjęcie dokumentu → **Udostępnij → Czyżyk Connect**. Zdjęcie zostanie sprawdzone na telefonie i dołączone do najnowszej wiadomości ze zdjęciem z obserwowanej grupy (przy kilku grupach aplikacja zapyta, z której). Dodatkowo Connect próbuje użyć podglądu zdjęcia z powiadomienia – liczniki „Podglądy w powiadomieniach” na karcie **Zdjęcia z grup** pokazują, czy to działa na danym telefonie.
+
+# Triaż wiadomości (koszty modelu)
+
+Przed pełną analizą worker sprawdza, czy paczka nowych wiadomości w ogóle może dotyczyć spraw organizacyjnych. Sama pogawędka („Dziękuję!”, „👍”, zdjęcie bez podpisu) jest pomijana bez modelu. Resztę ocenia krótko tani model (`TRIAGE_MODEL` w `.railway/railway.ts`; usuń zmienną, żeby zostały same reguły). Wiadomości od rodziny zawsze idą do analizy, a błąd oceny oznacza pełną analizę. Pominięte paczki widać w **Admin → LLM** („wstępna ocena – pominięte”) i w `sync_log` (status `skipped`).
