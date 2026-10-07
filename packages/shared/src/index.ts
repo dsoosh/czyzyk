@@ -9,3 +9,4 @@ export { chatNameFromFileName, matchGroupByFileName, parseChatExport, warsawToUt
 export * from "./assistant.js";
 export * from "./prompts.js";
 export * from "./contacts.js";
+export { OpenAiClient, OpenAiError, type OpenAiRequest, type OpenAiResponse, type OpenAiTool } from "./openai.js";

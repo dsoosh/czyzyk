@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { OpenAiClient } from "@czyzyk/shared";
 import type pg from "pg";
 import type { Logger } from "pino";
 import { errorLabel, logLlmCall } from "./llmLog.js";
@@ -65,6 +66,36 @@ export class AnthropicDocumentChecker implements DocumentChecker {
     if (response.stop_reason === "refusal") throw new DocumentCheckRefused();
     const call = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === TOOL_NAME);
     const input = call?.input as { contains_people?: unknown; description?: unknown } | undefined;
+    if (typeof input?.contains_people !== "boolean") throw new Error("document check: no valid tool call");
+    return {
+      containsPeople: input.contains_people,
+      description: typeof input.description === "string" ? input.description.slice(0, 2000) : "",
+    };
+  }
+}
+
+/** The same check through OpenAI (llm-provider), with OPENAI_DOCUMENT_MODEL (vision). */
+export class OpenAiDocumentChecker implements DocumentChecker {
+  constructor(
+    private readonly client: OpenAiClient,
+    private readonly model: string,
+  ) {}
+
+  get name(): string {
+    return this.model;
+  }
+
+  async check(imageBase64: string) {
+    const response = await this.client.complete({
+      model: this.model,
+      system: DOCUMENT_CHECK_SYSTEM,
+      messages: [{ role: "user", content: "Oceń to zdjęcie." }],
+      images: [{ label: "Zdjęcie:", data: imageBase64 }],
+      tool: { name: TOOL.name, description: TOOL.description ?? "", parameters: TOOL.input_schema as Record<string, unknown> },
+      maxTokens: 1000,
+    });
+    if (response.refusal) throw new DocumentCheckRefused();
+    const input = response.toolInput as { contains_people?: unknown; description?: unknown } | undefined;
     if (typeof input?.contains_people !== "boolean") throw new Error("document check: no valid tool call");
     return {
       containsPeople: input.contains_people,

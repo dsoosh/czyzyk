@@ -86,6 +86,9 @@ export default defineRailway(() => {
       // View assistant. Model names live in configuration, never in code (CLAUDE.md).
       ANTHROPIC_API_KEY: preserve(),
       CHAT_MODEL: "claude-sonnet-5-5",
+      // OpenAI instead of Claude (llm-provider) once both are set in Railway; unset = Claude.
+      OPENAI_API_KEY: preserve(),
+      OPENAI_CHAT_MODEL: preserve(),
       ASSISTANT_DAILY_LIMIT: "100",
     },
   });
@@ -106,6 +109,12 @@ export default defineRailway(() => {
       EXTRACTION_MODEL: "claude-haiku-4-5",
       // Short first look at a batch (message-triage); remove to keep only the free rules.
       TRIAGE_MODEL: "claude-haiku-4-5",
+      // OpenAI instead of Claude (llm-provider): set the key and OPENAI_EXTRACTION_MODEL in Railway;
+      // OPENAI_TRIAGE_MODEL and OPENAI_DOCUMENT_MODEL (vision) are optional. Unset = Claude.
+      OPENAI_API_KEY: preserve(),
+      OPENAI_EXTRACTION_MODEL: preserve(),
+      OPENAI_TRIAGE_MODEL: preserve(),
+      OPENAI_DOCUMENT_MODEL: preserve(),
       EXTRACTION_DELAY_SECONDS: "15",
       EXTRACTION_CONFIDENCE_THRESHOLD: "0.7",
       EXTRACTION_CONTEXT_MESSAGES: "50",

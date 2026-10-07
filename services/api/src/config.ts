@@ -16,6 +16,9 @@ export const apiEnvSchema = baseEnvSchema.extend({
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   /** Model names live only in configuration (see CLAUDE.md). */
   CHAT_MODEL: z.string().min(1).optional(),
+  /** OpenAI instead of Claude for the assistant (llm-provider), when both are set. */
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_CHAT_MODEL: z.string().min(1).optional(),
   /** Questions per family member and Warsaw day. */
   ASSISTANT_DAILY_LIMIT: z.coerce.number().int().positive().default(100),
   /** Comma-separated PWA origins (or bare domains) allowed to call /push/* from the browser. */

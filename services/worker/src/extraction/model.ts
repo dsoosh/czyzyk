@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { extractionResultSchema, extractionToolInputSchema } from "@czyzyk/shared";
+import { extractionResultSchema, extractionToolInputSchema, type OpenAiClient } from "@czyzyk/shared";
 import { EXTRACTION_TOOL_NAME } from "./prompt.js";
 
 export interface ExtractionModelResult {
@@ -29,7 +29,7 @@ export class ExtractionError extends Error {
   }
 }
 
-const TOOL: Anthropic.Tool = {
+export const TOOL: Anthropic.Tool = {
   name: EXTRACTION_TOOL_NAME,
   description:
     "Zapisuje operacje na elementach (wydarzenia, rzeczy do przyniesienia, płatności, sprawy, dni wolne, fakty) wynikające z nowych wiadomości. Wywołaj dokładnie raz; pusta lista, gdy nic nie wynika.",
@@ -88,4 +88,36 @@ export function userContent(prompt: ModelPrompt): string | Anthropic.ContentBloc
       { type: "image", source: { type: "base64", media_type: "image/jpeg", data: image.data } },
     ]),
   ];
+}
+
+/**
+ * The same extraction through OpenAI (llm-provider), chosen when OPENAI_API_KEY and
+ * OPENAI_EXTRACTION_MODEL are set. Same tool, same validation, same failure reasons.
+ */
+export class OpenAiExtractionModel implements ExtractionModel {
+  constructor(
+    private readonly client: OpenAiClient,
+    private readonly model: string,
+  ) {}
+
+  get name(): string {
+    return this.model;
+  }
+
+  async extract(prompt: ModelPrompt): Promise<ExtractionModelResult> {
+    const response = await this.client.complete({
+      model: this.model,
+      system: prompt.system,
+      messages: [{ role: "user", content: prompt.user }],
+      images: prompt.images,
+      tool: { name: TOOL.name, description: TOOL.description ?? "", parameters: TOOL.input_schema as Record<string, unknown> },
+      maxTokens: 16000,
+    });
+    if (response.refusal) throw new ExtractionError("refusal");
+    if (response.finishReason === "length") throw new ExtractionError("max_tokens");
+    if (response.toolInput === undefined) throw new ExtractionError("no_tool_call");
+    const parsed = extractionResultSchema.safeParse(response.toolInput);
+    if (!parsed.success) throw new ExtractionError("invalid_tool_input");
+    return { operations: parsed.data.operations, usage: response.usage };
+  }
 }
