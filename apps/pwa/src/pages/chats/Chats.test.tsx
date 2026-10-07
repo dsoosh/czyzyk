@@ -29,6 +29,7 @@ const motylki = Array.from({ length: 120 }, (_, i) => ({
 const messages = [
   ...motylki,
   { id: "r1", group_id: "g2", author: "Przewodnicząca", sent_at: "2026-10-07T18:00:00.000Z", text: "Zebranie w czwartek", has_attachment: false, status: "active" },
+  { id: "r2", group_id: "g2", author: "Mama Zosi", sent_at: "2026-10-07T17:55:00.000Z", text: "Dziękuję!", has_attachment: false, status: "active", triage: "rules" },
   { id: "s1", group_id: "g3", author: "Sąsiad", sent_at: "2026-10-08T09:00:00.000Z", text: "prywatne", has_attachment: false, status: "active" },
 ];
 
@@ -128,5 +129,19 @@ describe("Czaty", () => {
 describe("likePattern", () => {
   it("escapuje znaki specjalne LIKE", () => {
     expect(likePattern(" 100% _x\\ ")).toBe("%100\\% \\_x\\\\%");
+  });
+
+  it("admin widzi, które wiadomości triaż pominął", async () => {
+    renderAt("/czaty/g2", { admin: true, tables: { wa_groups: groups, messages } });
+    const skipped = (await screen.findByText("Dziękuję!")).closest("li")!;
+    expect(within(skipped).getByText("pominięte – pogawędka")).toBeInTheDocument();
+    const analysed = screen.getByText("Zebranie w czwartek").closest("li")!;
+    expect(within(analysed).queryByText(/pominięte/)).not.toBeInTheDocument();
+  });
+
+  it("zwykły członek rodziny nie widzi znaczników triażu", async () => {
+    renderAt("/czaty/g2", { tables: { wa_groups: groups, messages } });
+    await screen.findByText("Dziękuję!");
+    expect(screen.queryByText(/pominięte/)).not.toBeInTheDocument();
   });
 });

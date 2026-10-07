@@ -5,7 +5,7 @@ import type { Logger } from "pino";
 const LLM_LOG_RETENTION_DAYS = 14;
 
 export interface LlmCallEntry {
-  kind: "extraction" | "document";
+  kind: "extraction" | "document" | "triage";
   groupId: string;
   model: string | null;
   /** What went to the model; images are listed by label, never stored again here. */

@@ -224,6 +224,8 @@ export interface ContextMessage {
   text: string;
   has_attachment: boolean;
   status: string;
+  /** Which triage step skipped the message (message-triage); null once analysed. */
+  triage?: "rules" | "model" | null;
 }
 
 export interface SourceData {

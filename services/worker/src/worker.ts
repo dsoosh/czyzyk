@@ -5,6 +5,7 @@ import type { Logger } from "pino";
 import type { WorkerConfig } from "./config.js";
 import type { ExtractionModel } from "./extraction/model.js";
 import type { DocumentChecker } from "./extraction/documents.js";
+import type { TriageModel } from "./extraction/triage.js";
 import { runGroupExtraction, type ExtractionDeps } from "./extraction/run.js";
 import { listenForMessages } from "./extraction/listen.js";
 import { findDueGroups } from "./extraction/scheduler.js";
@@ -44,6 +45,8 @@ export async function startWorker(
     model: ExtractionModel;
     /** Server-side check of document images (document-import). */
     documents?: DocumentChecker;
+    /** Cheap first look at a batch (message-triage). */
+    triage?: TriageModel;
     now?: () => Date;
     scanSchedule?: string | null;
     /** Web Push (formerly the separate cron service); absent = push off. */
@@ -74,6 +77,7 @@ export async function startWorker(
     db: pool,
     model: deps.model,
     documents: deps.documents,
+    triage: deps.triage,
     logger,
     now,
     confidenceThreshold: config.EXTRACTION_CONFIDENCE_THRESHOLD,

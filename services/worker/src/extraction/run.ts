@@ -1,9 +1,10 @@
 import type pg from "pg";
 import type { Logger } from "pino";
 import { applyOperations, type ApplySummary } from "./apply.js";
-import { loadBatch } from "./batch.js";
+import { loadBatch, type ExtractionBatch } from "./batch.js";
 import { checkPendingDocuments, type DocumentChecker } from "./documents.js";
 import { errorLabel, logLlmCall } from "./llmLog.js";
+import { buildTriagePrompt, onlyChatter, type TriageModel } from "./triage.js";
 import type { ExtractionModel } from "./model.js";
 import { buildExtractionPrompt } from "./prompt.js";
 import { resolveOperations } from "./resolve.js";
@@ -12,6 +13,8 @@ import { warsawDate } from "./time.js";
 export interface ExtractionDeps {
   db: pg.Pool;
   model: ExtractionModel;
+  /** Cheap model asked first whether a batch needs the full extraction (message-triage); optional. */
+  triage?: TriageModel;
   /** Server-side check of document images (document-import); without it images are removed. */
   documents?: DocumentChecker;
   logger: Logger;
@@ -25,10 +28,39 @@ export interface ExtractionDeps {
 export type RunResult =
   | { status: "locked" }
   | { status: "nothing_to_do" }
+  | { status: "skipped"; messages: number; by: "rules" | "model" }
   | ({ status: "ok"; messages: number } & ApplySummary);
 
 async function logSync(db: pg.Pool | pg.PoolClient, status: string, details: Record<string, unknown>) {
   await db.query("insert into public.sync_log (kind, status, details) values ('extraction', $1, $2)", [status, details]);
+}
+
+/**
+ * Asks the triage model whether the batch needs the full extraction. Any failure means
+ * "analyse it" – triage only saves money, it must never lose a message.
+ */
+async function triageSaysSkip(deps: ExtractionDeps, batch: ExtractionBatch, groupId: string): Promise<boolean> {
+  if (!deps.triage) return false;
+  const prompt = buildTriagePrompt(batch);
+  const started = Date.now();
+  const log = (entry: { response?: unknown; error?: string; usage?: unknown }) =>
+    logLlmCall(deps.db, deps.logger, {
+      kind: "triage",
+      groupId,
+      model: deps.triage?.name ?? null,
+      request: { system: prompt.system, user: prompt.user },
+      ...entry,
+      durationMs: Date.now() - started,
+    });
+  try {
+    const verdict = await deps.triage.triage(prompt);
+    await log({ response: { relevant: verdict.relevant }, usage: verdict.usage });
+    return !verdict.relevant;
+  } catch (error) {
+    await log({ error: errorLabel(error) });
+    deps.logger.warn({ groupId, error: errorLabel(error) }, "triage failed, extracting");
+    return false;
+  }
 }
 
 /**
@@ -53,6 +85,15 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
       const now = deps.now();
       const batch = await loadBatch(client, groupId, warsawDate(now), deps.contextMessages);
       if (!batch || batch.newMessages.length === 0) return { status: "nothing_to_do" };
+
+      const skippedBy = onlyChatter(batch) ? "rules" : await triageSaysSkip(deps, batch, groupId) ? "model" : null;
+      if (skippedBy) {
+        const ids = batch.newMessages.map((m) => m.id);
+        await client.query("update public.messages set processed_at = now(), triage = $2 where id = any($1::uuid[])", [ids, skippedBy]);
+        await logSync(client, "skipped", { group_id: groupId, messages: ids.length, by: skippedBy });
+        deps.logger.info({ groupId, messages: ids.length, by: skippedBy }, "extraction skipped by triage");
+        return { status: "skipped", messages: ids.length, by: skippedBy };
+      }
 
       const prompt = buildExtractionPrompt(batch, now);
       const request = {
@@ -89,7 +130,7 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
       try {
         const summary = await applyOperations({ client, groupId, threshold: deps.confidenceThreshold }, accepted);
         summary.rejected = [...rejected, ...summary.rejected].sort((a, b) => a.index - b.index);
-        await client.query("update public.messages set processed_at = now() where id = any($1::uuid[])", [
+        await client.query("update public.messages set processed_at = now(), triage = null where id = any($1::uuid[])", [
           prompt.newMessageIds,
         ]);
         await logSync(client, summary.rejected.length ? "partial" : "ok", {

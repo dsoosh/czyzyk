@@ -10,6 +10,8 @@ export const workerEnvSchema = baseEnvSchema.extend({
   ANTHROPIC_API_KEY: z.string().min(1),
   /** Model name lives only in configuration (see CLAUDE.md). */
   EXTRACTION_MODEL: z.string().min(1),
+  /** Cheap model asking whether a batch needs the full extraction (message-triage); unset = rules only. */
+  TRIAGE_MODEL: z.string().min(1).optional(),
   /** Vision model checking document images for people (document-import); defaults to EXTRACTION_MODEL. */
   DOCUMENT_MODEL: z.string().min(1).optional(),
   /** Seconds between a new message and its extraction; messages arriving meanwhile join the same run. */

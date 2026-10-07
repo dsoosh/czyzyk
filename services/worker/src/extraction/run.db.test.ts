@@ -4,6 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
 import type { DocumentChecker } from "./documents.js";
 import type { ExtractionModel } from "./model.js";
+import type { TriageModel } from "./triage.js";
 import type { ExtractionPrompt } from "./prompt.js";
 import { runGroupExtraction, type ExtractionDeps } from "./run.js";
 
@@ -135,8 +136,8 @@ describe("runGroupExtraction", () => {
   });
 
   it("rozmowa bez treści organizacyjnej nie tworzy elementów, ale oznacza wiadomości", async () => {
-    await addMessage("Dziękujemy! 😊", "2026-10-07T10:00:00Z");
-    await addMessage("👍", "2026-10-07T10:01:00Z");
+    await addMessage("Jak się udała zabawa?", "2026-10-07T10:00:00Z");
+    await addMessage("Świetnie, dzieci zachwycone", "2026-10-07T10:01:00Z");
     const { model } = scripted(() => []);
     expect(await runGroupExtraction(deps(model), groupId)).toMatchObject({ status: "ok", messages: 2, created: 0 });
     expect((await db.client.query("select count(*)::int as n from messages where processed_at is null")).rows[0].n).toBe(0);
@@ -363,7 +364,7 @@ describe("runGroupExtraction", () => {
     await allowEmail(db.client, "ola.k@example.com", "family");
     await createAuthUser(db.client, "ola.k@example.com", "Ola Kowalska");
     await db.client.query("insert into llm_prompts (key, template) values ('extraction', 'Moje instrukcje dla {{rodzina}}.')");
-    await addMessage("Dzień dobry", "2026-10-07T16:02:00Z");
+    await addMessage("Dzień dobry, jutro zbiórka", "2026-10-07T16:02:00Z");
     const { model, prompts } = scripted(() => []);
     await runGroupExtraction(deps(model), groupId);
     expect(prompts[0]!.system.startsWith('Moje instrukcje dla "Ola".')).toBe(true);
@@ -509,5 +510,68 @@ describe("dokumenty ze zdjęć", () => {
     await runGroupExtraction(deps(model), groupId);
     expect(prompts[0]!.user).toContain('[dokument "IMG-1.jpg": "Plan: 15.10 teatrzyk"]');
     expect(prompts[0]!.images).toBeUndefined();
+  });
+});
+
+describe("triaż wiadomości", () => {
+  const triage = (relevant: boolean | Error): TriageModel & { calls: number } => ({
+    name: "tani-model",
+    calls: 0,
+    async triage() {
+      this.calls++;
+      if (relevant instanceof Error) throw relevant;
+      return { relevant, usage: { input_tokens: 300, output_tokens: 10 } };
+    },
+  });
+
+  it("same podziękowania nie idą do modelu – ani do triażu", async () => {
+    await addMessage("Dziękuję bardzo!", "2026-10-07T10:00:00Z");
+    await addMessage("👍", "2026-10-07T10:01:00Z");
+    const { model, prompts } = scripted(() => []);
+    const t = triage(true);
+    expect(await runGroupExtraction({ ...deps(model), triage: t }, groupId)).toEqual({ status: "skipped", messages: 2, by: "rules" });
+    expect(prompts).toHaveLength(0);
+    expect(t.calls).toBe(0);
+    expect((await db.client.query("select count(*)::int as n from messages where processed_at is null")).rows[0].n).toBe(0);
+    expect((await db.client.query("select status, details from sync_log")).rows).toEqual([
+      { status: "skipped", details: { group_id: groupId, messages: 2, by: "rules" } },
+    ]);
+    expect((await db.client.query("select distinct triage from messages")).rows).toEqual([{ triage: "rules" }]);
+  });
+
+  it("tani model mówi „nic organizacyjnego” – pełna analiza się nie odbywa", async () => {
+    await addMessage("Jak się udała zabawa dzieciaków?", "2026-10-07T10:00:00Z");
+    const { model, prompts } = scripted(() => []);
+    const t = triage(false);
+    expect(await runGroupExtraction({ ...deps(model), triage: t }, groupId)).toMatchObject({ status: "skipped", by: "model" });
+    expect(prompts).toHaveLength(0);
+    expect((await db.client.query("select triage from messages")).rows).toEqual([{ triage: "model" }]);
+    // Analysed again later (e.g. "Analizuj ponownie"): the mark goes away.
+    await db.client.query("update messages set processed_at = null");
+    await runGroupExtraction(deps(model), groupId);
+    expect((await db.client.query("select triage from messages")).rows).toEqual([{ triage: null }]);
+    const { rows } = await db.client.query("select kind, model, response, usage from llm_calls where kind = 'triage'");
+    expect(rows).toEqual([{ kind: "triage", model: "tani-model", response: { relevant: false }, usage: { input_tokens: 300, output_tokens: 10 } }]);
+  });
+
+  it("triaż mówi „tak” albo zawodzi – wiadomości idą do pełnej analizy", async () => {
+    await addMessage("W piątek bal, przebrania", "2026-10-07T10:00:00Z");
+    for (const verdict of [true, new Error("overloaded")]) {
+      await db.client.query("update messages set processed_at = null");
+      const { model, prompts } = scripted(() => []);
+      expect(await runGroupExtraction({ ...deps(model), triage: triage(verdict) }, groupId)).toMatchObject({ status: "ok" });
+      expect(prompts).toHaveLength(1);
+    }
+    expect((await db.client.query("select error from llm_calls where kind = 'triage' order by created_at")).rows).toEqual([
+      { error: null },
+      { error: "Error" },
+    ]);
+  });
+
+  it("bez modelu triażu działają tylko reguły", async () => {
+    await addMessage("Jak się udała zabawa?", "2026-10-07T10:00:00Z");
+    const { model, prompts } = scripted(() => []);
+    expect(await runGroupExtraction(deps(model), groupId)).toMatchObject({ status: "ok" });
+    expect(prompts).toHaveLength(1);
   });
 });
