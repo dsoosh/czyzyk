@@ -29,7 +29,7 @@ const apply = (args: Record<string, unknown>, tables: Record<string, Record<stri
   const item = tables.action_required!.find((a) => a.id === args.p_id)!;
   const chosen = (item.suggested_actions as { kind: string; label: string }[])[Number(args.p_index)]!;
   Object.assign(item, { resolved_at: "2026-10-05T10:00:00Z", resolved_by: "u-family", resolution: chosen.label });
-  return { kind: chosen.kind, created_id: null };
+  return { kind: chosen.kind, created_id: chosen.kind === "bring" ? "b9" : null, due_date: chosen.kind === "bring" ? "2026-10-06" : null };
 };
 
 describe("proponowane akcje w „Wymaga odpowiedzi”", () => {
@@ -50,7 +50,7 @@ describe("proponowane akcje w „Wymaga odpowiedzi”", () => {
     const group = await screen.findByRole("group", { name: /Proponowane akcje: Zakup/ });
     await act(async () => userEvent.click(within(group).getByRole("button", { name: "Do przyniesienia" })));
     expect(rpc).toHaveBeenCalledWith("apply_action_suggestion", { p_id: "a1", p_index: 0 });
-    expect(await screen.findByRole("status")).toHaveTextContent("Dodano do rzeczy do przyniesienia.");
+    expect(await screen.findByRole("status")).toHaveTextContent("Dodano do rzeczy do przyniesienia na jutro.");
     expect(await screen.findByText("„Do przyniesienia”")).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: /Proponowane akcje/ })).not.toBeInTheDocument();
   });

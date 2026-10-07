@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
-import { applySuggestion, SUGGESTION_RESULT } from "../lib/actions";
+import { appliedMessage, applySuggestion } from "../lib/actions";
 import type { ActionRequired } from "../lib/items";
 
 /**
@@ -18,8 +18,7 @@ export function ActionSuggestions({ item, onApplied }: { item: ActionRequired; o
     setBusy(true);
     setError(null);
     try {
-      const kind = await applySuggestion(client, item.id, index);
-      onApplied(SUGGESTION_RESULT[kind]);
+      onApplied(appliedMessage(await applySuggestion(client, item.id, index)));
     } catch {
       setError("Nie udało się. Spróbuj ponownie.");
       setBusy(false);
