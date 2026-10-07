@@ -47,6 +47,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       # assembleRelease (R8, unsigned here) catches release-only breakage before android-release.yml.
       - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease --stacktrace
+      - name: Release APK size
+        # Installed apps reject updates over 100 MiB (UpdateInfo.MAX_APK_BYTES).
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          size=$(stat -c%s "$apk")
+          echo "Release APK: $size bytes" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$size" -le 104857600
       - name: Unit test summary
         # Guards against tests being silently skipped: raise MIN_TESTS when adding tests.
         env:
