@@ -1,5 +1,6 @@
 import { matchGroupByFileName, parseChatExport } from "@czyzyk/shared/chat-export";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useSearchParams } from "react-router";
 import { useAuth } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
 import { importChat, ImportError, readChatExport, type ImportSummary } from "../../lib/chatImport";
@@ -7,6 +8,7 @@ import { takeSharedChat } from "../../lib/androidApp";
 import { readPublicEnv } from "../../lib/env";
 import { run, type Group } from "../../lib/items";
 import { useLoader } from "../../lib/useLoader";
+import { PasteMessages } from "./PasteMessages";
 
 interface Selected {
   fileName: string;
@@ -34,6 +36,7 @@ const day = (localTime: string) => {
 export function ImportPage() {
   const { client } = useAuth();
   const apiUrl = readPublicEnv().apiUrl;
+  const [params] = useSearchParams();
   const groups = useLoader(
     () => run<Group[]>(client.from("wa_groups").select("id, wa_name, display_name, tracked").eq("tracked", true).order("wa_name")),
     [client],
@@ -111,14 +114,7 @@ export function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-4xl font-bold text-ink">Import eksportu czatu</h1>
-      <div className="space-y-2 rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm">
-        <p>
-          W WhatsAppie otwórz grupę → <strong>⋮ → Więcej → Eksportuj czat</strong> i zapisz plik. Możesz wybrać „Bez multimediów” albo
-          „Dołącz multimedia” – z paczki ZIP odczytywany jest tylko tekst czatu, a zdjęcia i filmy nie opuszczają tego urządzenia.
-        </p>
-        <p>Wiadomości, które już są w aplikacji (np. z powiadomień), zostaną pominięte.</p>
-      </div>
+      <h1 className="font-display text-4xl font-bold text-ink">Import wiadomości</h1>
 
       {!apiUrl && (
         <p role="alert" className="text-sm text-red-700">
@@ -128,6 +124,17 @@ export function ImportPage() {
       {groups.data.length === 0 && (
         <p className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">Najpierw włącz śledzenie grupy w zakładce Grupy.</p>
       )}
+
+      <PasteMessages groups={groups.data} apiUrl={apiUrl} initialGroupId={params.get("grupa") ?? ""} />
+
+      <h2 className="pt-2 font-display text-2xl font-bold text-ink">Eksport czatu</h2>
+      <div className="space-y-2 rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm">
+        <p>
+          W WhatsAppie otwórz grupę → <strong>⋮ → Więcej → Eksportuj czat</strong> i zapisz plik. Możesz wybrać „Bez multimediów” albo
+          „Dołącz multimedia” – z paczki ZIP odczytywany jest tylko tekst czatu, a zdjęcia i filmy nie opuszczają tego urządzenia.
+        </p>
+        <p>Wiadomości, które już są w aplikacji (np. z powiadomień), zostaną pominięte.</p>
+      </div>
 
       <form onSubmit={submit} aria-label="Import eksportu" className="space-y-4 rounded-2xl bg-white p-4 shadow-sm">
         <label className="block text-sm font-medium">

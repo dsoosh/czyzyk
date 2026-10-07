@@ -69,6 +69,15 @@ describe("parseChatExport", () => {
     expect(messages.map((m) => m.localTime.slice(0, 10))).toEqual(["2026-02-01", "2026-12-25"]);
   });
 
+  it("wiadomości skopiowane do schowka (Android): godzina przed datą", () => {
+    const { messages } = parseChatExport(["[18:02, 7.10.2026] Pani Ania: W piątek bal", "Przebrania mile widziane", "[9:05, 8.10.2026] Mama Zosi: Super"].join("\n"));
+    expect(messages.map((m) => [m.author, m.localTime, m.text])).toEqual([
+      ["Pani Ania", "2026-10-07T18:02:00", "W piątek bal\nPrzebrania mile widziane"],
+      ["Mama Zosi", "2026-10-08T09:05:00", "Super"],
+    ]);
+    expect(parseChatExport("[8:15 PM, 10/9/26] Anna: See you").messages[0]!.localTime).toBe("2026-10-09T20:15:00");
+  });
+
   it("zimą przesunięcie +1 h, plik bez rozpoznanych wiadomości daje pustą listę", () => {
     expect(parseChatExport("05.01.2027, 10:00 - A: zima").messages[0]!.sentAt.toISOString()).toBe("2027-01-05T09:00:00.000Z");
     expect(parseChatExport("to nie jest eksport\nani trochę").messages).toEqual([]);

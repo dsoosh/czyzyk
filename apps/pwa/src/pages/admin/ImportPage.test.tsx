@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { strToU8, zipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderAt } from "../../test/render";
@@ -113,5 +113,42 @@ describe("Admin → Import", () => {
   it("członek rodziny nie ma ekranu importu", async () => {
     renderAt("/admin/import", { tables: { wa_groups: groups } });
     expect(await screen.findByRole("heading", { name: "Dziś i jutro" })).toBeInTheDocument();
+  });
+});
+
+describe("Admin → Import → Wklej wiadomości", () => {
+  const paste = async (text: string) => {
+    const form = await screen.findByRole("form", { name: "Wklej wiadomości" });
+    fireEvent.change(within(form).getByLabelText("Treść"), { target: { value: text } });
+    return form;
+  };
+
+  it("pojedyncza wiadomość z autorem i godziną; grupa z adresu", async () => {
+    fetchMock.mockResolvedValue(ok({ messages: 1, inserted: 1, duplicates: 0 }));
+    renderAt("/admin/import?grupa=g2", { admin: true, tables: { wa_groups: groups } });
+    const form = await paste("Jutro zbiórka o 8:00");
+    expect(within(form).getByLabelText("Do grupy")).toHaveValue("g2");
+    fireEvent.change(within(form).getByLabelText("Kto napisał (opcjonalnie)"), { target: { value: " Pani Ania " } });
+    fireEvent.change(within(form).getByLabelText("Kiedy (opcjonalnie, domyślnie teraz)"), { target: { value: "2026-10-20T13:30" } });
+    await act(async () => fireEvent.click(within(form).getByRole("button", { name: "Dodaj wiadomości" })));
+
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://czyzykapi-production.up.railway.app/import/message");
+    expect(JSON.parse(init.body)).toEqual({ group_id: "g2", text: "Jutro zbiórka o 8:00", author: "Pani Ania", sent_at: "2026-10-20T11:30:00.000Z" });
+    expect(await screen.findByRole("status", { name: "Wynik wklejenia" })).toHaveTextContent("Dodano: 1.");
+    expect(within(form).getByLabelText("Treść")).toHaveValue("");
+  });
+
+  it("skopiowane wiadomości z nagłówkami: bez pól autora i godziny", async () => {
+    fetchMock.mockResolvedValue(ok({ messages: 2, inserted: 0, duplicates: 2 }));
+    renderAt("/admin/import", { admin: true, tables: { wa_groups: groups } });
+    const text = "[18:02, 7.10.2026] Pani Ania: W piątek bal\n[18:05, 7.10.2026] Mama Zosi: Super";
+    const form = await paste(text);
+    expect(within(form).getByRole("status", { name: "Rozpoznane wiadomości" })).toHaveTextContent("Rozpoznano 2 wiadomości");
+    expect(within(form).queryByLabelText("Kto napisał (opcjonalnie)")).not.toBeInTheDocument();
+    fireEvent.change(within(form).getByLabelText("Do grupy"), { target: { value: "g1" } });
+    await act(async () => fireEvent.click(within(form).getByRole("button", { name: "Dodaj wiadomości" })));
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({ group_id: "g1", text });
+    expect(await screen.findByRole("status", { name: "Wynik wklejenia" })).toHaveTextContent("Te wiadomości już są w aplikacji.");
   });
 });

@@ -69,17 +69,20 @@ const API_ERRORS: Record<string, string> = {
   import_not_configured: "Import nie jest skonfigurowany na serwerze (SUPABASE_URL).",
 };
 
-export async function importChat(
-  db: Db,
-  apiUrl: string,
-  body: { group_id: string; text: string; extract_days: number },
-): Promise<ImportSummary> {
+export interface PasteSummary {
+  messages: number;
+  inserted: number;
+  duplicates: number;
+}
+
+/** POST to the admin import API with the session token; errors become Polish messages. */
+async function postAdmin<T>(db: Db, apiUrl: string, path: string, body: unknown): Promise<T> {
   const { data } = await db.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new ImportError(API_ERRORS.unauthorized!);
   let res: Response;
   try {
-    res = await fetch(`${apiUrl}/import/chat`, {
+    res = await fetch(`${apiUrl}${path}`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -87,10 +90,27 @@ export async function importChat(
   } catch {
     throw new ImportError("Brak połączenia z serwerem.");
   }
-  const json = (await res.json().catch(() => ({}))) as { error?: string } & Partial<ImportSummary>;
+  const json = (await res.json().catch(() => ({}))) as { error?: string };
   if (!res.ok) {
-    if (res.status === 413) throw new ImportError("Plik jest za duży.");
+    if (res.status === 413) throw new ImportError(path === "/import/message" ? "Za dużo wiadomości naraz (limit 200)." : "Plik jest za duży.");
     throw new ImportError(API_ERRORS[json.error ?? ""] ?? `Import nie powiódł się (błąd ${res.status}).`);
   }
-  return json as ImportSummary;
+  return json as T;
+}
+
+export function importChat(
+  db: Db,
+  apiUrl: string,
+  body: { group_id: string; text: string; extract_days: number },
+): Promise<ImportSummary> {
+  return postAdmin<ImportSummary>(db, apiUrl, "/import/chat", body);
+}
+
+/** Messages copied from WhatsApp (manual-entry); author and time only for text without WhatsApp headers. */
+export function pasteMessages(
+  db: Db,
+  apiUrl: string,
+  body: { group_id: string; text: string; author?: string; sent_at?: string },
+): Promise<PasteSummary> {
+  return postAdmin<PasteSummary>(db, apiUrl, "/import/message", body);
 }
