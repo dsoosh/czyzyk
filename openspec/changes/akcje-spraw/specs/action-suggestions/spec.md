@@ -25,6 +25,10 @@ Członek rodziny SHALL móc wybrać proponowaną akcję otwartej sprawy. „Do p
 - **WHEN** rodzic stuka „Do przyniesienia” przy sprawie sprayu dla Eleny z terminem 6.10
 - **THEN** na liście rzeczy do przyniesienia pojawia się „spray przeciwko insektom” na 6.10 przypisany do Eleny, a sprawa jest załatwiona z adnotacją „Do przyniesienia”
 
+#### Scenario: Termin już minął
+- **WHEN** rodzic stuka „Kupić i przynieść” przy sprawie z terminem z przeszłości
+- **THEN** rzecz trafia na najbliższy dzień roboczy, a potwierdzenie podaje ten dzień
+
 #### Scenario: Odpowiedź
 - **WHEN** rodzic stuka „Tak, zapisujemy” przy pytaniu o szachy
 - **THEN** sprawa jest załatwiona z adnotacją „Tak, zapisujemy”

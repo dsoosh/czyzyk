@@ -21,7 +21,7 @@ afterAll(async () => {
 
 const asOla = (sql: string, params: unknown[] = []) => as(db.client, user(olaId), async (q) => (await q(sql, params)).rows, { commit: true });
 
-async function action(suggestions: unknown[], due: string | null = "2026-10-06") {
+async function action(suggestions: unknown[], due: string | null = "2099-01-15") {
   const { rows } = await db.client.query<{ id: string }>(
     `insert into action_required (group_id, question, due_date, child_ids, suggested_actions, confidence)
      values ($1, 'Zakup i doniesienie sprayu przeciwko insektom', $2, $3, $4, 0.9) returning id`,
@@ -48,11 +48,26 @@ describe("proponowane akcje", () => {
       result.r.created_id,
     ]);
     expect(bring[0]).toMatchObject({ description: "spray przeciwko insektom", group_id: groupId, child_ids: [childId], status: "active" });
-    expect(bring[0].due).toBe("2026-10-06");
+    expect(bring[0].due).toBe("2099-01-15");
+    expect(result.r.due_date).toBe("2099-01-15");
     expect(bring[0].rationale).toBe("Z „Wymaga odpowiedzi”: Do przyniesienia");
     const { rows: closed } = await db.client.query("select resolved_by, resolution from action_required where id = $1", [id]);
     expect(closed[0]).toEqual({ resolved_by: olaId, resolution: "Do przyniesienia" });
     await expect(asOla("select apply_action_suggestion($1, 1)", [id])).rejects.toThrow(/Nie ma takiej otwartej sprawy/);
+  });
+
+  it("rzecz z minionym albo pustym terminem trafia na najbliższy dzień roboczy", async () => {
+    const { rows: expected } = await db.client.query<{ d: string }>(
+      `select to_char(d + case extract(isodow from d) when 5 then 3 when 6 then 2 else 1 end, 'YYYY-MM-DD') as d
+         from (select (now() at time zone 'Europe/Warsaw')::date as d) t`,
+    );
+    for (const due of ["2020-01-01", null]) {
+      const id = await action([s("bring", "Kupić i przynieść", { description: "repelent" })], due);
+      const [result] = await asOla("select apply_action_suggestion($1, 0) as r", [id]);
+      const { rows } = await db.client.query("select to_char(due_date, 'YYYY-MM-DD') as due from bring_items where id = $1", [result.r.created_id]);
+      expect(rows[0].due).toBe(expected[0]!.d);
+      expect(result.r.due_date).toBe(expected[0]!.d);
+    }
   });
 
   it("odpowiedź zapisuje wybraną odpowiedź; cofnięcie czyści ją", async () => {
