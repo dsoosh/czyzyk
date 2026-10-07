@@ -16,6 +16,8 @@ export interface ParsedMessage {
   sentAt: Date;
   text: string;
   hasAttachment: boolean;
+  /** File names of the attachments ("IMG-20261007-WA0003.jpg"); empty when the export has no media. */
+  attachments: string[];
 }
 
 export interface ParseResult {
@@ -123,16 +125,24 @@ function detectDayFirst(headers: Header[]): boolean {
 
 const pad = (n: number, w = 2) => String(n).padStart(w, "0");
 
-function cleanText(raw: string): { text: string; hasAttachment: boolean } {
+/** File name inside an attachment marker ("<attached: NAME>", "NAME (file attached)"). */
+const ATTACHMENT_FILE = [/^<(?:załączony(?: plik)?|attached):\s*([^>]*?)\s*>$/iu, /^(\S+\.[A-Za-z0-9]{2,5}) \((?:plik załączony|file attached)\)$/iu];
+
+function cleanText(raw: string): { text: string; hasAttachment: boolean; attachments: string[] } {
   let text = raw.replace(EDITED, "");
   let hasAttachment = false;
+  const attachments: string[] = [];
   for (const pattern of ATTACHMENT_PATTERNS) {
-    text = text.replace(pattern, () => {
+    text = text.replace(pattern, (marker) => {
       hasAttachment = true;
+      for (const file of ATTACHMENT_FILE) {
+        const name = file.exec(marker)?.[1];
+        if (name && !name.includes("/") && !attachments.includes(name)) attachments.push(name);
+      }
       return "";
     });
   }
-  return { text: text.replace(/[ \t]+\n/g, "\n").replace(/^\s+|\s+$/g, ""), hasAttachment };
+  return { text: text.replace(/[ \t]+\n/g, "\n").replace(/^\s+|\s+$/g, ""), hasAttachment, attachments };
 }
 
 export function parseChatExport(content: string): ParseResult {
@@ -151,9 +161,9 @@ export function parseChatExport(content: string): ParseResult {
     if (current.system || DELETED.some((p) => p.test(raw.replace(LRM, "").trim()))) {
       skipped++;
     } else {
-      const { text, hasAttachment } = cleanText(raw.replace(LRM, ""));
+      const { text, hasAttachment, attachments } = cleanText(raw.replace(LRM, ""));
       if (text || hasAttachment) {
-        messages.push({ author: current.author, localTime: current.localTime, sentAt: current.sentAt, text, hasAttachment });
+        messages.push({ author: current.author, localTime: current.localTime, sentAt: current.sentAt, text, hasAttachment, attachments });
       } else skipped++;
     }
     current = null;
