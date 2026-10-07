@@ -72,6 +72,8 @@ class PwaWebView(
             val url = request.url.toString()
             val app = appUrl() ?: return true
             if (WebRules.isInApp(url, app)) return false
+            // Never hand the app's own host to Android: the PWA from Chrome would take it over.
+            if (WebRules.isAppHost(url, app)) return true
             openOutside(view.context, request.url)
             return true
         }

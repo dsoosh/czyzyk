@@ -31,6 +31,15 @@ class WebRulesTest {
     }
 
     @Test
+    fun theAppHostNeverLeavesTheApp() {
+        assertTrue(WebRules.isAppHost("http://czyzyk.up.railway.app/", app))
+        assertTrue(WebRules.isAppHost("https://CZYZYK.up.railway.app:8443/x", app))
+        assertFalse(WebRules.isAppHost("https://czyzyk.up.railway.app.evil.example/", app))
+        assertFalse(WebRules.isAppHost("https://abc.supabase.co/auth/v1/authorize", app))
+        assertFalse(WebRules.isAppHost("mailto:ania@example.com", app))
+    }
+
+    @Test
     fun authCallbackLoadsTheCodeOnThePwaRoot() {
         val link = "czyzyk://auth/callback?code=abc-123&state=x&next=https%3A%2F%2Fevil.example"
         assertTrue(WebRules.isAuthCallback(link))

@@ -60,7 +60,8 @@ describe("startWorker", () => {
     try {
       expect(await worker.scanNow()).toEqual([g[0].id]);
       let jobs: { data: { type: string; id: string } }[] = [];
-      for (let i = 0; i < 50 && jobs.length === 0; i++) {
+      // The extraction queue is polled every EXTRACTION_POLL_SECONDS (10 s): wait past one full poll.
+      for (let i = 0; i < 75 && jobs.length === 0; i++) {
         await new Promise((r) => setTimeout(r, 200));
         ({ rows: jobs } = await db.client.query("select data from pgboss.job where name = 'push-alert'"));
       }

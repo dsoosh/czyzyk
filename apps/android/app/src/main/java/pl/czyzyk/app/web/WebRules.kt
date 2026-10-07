@@ -32,6 +32,17 @@ object WebRules {
             port(target) == port(app)
     }
 
+    /**
+     * True when `url` points at the PWA's host but not exactly its origin (other scheme or port).
+     * Such links must never leave the app: the PWA installed from Chrome claims that host, and
+     * handing them to Android would open it instead of this app.
+     */
+    fun isAppHost(url: String, appUrl: String): Boolean {
+        val target = runCatching { URI(url) }.getOrNull() ?: return false
+        val app = runCatching { URI(appUrl) }.getOrNull() ?: return false
+        return target.host != null && target.host.equals(app.host, true)
+    }
+
     /** `czyzyk://auth/callback?code=…` – where Supabase returns after Google sign-in in the browser. */
     fun isAuthCallback(link: String): Boolean {
         val uri = runCatching { URI(link) }.getOrNull() ?: return false
