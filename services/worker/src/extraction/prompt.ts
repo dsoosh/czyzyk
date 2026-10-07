@@ -16,8 +16,8 @@ import { warsawDayLong, warsawStamp } from "./time.js";
 export interface Aliases {
   /** W1… → message id */
   messages: Map<string, string>;
-  /** E1… → existing item */
-  items: Map<string, { id: string; type: ItemType }>;
+  /** E1… → existing item; `foreign` for an item of another group (only join). */
+  items: Map<string, { id: string; type: ItemType; foreign?: boolean }>;
 }
 
 /** A document image shown to the model after the text, labelled with its message alias. */
@@ -99,7 +99,8 @@ function renderItem(alias: string, item: ExistingItem, eventAliasById: Map<strin
   }
   const review = item.status === "needs_review" ? " (czeka na przegląd)" : "";
   const children = item.children.length ? ` | dzieci: ${escapeTags(JSON.stringify(item.children))}` : "";
-  return `${alias} | ${item.type} (${TYPE_LABELS[item.type]})${review} | ${escapeTags(JSON.stringify(data))}${children}`;
+  const group = item.groupName ? ` | grupa: ${quote(item.groupName)}` : "";
+  return `${alias} | ${item.type} (${TYPE_LABELS[item.type]})${review} | ${escapeTags(JSON.stringify(data))}${children}${group}`;
 }
 
 export function buildExtractionPrompt(batch: ExtractionBatch, now: Date): ExtractionPrompt {
@@ -119,6 +120,12 @@ export function buildExtractionPrompt(batch: ExtractionBatch, now: Date): Extrac
     return [alias, item] as const;
   });
 
+  const otherLines = (batch.otherItems ?? []).map((item, i) => {
+    const alias = `E${itemLines.length + i + 1}`;
+    aliases.items.set(alias, { id: item.id, type: item.type, foreign: true });
+    return renderItem(alias, item, eventAliasById);
+  });
+
   const contextLines = batch.contextMessages.map((m) => renderMessage(messageAlias(m), m, batch.contactRoles));
   const newLines = batch.newMessages.map((m) => renderMessage(messageAlias(m), m, batch.contactRoles));
   const laterLines = batch.laterMessages.map((m) => renderMessage(messageAlias(m), m, batch.contactRoles));
@@ -132,6 +139,8 @@ export function buildExtractionPrompt(batch: ExtractionBatch, now: Date): Extrac
     ...(itemLines.length ? itemLines.map(([alias, item]) => renderItem(alias, item, eventAliasById)) : ["(brak)"]),
     "</elementy>",
     "",
+    // Shared items (shared-items): only when another child of the family attends another group.
+    ...(otherLines.length ? ["<elementy_innych_grup>", ...otherLines, "</elementy_innych_grup>", ""] : []),
     "<wiadomosci_wczesniejsze>",
     ...(contextLines.length ? contextLines : ["(brak)"]),
     "</wiadomosci_wczesniejsze>",

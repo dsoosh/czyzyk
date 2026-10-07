@@ -164,6 +164,12 @@ export const rawOperationSchema = z.discriminatedUnion("op", [
     ...baseOperation,
     target: z.string().regex(/^E\d+$/),
   }),
+  z.object({
+    op: z.literal("join"),
+    ...baseOperation,
+    target: z.string().regex(/^E\d+$/).describe("Alias elementu z bloku <elementy_innych_grup>"),
+    children: childrenField.describe("Imiona dzieci tej grupy z listy <dzieci>; pusta lista = wszystkie dzieci tej grupy"),
+  }),
 ]);
 export type RawOperation = z.infer<typeof rawOperationSchema>;
 
@@ -174,7 +180,8 @@ export const extractionResultSchema = z.object({
 export type ParsedOperation =
   | { op: "create"; type: ItemType; ref: string | null; data: ItemData[ItemType]; children: string[]; sourceMessages: string[]; confidence: number; rationale: string }
   | { op: "update"; type: ItemType; target: string; data: Partial<ItemData[ItemType]>; children: string[]; sourceMessages: string[]; confidence: number; rationale: string }
-  | { op: "cancel"; type: ItemType; target: string; sourceMessages: string[]; confidence: number; rationale: string };
+  | { op: "cancel"; type: ItemType; target: string; sourceMessages: string[]; confidence: number; rationale: string }
+  | { op: "join"; type: ItemType; target: string; children: string[]; sourceMessages: string[]; confidence: number; rationale: string };
 
 /** Validates one operation, including type-specific data (partial for updates). */
 export function parseOperation(input: unknown): { ok: true; value: ParsedOperation } | { ok: false; error: string } {
@@ -183,6 +190,10 @@ export function parseOperation(input: unknown): { ok: true; value: ParsedOperati
   const o = raw.data;
   const common = { type: o.type, sourceMessages: o.source_messages, confidence: o.confidence, rationale: o.rationale };
   if (o.op === "cancel") return { ok: true, value: { op: "cancel", target: o.target, ...common } };
+  if (o.op === "join") {
+    if (!(CHILD_ITEM_TYPES as readonly ItemType[]).includes(o.type)) return { ok: false, error: `type: join is not available for ${o.type}` };
+    return { ok: true, value: { op: "join", target: o.target, children: o.children, ...common } };
+  }
 
   const schema = itemDataSchemas[o.type];
   if (o.op === "create") {

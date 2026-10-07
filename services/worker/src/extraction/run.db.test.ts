@@ -425,6 +425,62 @@ describe("runGroupExtraction", () => {
     expect([...both[0].child_ids].sort()).toEqual([antek, zosia].sort());
   });
 
+  it("wspólna sprawa dwojga dzieci z różnych grup: join dopisuje dziecko zamiast tworzyć duplikat", async () => {
+    const { rows: g } = await db.client.query("insert into wa_groups (wa_name, tracked) values ('Sowy', true) returning id");
+    const sowy = g[0].id as string;
+    const { rows: kids } = await db.client.query<{ id: string; name: string }>(
+      "insert into children (name, group_id) values ('Zosia', $1), ('Antek', $2) returning id, name",
+      [groupId, sowy],
+    );
+    const zosia = kids.find((c) => c.name === "Zosia")!.id;
+    const antek = kids.find((c) => c.name === "Antek")!.id;
+    // The trip came first in Sowy, for the whole group (no children assigned).
+    const { rows: ev } = await db.client.query(
+      "insert into events (group_id, title, starts_at, all_day) values ($1, 'Wycieczka do Zajezdni', '2026-10-14T07:30:00Z', false) returning id",
+      [sowy],
+    );
+    const { rows: pay } = await db.client.query(
+      "insert into payments (group_id, description, amount_pln, due_date) values ($1, 'Wycieczka', 60, '2026-10-14') returning id",
+      [sowy],
+    );
+    await addMessage("Wycieczka do Centrum Zajezdnia 14.10, koszt 60 zł", "2026-10-07T16:00:00Z");
+    const { model, prompts } = scripted((p) => {
+      const alias = (title: string) => p.user.split("\n").find((l) => l.includes(title))!.split(" | ")[0]!;
+      return [
+        op({ op: "join", type: "event", target: alias("Wycieczka do Zajezdni"), children: [], source_messages: [lastAlias(p)] }),
+        op({ op: "join", type: "payment", target: alias('"Wycieczka"'), children: ["Zosia"], source_messages: [lastAlias(p)] }),
+        // Items of another group cannot be changed from here.
+        op({ op: "update", type: "event", target: alias("Wycieczka do Zajezdni"), data: { title: "Inna" }, source_messages: [lastAlias(p)] }),
+      ];
+    });
+    const summary = await runGroupExtraction(deps(model), groupId);
+    expect(summary).toMatchObject({ created: 0, updated: 2, rejected: [{ index: 2, reason: expect.stringContaining("another group") }] });
+    expect(prompts[0]!.user).toMatch(/<elementy_innych_grup>\n.*Wycieczka do Zajezdni.*\| grupa: "Sowy"/);
+
+    const { rows: events } = await db.client.query("select title, group_id, child_ids from events");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ title: "Wycieczka do Zajezdni", group_id: sowy });
+    expect([...events[0].child_ids].sort()).toEqual([antek, zosia].sort());
+    const { rows: payments } = await db.client.query("select child_ids, cardinality(source_message_ids) as sources from payments where id = $1", [pay[0].id]);
+    expect([...payments[0].child_ids].sort()).toEqual([antek, zosia].sort());
+    expect(payments[0].sources).toBe(1);
+    const { rows: history } = await db.client.query(
+      "select changes from item_changes where item_type = 'event' and item_id = $1",
+      [ev[0].id],
+    );
+    expect(history).toEqual([{ changes: { children: { from: ["Antek"], to: ["Antek", "Zosia"] } } }]);
+  });
+
+  it("bez dzieci w innych grupach model nie dostaje cudzych spraw", async () => {
+    const { rows: g } = await db.client.query("insert into wa_groups (wa_name, tracked) values ('Rodzice', true) returning id");
+    await db.client.query("insert into events (group_id, title, starts_at, all_day) values ($1, 'Zebranie', '2026-10-14T07:30:00Z', false)", [g[0].id]);
+    await db.client.query("insert into children (name, group_id) values ('Zosia', $1)", [groupId]);
+    await addMessage("Zebranie 14.10", "2026-10-07T16:00:00Z");
+    const { model, prompts } = scripted(() => []);
+    await runGroupExtraction(deps(model), groupId);
+    expect(prompts[0]!.user).not.toContain("elementy_innych_grup");
+  });
+
   it("używa szablonu promptu zapisanego przez admina, z imionami rodziny i stałymi zasadami", async () => {
     await allowEmail(db.client, "ola.k@example.com", "family");
     await createAuthUser(db.client, "ola.k@example.com", "Ola Kowalska");

@@ -28,6 +28,8 @@ export type ResolvedOperation = { index: number } & (
       rationale: string;
     }
   | { op: "cancel"; type: ItemType; targetId: string; sourceMessageIds: string[]; confidence: number; rationale: string }
+  /** Adds this group's children to an item of another group (shared-items). */
+  | { op: "join"; type: ItemType; targetId: string; children: string[]; sourceMessageIds: string[]; confidence: number; rationale: string }
 );
 
 export interface Rejection {
@@ -70,7 +72,7 @@ export function resolveOperations(raw: unknown[], aliases: Aliases): { accepted:
     const common = { index, type: op.type, sourceMessageIds: [...new Set(sourceMessageIds)], confidence: op.confidence, rationale: op.rationale };
 
     let eventRef: EventRef | undefined;
-    if (op.op !== "cancel" && op.type === "bring_item" && "event" in op.data) {
+    if ((op.op === "create" || op.op === "update") && op.type === "bring_item" && "event" in op.data) {
       const ref = (op.data as { event?: string | null }).event;
       if (ref == null) eventRef = null;
       else if (ref.startsWith("E")) {
@@ -106,6 +108,16 @@ export function resolveOperations(raw: unknown[], aliases: Aliases): { accepted:
     }
     if (target.type !== op.type) {
       reject(`item ${op.target} is ${target.type}, not ${op.type}`);
+      continue;
+    }
+    // Items of other groups can only be joined; own items cannot (update them instead).
+    if (op.op === "join") {
+      if (!target.foreign) reject(`item ${op.target} is not from another group`);
+      else accepted.push({ op: "join", targetId: target.id, children: op.children, ...common });
+      continue;
+    }
+    if (target.foreign) {
+      reject(`item ${op.target} belongs to another group`);
       continue;
     }
     accepted.push(
