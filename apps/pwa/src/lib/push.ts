@@ -6,6 +6,11 @@ export interface PushSettings {
   alert_closures: boolean;
   alert_actions: boolean;
   alert_payments: boolean;
+  /** Morning plan for today (morning-push). */
+  morning_enabled: boolean;
+  morning_time: string;
+  /** Payments and answers due today or tomorrow, at the morning hour. */
+  reminders_enabled: boolean;
 }
 
 export const DEFAULT_PUSH_SETTINGS: PushSettings = {
@@ -14,6 +19,9 @@ export const DEFAULT_PUSH_SETTINGS: PushSettings = {
   alert_closures: true,
   alert_actions: true,
   alert_payments: true,
+  morning_enabled: true,
+  morning_time: "06:45",
+  reminders_enabled: true,
 };
 
 /** iPhone/iPad, including iPadOS that reports itself as a Mac. */

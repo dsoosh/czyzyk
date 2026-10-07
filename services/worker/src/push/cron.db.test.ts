@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
 import { handleAlert } from "./alerts.js";
 import { registerPushJobs } from "./cron.js";
-import { runDigest } from "./digest.js";
+import { runDigest, runMorning } from "./digest.js";
 import type { DeliveryResult, PushPayload, PushSender, Subscription } from "./send.js";
 
 let db: TestDb;
@@ -66,6 +66,50 @@ async function seedTomorrow() {
   await db.client.query("insert into bring_items (description, due_date) values ('strój sportowy', '2026-10-09')");
   await db.client.query("insert into payments (description, amount_pln, due_date) values ('10 zł na teatrzyk', 10, '2026-10-09')");
 }
+
+const morning = (sender: PushSender, now: Date) => runMorning({ db: pool, sender, logger, windowMinutes: 120 }, now);
+
+describe("Poranny skrót i przypomnienia o terminach", () => {
+  it("o 6:45 plan na dziś, a osobno terminy na dziś i jutro", async () => {
+    await db.client.query("insert into events (title, starts_at, all_day) values ('Basen', '2026-10-08 09:00+02', false)");
+    await db.client.query("insert into bring_items (description, due_date) values ('strój kąpielowy', '2026-10-08'), ('kapcie', '2026-10-08')");
+    await db.client.query("insert into bring_items (description, due_date, packed_at) values ('spakowane', '2026-10-08', now())");
+    await db.client.query("insert into payments (description, amount_pln, due_date) values ('składka', 20, '2026-10-08'), ('teatrzyk', 10, '2026-10-09')");
+    await db.client.query("insert into payments (description, due_date, paid_at) values ('zapłacone', '2026-10-08', now())");
+    await db.client.query("insert into action_required (question, due_date) values ('Zgoda na wycieczkę', '2026-10-09')");
+    await db.client.query("insert into action_required (question, due_date, resolved_at) values ('Załatwione', '2026-10-08', now())");
+    const { sender, sent } = fakeSender();
+    const result = await morning(sender, at("2026-10-08T06:45:00"));
+    expect(result).toMatchObject({ plan: { sent: 2 }, reminders: { sent: 2 } });
+    expect(sent.filter((s) => s.endpoint.endsWith("/1")).map((s) => s.payload)).toEqual([
+      { title: "Czyżyk", body: "Dziś: Basen 09:00, spakować: kapcie, strój kąpielowy", url: "/", tag: "morning-2026-10-08" },
+      { title: "Czyżyk", body: "Termin dziś: składka (20 zł). Termin jutro: teatrzyk (10 zł), Zgoda na wycieczkę", url: "/", tag: "deadlines-2026-10-08" },
+    ]);
+  });
+
+  it("raz dziennie, o wybranej godzinie, z osobnymi przełącznikami", async () => {
+    await db.client.query("insert into bring_items (description, due_date) values ('kapcie', '2026-10-08')");
+    await db.client.query("insert into payments (description, due_date) values ('składka', '2026-10-08')");
+    await db.client.query("update push_settings set morning_time = '07:30', reminders_enabled = false where user_id = $1", [olaId]);
+    await db.client.query("update push_settings set morning_enabled = false where user_id = $1", [darekId]);
+    const { sender, sent } = fakeSender();
+    await morning(sender, at("2026-10-08T06:45:00"));
+    expect(sent.map((s) => [s.endpoint, s.payload.tag])).toEqual([["https://push.example/2", "deadlines-2026-10-08"]]);
+    await morning(sender, at("2026-10-08T07:30:00"));
+    await morning(sender, at("2026-10-08T07:35:00"));
+    expect(sent.map((s) => [s.endpoint, s.payload.tag])).toEqual([
+      ["https://push.example/2", "deadlines-2026-10-08"],
+      ["https://push.example/1", "morning-2026-10-08"],
+    ]);
+  });
+
+  it("nic na dziś i brak terminów: nic nie jest wysyłane", async () => {
+    await db.client.query("insert into payments (description, due_date) values ('za tydzień', '2026-10-15')");
+    const { sender, sent } = fakeSender();
+    await morning(sender, at("2026-10-08T06:45:00"));
+    expect(sent).toHaveLength(0);
+  });
+});
 
 describe("Wieczorny skrót", () => {
   it("jutro strój i teatrzyk: o 19:00 „Jutro: strój sportowy, 10 zł na teatrzyk”, stuknięcie otwiera „/”", async () => {

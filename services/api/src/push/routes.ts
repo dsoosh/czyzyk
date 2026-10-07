@@ -22,6 +22,10 @@ export const settingsSchema = z
     alert_closures: z.boolean(),
     alert_actions: z.boolean(),
     alert_payments: z.boolean(),
+    // morning-push; optional so an older PWA keeps working (missing = unchanged).
+    morning_enabled: z.boolean().optional(),
+    morning_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM").optional(),
+    reminders_enabled: z.boolean().optional(),
   })
   .strict();
 
@@ -99,14 +103,29 @@ export async function pushRoutes(
     if (!parsed.success) return reply.code(400).send(invalid(parsed.error));
     const s = parsed.data;
     const { rows } = await db.query(
-      `insert into public.push_settings (user_id, digest_enabled, digest_time, alert_closures, alert_actions, alert_payments)
-       values ($1, $2, $3::time, $4, $5, $6)
+      `insert into public.push_settings
+         (user_id, digest_enabled, digest_time, alert_closures, alert_actions, alert_payments, morning_enabled, morning_time, reminders_enabled)
+       values ($1, $2, $3::time, $4, $5, $6, coalesce($7, true), coalesce($8::time, '06:45'), coalesce($9, true))
        on conflict (user_id) do update set
          digest_enabled = excluded.digest_enabled, digest_time = excluded.digest_time,
          alert_closures = excluded.alert_closures, alert_actions = excluded.alert_actions,
-         alert_payments = excluded.alert_payments
-       returning digest_enabled, to_char(digest_time, 'HH24:MI') as digest_time, alert_closures, alert_actions, alert_payments`,
-      [request.userId, s.digest_enabled, s.digest_time, s.alert_closures, s.alert_actions, s.alert_payments],
+         alert_payments = excluded.alert_payments,
+         morning_enabled = coalesce($7, push_settings.morning_enabled),
+         morning_time = coalesce($8::time, push_settings.morning_time),
+         reminders_enabled = coalesce($9, push_settings.reminders_enabled)
+       returning digest_enabled, to_char(digest_time, 'HH24:MI') as digest_time, alert_closures, alert_actions, alert_payments,
+                 morning_enabled, to_char(morning_time, 'HH24:MI') as morning_time, reminders_enabled`,
+      [
+        request.userId,
+        s.digest_enabled,
+        s.digest_time,
+        s.alert_closures,
+        s.alert_actions,
+        s.alert_payments,
+        s.morning_enabled ?? null,
+        s.morning_time ?? null,
+        s.reminders_enabled ?? null,
+      ],
     );
     return rows[0];
   });

@@ -153,7 +153,26 @@ describe("PUT /push/settings", () => {
       "PUT",
     );
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ digest_enabled: true, digest_time: "20:30", alert_closures: true, alert_actions: false, alert_payments: true });
+    expect(res.json()).toEqual({
+      digest_enabled: true,
+      digest_time: "20:30",
+      alert_closures: true,
+      alert_actions: false,
+      alert_payments: true,
+      morning_enabled: true,
+      morning_time: "06:45",
+      reminders_enabled: true,
+    });
+  });
+
+  it("zmienia poranny skrót i przypomnienia; starsza PWA bez tych pól ich nie zmienia", async () => {
+    const token = await jwt(olaId);
+    const base = { digest_enabled: true, digest_time: "19:00", alert_closures: true, alert_actions: true, alert_payments: true };
+    const res = await post("/push/settings", { ...base, morning_enabled: false, morning_time: "07:15", reminders_enabled: false }, token, "PUT");
+    expect(res.json()).toMatchObject({ morning_enabled: false, morning_time: "07:15", reminders_enabled: false });
+    const older = await post("/push/settings", base, token, "PUT");
+    expect(older.json()).toMatchObject({ morning_enabled: false, morning_time: "07:15", reminders_enabled: false });
+    expect((await post("/push/settings", { ...base, morning_time: "7:15" }, token, "PUT")).statusCode).toBe(400);
   });
 
   it("odrzuca niepoprawną godzinę i nieznane pola", async () => {
