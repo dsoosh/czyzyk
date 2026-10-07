@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { mentionsFamily, roleOf, type ContactRoleRow } from "@czyzyk/shared";
+import { mentionsFamily, roleOf, type ContactRoleRow, type OpenAiClient } from "@czyzyk/shared";
 import type { BatchMessage, ExistingItem, ExtractionBatch } from "./batch.js";
 import type { ModelPrompt } from "./model.js";
 import { warsawStamp } from "./time.js";
@@ -123,5 +123,30 @@ export class AnthropicTriageModel implements TriageModel {
     const relevant = (call?.input as { relevant?: unknown } | undefined)?.relevant;
     if (typeof relevant !== "boolean") throw new Error("triage: no valid tool call");
     return { relevant, usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens } };
+  }
+}
+
+/** The same triage through OpenAI (llm-provider), with OPENAI_TRIAGE_MODEL. */
+export class OpenAiTriageModel implements TriageModel {
+  constructor(
+    private readonly client: OpenAiClient,
+    private readonly model: string,
+  ) {}
+
+  get name(): string {
+    return this.model;
+  }
+
+  async triage(prompt: ModelPrompt) {
+    const response = await this.client.complete({
+      model: this.model,
+      system: prompt.system,
+      messages: [{ role: "user", content: prompt.user }],
+      tool: { name: TOOL.name, description: TOOL.description ?? "", parameters: TOOL.input_schema as Record<string, unknown> },
+      maxTokens: 200,
+    });
+    const relevant = (response.toolInput as { relevant?: unknown } | undefined)?.relevant;
+    if (typeof relevant !== "boolean") throw new Error("triage: no valid tool call");
+    return { relevant, usage: response.usage };
   }
 }

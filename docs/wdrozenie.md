@@ -214,3 +214,12 @@ Czyżyk Connect może sprawdzać zdjęcia z obserwowanych grup i wysyłać tylko
 # Triaż wiadomości (koszty modelu)
 
 Przed pełną analizą worker sprawdza, czy paczka nowych wiadomości w ogóle może dotyczyć spraw organizacyjnych. Sama pogawędka („Dziękuję!”, „👍”, zdjęcie bez podpisu) jest pomijana bez modelu. Resztę ocenia krótko tani model (`TRIAGE_MODEL` w `.railway/railway.ts`; usuń zmienną, żeby zostały same reguły). Wiadomości od rodziny zawsze idą do analizy, a błąd oceny oznacza pełną analizę. Pominięte paczki widać w **Admin → LLM** („wstępna ocena – pominięte”) i w `sync_log` (status `skipped`).
+
+# Dostawca modeli: Anthropic albo OpenAI
+
+Domyślnie wszystkie wywołania modeli idą do Anthropic (`ANTHROPIC_API_KEY`, nazwy modeli w `.railway/railway.ts`). Żeby przejść na OpenAI, ustaw w panelu Railway (bez zmian w kodzie):
+
+- **worker**: `OPENAI_API_KEY` i `OPENAI_EXTRACTION_MODEL` – od tej chwili analiza wiadomości idzie do OpenAI. Opcjonalnie `OPENAI_TRIAGE_MODEL` (wstępna ocena; bez niego działają same reguły triażu) i `OPENAI_DOCUMENT_MODEL` (kontrola zdjęć – model musi przyjmować obrazy; domyślnie model analizy).
+- **api**: `OPENAI_API_KEY` i `OPENAI_CHAT_MODEL` – asystent „Zapytaj”.
+
+Usunięcie tych zmiennych przywraca Anthropic. Nazwę użytego modelu widać przy każdym wpisie w **Admin → LLM**.
