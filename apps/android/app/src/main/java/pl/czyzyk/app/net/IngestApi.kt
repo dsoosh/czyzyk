@@ -8,6 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import pl.czyzyk.app.capture.CapturedMessage
 import pl.czyzyk.app.pairing.Pairing
+import pl.czyzyk.app.photos.PendingDocument
 import java.io.IOException
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -34,6 +35,8 @@ interface IngestApi {
     /** Returns null when the request failed; throws [UnauthorizedException] on 401. */
     fun fetchConfig(pairing: Pairing): IngestConfig?
     fun reportGroups(pairing: Pairing, names: Collection<String>): SendResult
+    /** A screened document for a delivered message; [imageBase64] only for screening IMAGE. 404 (message not there yet) → Retry. */
+    fun sendDocument(pairing: Pairing, document: PendingDocument, imageBase64: String?): SendResult
 }
 
 class UnauthorizedException : IOException("device token rejected")
@@ -79,6 +82,16 @@ class HttpIngestApi(
         )
     }
 
+    override fun sendDocument(pairing: Pairing, document: PendingDocument, imageBase64: String?): SendResult {
+        val body = JSONObject()
+            .put("idempotency_key", document.idempotencyKey)
+            .put("file_name", document.fileName)
+            .put("screening", document.screening.wire)
+            .put("text", document.text.take(MAX_DOCUMENT_TEXT))
+        if (imageBase64 != null) body.put("image", imageBase64)
+        return post(pairing, "/ingest/document", body)
+    }
+
     override fun reportGroups(pairing: Pairing, names: Collection<String>): SendResult =
         post(pairing, "/ingest/seen-groups", JSONObject().put("names", JSONArray(names.toList())))
 
@@ -99,3 +112,6 @@ class HttpIngestApi(
         null
     }
 }
+
+/** Matches the server limit for document text. */
+private const val MAX_DOCUMENT_TEXT = 20_000

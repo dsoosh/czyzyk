@@ -2,34 +2,45 @@
 
 ## Purpose
 
-Na telefonie, przed wysyłką, odróżnia dokumenty organizacyjne od zdjęć ludzi w eksporcie czatu udostępnionym do Czyżyk Connect, tak aby zdjęcia dzieci nigdy nie opuściły telefonu.
+Na telefonie, przed wysyłką, wybiera ze zdjęć obserwowanych grup WhatsApp tylko dokumenty organizacyjne i łączy je z wiadomościami, tak aby zdjęcia dzieci nigdy nie opuściły telefonu.
 
 ## ADDED Requirements
 
-### Requirement: Kontrola obrazów z udostępnionego eksportu na telefonie
-Gdy do Czyżyk Connect udostępniono ZIP eksportu z multimediami, aplikacja SHALL sprawdzić lokalnie każdy obraz wymieniony w pliku czatu modelami dołączonymi do aplikacji. Obraz MUST NOT być wysyłany do żadnej usługi w celu tej kontroli.
+### Requirement: Zdjęcia z obserwowanych grup sprawdzane na telefonie
+Gdy użytkownik włączy w Czyżyk Connect opcję „Zdjęcia z grup” i da dostęp do zdjęć, aplikacja SHALL sprawdzać nowe zdjęcia z folderu „WhatsApp Images” lokalnie, modelami dołączonymi do aplikacji. Zdjęcie MUST NOT być wysyłane do żadnej usługi w celu tej kontroli. Zdjęcia z folderu wysłanych („Sent”) MUST być pomijane.
 
-#### Scenario: Eksport ze zdjęciami
-- **WHEN** użytkownik udostępnia do Czyżyk Connect eksport z multimediami
-- **THEN** aplikacja pokazuje postęp sprawdzania zdjęć, a potem otwiera import z podsumowaniem decyzji
+#### Scenario: Jadłospis w grupie
+- **WHEN** w obserwowanej grupie ktoś wysyła zdjęcie jadłospisu, a WhatsApp je pobiera
+- **THEN** po chwili telefon wysyła dokument do wiadomości „📷 Zdjęcie” tej grupy
 
-### Requirement: Trzy decyzje, domyślnie wstrzymaj
-Każdy obraz SHALL dostać decyzję: `image` (czytelny tekst, brak ludzi – wysyłany obraz i tekst), `text_only` (czytelny tekst i wykryta twarz lub osoba – wysyłany tylko tekst rozpoznany na telefonie) albo `withheld` (nic nie jest wysyłane). Błąd analizy, obraz mniejszy niż 400 px, brak czytelnego tekstu, przekroczony limit liczby obrazów, filmy, PDF-y i inne pliki MUST dawać `withheld`. Wykrycie twarzy lub osoby MUST wykluczać `image`.
+#### Scenario: Opcja wyłączona
+- **WHEN** opcja „Zdjęcia z grup” jest wyłączona albo nie ma dostępu do zdjęć
+- **THEN** aplikacja nie czyta zdjęć ani nie zapisuje czasów powiadomień o zdjęciach
 
-#### Scenario: Zdjęcie jadłospisu
-- **WHEN** obraz to sfotografowany jadłospis bez ludzi
-- **THEN** decyzja to `image`
+### Requirement: Jednoznaczne dopasowanie po czasie
+Plik SHALL być łączony z wiadomością obserwowanej grupy tylko wtedy, gdy wszystkie powiadomienia o zdjęciach (z dowolnego czatu) w oknie od 10 minut przed do 2 minut po dodaniu pliku pochodzą z tej samej obserwowanej grupy. O innych czatach aplikacja MUST zapisywać wyłącznie czas zdjęcia, bez treści i nazw. Zdjęcie bez jednoznacznego dopasowania MUST zostać na telefonie.
+
+#### Scenario: Zdjęcie z prywatnego czatu w tym samym czasie
+- **WHEN** w ciągu tych samych minut przychodzi zdjęcie w obserwowanej grupie i w prywatnym czacie
+- **THEN** żaden z plików nie jest wysyłany
+
+#### Scenario: Album
+- **WHEN** w obserwowanej grupie przychodzą trzy zdjęcia jedno po drugim
+- **THEN** każdy plik jest łączony z wiadomością tej grupy
+
+### Requirement: Trzy decyzje, domyślnie zostaw na telefonie
+Każde dopasowane zdjęcie SHALL dostać decyzję: `image` (czytelny tekst, brak ludzi – wysyłany obraz i tekst), `text_only` (czytelny tekst i wykryta twarz lub osoba – wysyłany tylko tekst rozpoznany na telefonie) albo `withheld` (nic nie jest wysyłane). Błąd analizy, obraz mniejszy niż 400 px i brak czytelnego tekstu MUST dawać `withheld`. Wykrycie twarzy lub osoby MUST wykluczać `image`.
 
 #### Scenario: Plakat ze zdjęciem dzieci
-- **WHEN** obraz to plakat „Bal jesienny 24.10” ze zdjęciem dzieci
-- **THEN** decyzja to `text_only` i wysyłany jest tylko tekst plakatu
+- **WHEN** zdjęcie to plakat „Bal jesienny 24.10” ze zdjęciem dzieci
+- **THEN** wysyłany jest tylko tekst plakatu
 
 #### Scenario: Zdjęcie z zajęć
-- **WHEN** obraz przedstawia dzieci bez czytelnego tekstu
-- **THEN** decyzja to `withheld` i nic z tego obrazu nie opuszcza telefonu
+- **WHEN** zdjęcie przedstawia dzieci bez czytelnego tekstu
+- **THEN** nic z tego zdjęcia nie opuszcza telefonu
 
 ### Requirement: Obraz dokumentu bez metadanych
-Obraz z decyzją `image` SHALL być wysyłany jako nowo zakodowany JPEG o dłuższym boku najwyżej 2048 px, bez metadanych oryginału (w tym lokalizacji).
+Obraz z decyzją `image` SHALL być wysyłany jako nowo zakodowany JPEG o dłuższym boku najwyżej 2048 px i rozmiarze najwyżej 1,5 MB, bez metadanych oryginału (w tym lokalizacji).
 
 #### Scenario: Zdjęcie z lokalizacją GPS
 - **WHEN** dokument ma w EXIF współrzędne GPS

@@ -34,6 +34,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 is SendResult.Retry -> return Result.retry()
             }
         }
+        // Sweep for photos whose notification-triggered check did not run (process death, no network).
+        if (state.photosEnabled) Work.enqueuePhotos(applicationContext)
         return Result.success()
     }
 }

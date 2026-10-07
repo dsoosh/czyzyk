@@ -5,7 +5,20 @@ import { renderAt } from "../../test/render";
 
 const calls = [
   {
+    id: "c0",
+    kind: "document",
+    group_id: "g1",
+    model: "m",
+    request: { system: "Oceniasz zdjęcie", user: "", images: ["Zdjęcie dokumentu"] },
+    response: { containsPeople: true, description: "Plakat." },
+    error: null,
+    usage: null,
+    duration_ms: 1000,
+    created_at: "2026-10-07T16:06:00Z",
+  },
+  {
     id: "c1",
+    kind: "extraction",
     group_id: "g1",
     model: "model-z-konfiguracji",
     request: { system: "Jesteś asystentem rodziców", user: "W1 | 07.10 | \"Pani Ania\": \"W piątek bal\"" },
@@ -17,6 +30,7 @@ const calls = [
   },
   {
     id: "c2",
+    kind: "extraction",
     group_id: "g1",
     model: null,
     request: { system: "s", user: "u" },
@@ -31,8 +45,11 @@ const calls = [
 describe("Admin → LLM", () => {
   it("pokazuje wywołania od najnowszych z zapytaniem, odpowiedzią i błędem", async () => {
     renderAt("/admin/llm", { admin: true, tables: { llm_calls: calls, wa_groups: [{ id: "g1", wa_name: "Motylki 2026/27", display_name: "Motylki" }] } });
-    const items = await screen.findAllByRole("listitem");
-    expect(items).toHaveLength(2);
+    const all = await screen.findAllByRole("listitem");
+    expect(all).toHaveLength(3);
+    expect(within(all[0]!).getByText("kontrola zdjęcia")).toBeInTheDocument();
+    expect(within(all[0]!).getByText("widać ludzi – obraz usunięty")).toBeInTheDocument();
+    const items = all.slice(1);
     expect(within(items[0]!).getByText("1 operacja")).toBeInTheDocument();
     expect(within(items[0]!).getByText(/1200 → 80 tokenów · 2.4 s/)).toBeInTheDocument();
     expect(within(items[0]!).getByText("Motylki")).toBeInTheDocument();

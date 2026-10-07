@@ -2,31 +2,31 @@
 
 ## Purpose
 
-Przyjmuje dokumenty sprawdzone na telefonie razem z importem eksportu czatu, ponownie kontroluje obrazy na serwerze i używa treści dokumentów w ekstrakcji elementów.
+Przyjmuje dokumenty sprawdzone na telefonie, ponownie kontroluje obrazy na serwerze i pokazuje dokumenty modelowi analizującemu wiadomości.
 
 ## ADDED Requirements
 
-### Requirement: Dokumenty w imporcie eksportu
-Import eksportu SHALL przyjmować dokumenty (`image` z obrazem JPEG i tekstem albo `text_only` z samym tekstem) i łączyć je z wiadomością po nazwie pliku załącznika z pliku czatu. Dokument bez pasującej wiadomości, obraz inny niż JPEG oraz decyzja `withheld` MUST być odrzucone bez zapisu. Ten sam obraz (`sha256`) MUST NOT być zapisany dwa razy. Obraz SHALL być dostępny wyłącznie dla serwera; logi i `sync_log` MUST zawierać tylko liczby.
+### Requirement: Przyjęcie dokumentu z telefonu
+API SHALL przyjmować od sparowanego telefonu dokument dla dostarczonej wiadomości obserwowanej grupy: `image` (JPEG i tekst) albo `text_only` (sam tekst). Dokument dla nieznanej wiadomości MUST dostać odpowiedź „nie znaleziono” (telefon ponowi), obraz inny niż JPEG i decyzja `withheld` MUST być odrzucone. Ten sam obraz (`sha256`) MUST NOT być zapisany dwa razy. Obraz SHALL być dostępny wyłącznie dla serwera; logi i `sync_log` MUST zawierać tylko liczby i rodzaje. Nowy dokument przy przetworzonej wiadomości MUST wrócić ją do analizy.
 
-#### Scenario: Import z jadłospisem
-- **WHEN** admin importuje eksport, w którym wiadomość ma załącznik `IMG-20261006-WA0001.jpg` z decyzją `image`
-- **THEN** wiadomość ma dokument z tekstem i obrazem, a podsumowanie podaje liczbę przyjętych dokumentów
+#### Scenario: Dokument przed wiadomością
+- **WHEN** telefon wysyła dokument, zanim serwer dostał wiadomość
+- **THEN** odpowiedź to 404, a dokument zostaje przyjęty po dostarczeniu wiadomości
 
-#### Scenario: Ponowny import
-- **WHEN** ta sama paczka jest importowana drugi raz
+#### Scenario: Ten sam obraz drugi raz
+- **WHEN** ten sam obraz przychodzi ponownie
 - **THEN** nie powstaje drugi dokument
 
 ### Requirement: Kontrola zapasowa na serwerze
-Przed ekstrakcją grupy każdy nowy obraz dokumentu SHALL zostać sprawdzony modelem z wizją. Gdy model wykryje ludzi albo odmówi odpowiedzi, obraz MUST zostać usunięty, a dokument zachowuje wyłącznie tekst z telefonu.
+Przed analizą grupy każdy nowy obraz dokumentu SHALL zostać sprawdzony modelem z wizją. Gdy model wykryje ludzi albo odmówi odpowiedzi, obraz MUST zostać usunięty, a dokument zachowuje wyłącznie tekst z telefonu. Obraz niesprawdzony MUST NOT trafić do analizy.
 
 #### Scenario: Model widzi dzieci
-- **WHEN** kontrola zapasowa zgłasza ludzi na obrazie dokumentu
-- **THEN** obrazu nie ma w bazie, a tekst dokumentu zostaje
+- **WHEN** kontrola zapasowa zgłasza ludzi na obrazie
+- **THEN** obrazu nie ma w bazie, a do analizy trafia tylko tekst
 
-### Requirement: Treść dokumentu w ekstrakcji
-Tekst gotowego dokumentu SHALL trafiać do promptu ekstrakcji przy wiadomości jako niezaufane dane. Nowy dokument przy wiadomości z okresu ekstrakcji MUST spowodować ponowną ekstrakcję tej wiadomości.
+### Requirement: Dokument w analizie wiadomości
+Tekst gotowego dokumentu SHALL trafiać do promptu analizy przy wiadomości jako niezaufane dane, a obraz dokumentu nowej wiadomości SHALL trafiać do modelu razem z zapytaniem, oznaczony aliasem wiadomości.
 
 #### Scenario: Plan miesiąca
 - **WHEN** dokument z planem zawiera „15.10 – teatrzyk, 20.10 – wycieczka, zabrać prowiant”
-- **THEN** ekstrakcja tworzy wydarzenia i rzecz do przyniesienia ze źródłem w tej wiadomości
+- **THEN** analiza tworzy wydarzenia i rzecz do przyniesienia ze źródłem w tej wiadomości

@@ -6,6 +6,7 @@ import pl.czyzyk.app.BuildConfig
 import pl.czyzyk.app.net.HttpIngestApi
 import pl.czyzyk.app.net.IngestApi
 import pl.czyzyk.app.pairing.SecureStore
+import pl.czyzyk.app.photos.PhotoLog
 import pl.czyzyk.app.queue.MessageQueue
 import pl.czyzyk.app.update.ApkInstaller
 import pl.czyzyk.app.update.ReleaseSource
@@ -18,6 +19,7 @@ object Deps {
     var store: (Context) -> SecureStore = { SecureStore.get(it) }
     var queue: (Context) -> MessageQueue = { MessageQueue.get(it) }
     var state: (Context) -> AppState = { AppState.get(it) }
+    var photos: (Context) -> PhotoLog = { PhotoLog.get(it) }
 
     // App updates from GitHub releases.
     var updatesEnabled: () -> Boolean = { BuildConfig.UPDATES_ENABLED }

@@ -2,36 +2,37 @@
 
 ## Why
 
-Plany miesiąca, jadłospisy i ogłoszenia przedszkole często wysyła jako zdjęcia. Powiadomienia nie niosą obrazów, a import eksportu (zmiana `import-eksportu-z-pwa`) świadomie wysyła tylko tekst czatu, więc te informacje są dziś poza aplikacją. Użytkownik poprosił o sprawdzanie zdjęć na telefonie i wysyłanie tylko tych, które dotyczą spraw organizacyjnych.
+Plany miesiąca, jadłospisy i ogłoszenia przedszkole często wysyła jako zdjęcia. Powiadomienia nie niosą obrazów (pokazują tylko „📷 Zdjęcie”), więc te informacje są dziś poza aplikacją. Użytkownik zaproponował: zdjęcia z obserwowanych grup sprawdzać na telefonie w folderze „WhatsApp Images”, łączyć z wiadomościami po czasie i – jeśli to sprawy organizacyjne – przesyłać zdjęcie w całości do modelu, żeby analiza była poprawna.
 
-Zmiana poza kolejnością etapów, na prośbę użytkownika (jak `import-eksportu-z-pwa`). Realizuje rdzeń etapu 4 (`etap-4-eksport-i-zdjecia`): kontrolę obrazów na telefonie (D2), przekazanie dokumentów i kontrolę zapasową na serwerze (D6) – na istniejącej ścieżce „Udostępnij → Czyżyk Connect → Admin → Import”. Decyzja z 2026-10-04 obowiązuje bez zmian: zdjęcia z ludźmi nie opuszczają telefonu.
+Zmiana poza kolejnością etapów, na prośbę użytkownika (jak `import-eksportu-z-pwa`). Realizuje rdzeń etapu 4 (`etap-4-eksport-i-zdjecia`): kontrolę obrazów na telefonie (D2) i kontrolę zapasową na serwerze (D6), ale bez eksportu czatu – zdjęcia są brane automatycznie z folderu WhatsAppa. Decyzja z 2026-10-04 obowiązuje bez zmian: zdjęcia z ludźmi nie opuszczają telefonu.
 
-**Gotowe, gdy:** po udostępnieniu do Czyżyk Connect eksportu z multimediami zdjęcie planu lub ogłoszenia daje wydarzenia i rzeczy do przyniesienia, a zdjęcia z zajęć nie trafiają na serwer – ani jako plik, ani jako tekst.
+**Gotowe, gdy:** zdjęcie jadłospisu lub planu wysłane w obserwowanej grupie daje sprawy w aplikacji (model widzi zdjęcie), a zdjęcia z zajęć nie trafiają na serwer – ani jako plik, ani jako tekst.
 
 ## What Changes
 
-- Android (Czyżyk Connect): przy udostępnieniu ZIP-a z multimediami każdy obraz wymieniony w czacie jest sprawdzany lokalnie (ML Kit z modelami w APK: twarze, etykiety osób, rozpoznawanie tekstu) i dostaje decyzję `image`, `text_only` albo `withheld`. Obraz `image` jest przeskalowany i zapisany na nowo jako JPEG (bez metadanych EXIF, w tym GPS). Przekazywane do PWA są tylko dokumenty `image` (obraz + tekst) i `text_only` (sam tekst) oraz liczba wstrzymanych.
-- `packages/shared`: parser eksportu zwraca nazwy plików załączników wiadomości.
-- `services/api`: `POST /import/chat` przyjmuje dokumenty (opcjonalnie), łączy je z wiadomościami po nazwie pliku, zapisuje obraz w bazie (tabela dostępna tylko dla serwera), deduplikuje po `sha256`.
-- `services/worker`: przed ekstrakcją grupy kontrola zapasowa każdego nowego obrazu modelem z wizją (`DOCUMENT_MODEL`, domyślnie `EXTRACTION_MODEL`): wykrycie ludzi usuwa obraz i zostawia tekst; model przepisuje treść dokumentu. Tekst dokumentu trafia do promptu ekstrakcji przy wiadomości.
-- PWA: ekran importu pokazuje, ile zdjęć poszło jako dokument, ile jako sam tekst, a ile zostało na telefonie.
+- Android (Czyżyk Connect), opcja „Zdjęcia z grup” (wymaga dostępu do zdjęć):
+  - telefon zapamiętuje tylko czas powiadomień o zdjęciach (ze wszystkich czatów, bez treści);
+  - nowy plik w „WhatsApp Images” jest łączony z wiadomością obserwowanej grupy po czasie, wyłącznie gdy dopasowanie jest jednoznaczne;
+  - zdjęcie jest sprawdzane lokalnie (ML Kit z modelami w APK: twarze, etykiety osób, rozpoznawanie tekstu) i dostaje decyzję `image`, `text_only` albo `withheld`;
+  - wysyłane są tylko dokumenty: `image` jako nowo zakodowany JPEG bez EXIF z tekstem, `text_only` jako sam tekst.
+- `services/api`: `POST /ingest/document` (token urządzenia) – dokument dla dostarczonej wiadomości, deduplikacja po `sha256`, ponowna analiza wiadomości.
+- `services/worker`: przed analizą grupy kontrola zapasowa każdego nowego obrazu modelem z wizją (`DOCUMENT_MODEL`, domyślnie `EXTRACTION_MODEL`) – ludzie lub odmowa → obraz usunięty; obraz dokumentu trafia do modelu razem z wiadomością (z etykietą aliasu), tekst dokumentu – do treści wiadomości w prompcie. Kontrola zapasowa trafia do dziennika LLM admina.
 
-**Poza zakresem (zostaje w etapie 4):** eksport na klik (usługa ułatwień dostępu, kafelek, przypomnienia), PDF-y (zawsze `withheld`), podgląd obrazu dokumentu w PWA, zestaw regresji ok. 40 obrazów z testami instrumentalnymi, import zdjęć z ZIP-a wybranego w przeglądarce (bez kontroli na telefonie obrazy dalej nie opuszczają urządzenia).
+**Poza zakresem (zostaje w etapie 4):** eksport czatu na klik, PDF-y, podgląd dokumentu w PWA, zestaw regresji ok. 40 obrazów z testami instrumentalnymi.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `shared-document-screening`: kontrola obrazów z udostępnionego eksportu na telefonie i przekazanie wyłącznie dokumentów organizacyjnych.
-- `document-import`: przyjęcie dokumentów przy imporcie eksportu, kontrola zapasowa na serwerze i użycie treści dokumentów w ekstrakcji.
+- `shared-document-screening`: zdjęcia z obserwowanych grup sprawdzane na telefonie i łączone z wiadomościami; wysyłane wyłącznie dokumenty organizacyjne.
+- `document-import`: przyjęcie dokumentów, kontrola zapasowa na serwerze i użycie dokumentów (obraz i tekst) w analizie wiadomości.
 
 ### Modified Capabilities
 
-(brak; `chat-export-upload` ze zmiany `import-eksportu-z-pwa` nie jest jeszcze zarchiwizowane – rozszerzenie opisuje `document-import`)
+(brak; dziennik LLM ze zmiany `dziennik-llm` dostaje nowy rodzaj wpisu bez zmiany wymagań)
 
 ## Impact
 
-- Android: zależności ML Kit (face-detection, image-labeling, text-recognition) w wariantach z modelami w APK – większy APK (kilkanaście MB), brak pobierania modeli przez Google Play Services.
-- Baza: migracja `0018_documents.sql` – kolumny `attachments` (`file_name`, `screening`, `doc_text`, `description`, `sha256`, `doc_status`), tabela `attachment_files` z RLS bez polityk (tylko serwer).
-- API: limit treści `/import/chat` podniesiony o dokumenty (do 40 MB łącznie).
-- Worker: zmienna `DOCUMENT_MODEL` (opcjonalna).
+- Android: ML Kit (face-detection, image-labeling, text-recognition) z modelami w APK – większy APK; uprawnienie `READ_MEDIA_IMAGES` (Android 13+) / `READ_EXTERNAL_STORAGE` (starsze); WhatsApp musi pobierać zdjęcia automatycznie.
+- Baza: migracja `0019_documents.sql` – kolumny `attachments`, tabela `attachment_files` (RLS bez polityk, tylko serwer), nowe rodzaje w `sync_log` i `llm_calls`.
+- Worker: opcjonalna zmienna `DOCUMENT_MODEL`; koszt – jedno wywołanie modelu z obrazem na dokument plus obraz w analizie.
