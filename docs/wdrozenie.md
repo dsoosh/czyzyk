@@ -15,7 +15,7 @@ Instrukcja pierwszego uruchomienia produkcyjnego (etap 1). Kolejne etapy dopisuj
 3. Supabase → Authentication → **Sign In / Providers**:
    - **Google**: włącz, wklej Client ID i Client Secret.
    - **Email**: wyłącz (także magic link). **Phone** i **Anonymous sign-ins**: wyłączone.
-4. Supabase → Authentication → **URL Configuration**: *Site URL* = adres PWA na Railway (np. `https://czyzyk.up.railway.app`), w *Redirect URLs* dodaj ten sam adres oraz `http://localhost:5173` do pracy lokalnej.
+4. Supabase → Authentication → **URL Configuration**: *Site URL* = adres PWA na Railway (np. `https://czyzyk.up.railway.app`), w *Redirect URLs* dodaj ten sam adres oraz `http://localhost:5173` do pracy lokalnej. Dla aplikacji Android dodaj też `czyzyk://auth/callback` (bez tego logowanie w Czyżyk Connect kończy się w PWA, patrz niżej).
 
 Te same ustawienia opisuje `supabase/config.toml` (dla `supabase start` lokalnie).
 

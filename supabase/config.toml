@@ -26,7 +26,8 @@ enabled = true
 [auth]
 enabled = true
 site_url = "env(PWA_URL)"
-additional_redirect_urls = ["http://localhost:5173", "env(PWA_URL)"]
+# czyzyk://auth/callback: Google sign-in started in the Android app returns there, not to the PWA.
+additional_redirect_urls = ["http://localhost:5173", "env(PWA_URL)", "czyzyk://auth/callback"]
 jwt_expiry = 3600
 # Sign-ups stay enabled for OAuth; the before_user_created hook restricts them to the family.
 enable_signup = true
