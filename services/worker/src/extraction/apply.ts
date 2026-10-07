@@ -196,6 +196,38 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
   return summary;
 }
 
+/** Fields whose change is not part of the history (filled in separately, not user-visible facts). */
+const NOT_HISTORY = new Set(["suggestions", "event"]);
+
+/** {field: {from, to}} for fields whose value changed. */
+export function diffData(before: Record<string, unknown>, after: Record<string, unknown>): Record<string, { from: unknown; to: unknown }> {
+  const diff: Record<string, { from: unknown; to: unknown }> = {};
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    if (NOT_HISTORY.has(key)) continue;
+    const from = before[key] ?? null;
+    const to = after[key] ?? null;
+    if (JSON.stringify(from) !== JSON.stringify(to)) diff[key] = { from, to };
+  }
+  return diff;
+}
+
+/** One entry of the item's history (item-history), in the extraction's transaction. */
+async function recordChange(
+  client: pg.PoolClient,
+  type: ItemType,
+  id: string,
+  op: "create" | "update" | "cancel",
+  changes: unknown,
+  sourceMessageIds: string[],
+  rationale: string,
+) {
+  await client.query(
+    `insert into public.item_changes (item_type, item_id, op, changes, source_message_ids, rationale)
+     values ($1, $2, $3, $4, $5::uuid[], $6)`,
+    [type, id, op, changes === null ? null : JSON.stringify(changes), sourceMessageIds, rationale],
+  );
+}
+
 /** Stores the change as pending_patch (same field names as extraction data) for the admin to accept or dismiss. */
 async function queueProposal(client: pg.PoolClient, table: string, op: Extract<ResolvedOperation, { op: "update" | "cancel" }>) {
   let data: Record<string, unknown> | undefined;
@@ -245,6 +277,8 @@ async function applyOne(
       [...meta, ...cols.params],
     );
     if (op.ref) refIds.set(op.ref, rows[0]!.id);
+    const { suggestions: _s, ...recorded } = data as Record<string, unknown>;
+    await recordChange(client, op.type, rows[0]!.id, "create", recorded, op.sourceMessageIds, op.rationale);
     return { id: rows[0]!.id };
   }
 
@@ -283,6 +317,7 @@ async function applyOne(
         where id = $1`,
       [op.targetId, ...meta],
     );
+    await recordChange(client, op.type, op.targetId, "cancel", null, op.sourceMessageIds, op.rationale);
     return { id: op.targetId };
   }
 
@@ -304,5 +339,9 @@ async function applyOne(
       where id = $1`,
     [op.targetId, ...meta, ...cols.params],
   );
+  const diff = diffData(existing.data as Record<string, unknown>, data as Record<string, unknown>);
+  const names = (list: readonly string[]) => JSON.stringify(list.map((n) => n.toLocaleLowerCase("pl-PL")).sort());
+  if (ids.length > 0 && names(op.children) !== names(existing.children)) diff.children = { from: existing.children, to: op.children };
+  if (Object.keys(diff).length) await recordChange(client, op.type, op.targetId, "update", diff, op.sourceMessageIds, op.rationale);
   return { id: op.targetId };
 }

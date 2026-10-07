@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fixtures as f, renderAt } from "../test/render";
@@ -65,5 +65,46 @@ describe("Skąd to wiem", () => {
   it("nieznany typ lub element", async () => {
     renderAt("/zrodlo/cokolwiek/x");
     expect(await screen.findByText("Nie znaleziono elementu.")).toBeInTheDocument();
+  });
+
+  it("historia zmian: zmiana godziny z poprzednią wartością i wiadomością, rozmowa wokół najnowszego źródła", async () => {
+    const { rpc } = renderAt("/zrodlo/bring_item/b1", {
+      tables: {
+        bring_items: [f.bring({ source_message_ids: ["m20", "m35"] })],
+        messages,
+        item_changes: [
+          { id: "h1", item_type: "bring_item", item_id: "b1", op: "create", changes: { description: "przebranie", due_date: "2026-10-09" }, source_message_ids: ["m20"], rationale: "Bal.", created_at: "2026-10-07T14:21:00Z" },
+          {
+            id: "h2",
+            item_type: "bring_item",
+            item_id: "b1",
+            op: "update",
+            changes: { due_date: { from: "2026-10-09", to: "2026-10-10" } },
+            source_message_ids: ["m35"],
+            rationale: "Bal przeniesiony na sobotę.",
+            created_at: "2026-10-07T14:36:00Z",
+          },
+        ],
+      },
+      rpc: { message_context: messageContext },
+    });
+    const history = await screen.findByRole("region", { name: "Historia zmian" });
+    const entries = within(history).getAllByRole("listitem").filter((li) => li.parentElement?.parentElement === history);
+    expect(entries.map((e) => within(e).getAllByText(/Utworzono|Zmieniono/)[0]!.textContent)).toEqual(["Zmieniono", "Utworzono"]);
+    expect(entries[0]).toHaveTextContent("Termin: 9.10 → 10.10");
+    expect(entries[0]).toHaveTextContent("Bal przeniesiony na sobotę.");
+    expect(entries[0]).toHaveTextContent("wiadomość 35");
+    expect(entries[1]).toHaveTextContent("W piątek bal, przebrania");
+    expect(rpc).toHaveBeenCalledWith("message_context", { p_message_id: "m35", p_before: 10, p_after: 10 });
+  });
+
+  it("bez historii (starsze sprawy) pokazuje wszystkie wiadomości źródłowe", async () => {
+    renderAt("/zrodlo/bring_item/b1", {
+      tables: { bring_items: [f.bring({ source_message_ids: ["m20", "m35"] })], messages, item_changes: [] },
+      rpc: { message_context: messageContext },
+    });
+    const sourcesList = await screen.findByRole("region", { name: "Wiadomości źródłowe" });
+    expect(sourcesList).toHaveTextContent("W piątek bal, przebrania");
+    expect(sourcesList).toHaveTextContent("wiadomość 35");
   });
 });

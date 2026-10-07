@@ -228,22 +228,48 @@ export interface ContextMessage {
   triage?: "rules" | "model" | null;
 }
 
-export interface SourceData {
-  item: (Provenance & Record<string, unknown>) | null;
-  messages: ContextMessage[];
+/** One entry of an item's history (item-history). */
+export interface ItemChange {
+  id: string;
+  op: "create" | "update" | "cancel";
+  /** create: the data; update: {field: {from, to}}; cancel: null. */
+  changes: Record<string, unknown> | null;
+  source_message_ids: string[];
+  rationale: string | null;
+  created_at: string;
 }
 
-/** An item's provenance and its first source message with surrounding conversation. */
+export interface SourceData {
+  item: (Provenance & Record<string, unknown>) | null;
+  /** Conversation around the newest source message. */
+  messages: ContextMessage[];
+  history: ItemChange[];
+  /** Every source message of the item and of its history, oldest first. */
+  sources: ContextMessage[];
+}
+
+const SOURCE_COLUMNS = "id, group_id, author, sent_at, text, has_attachment, status";
+
 export async function fetchSource(db: Db, kind: ItemKind, id: string, before: number): Promise<SourceData> {
-  const item = await run<(Provenance & Record<string, unknown>) | null>(
-    db.from(ITEM_TABLES[kind]).select("*").eq("id", id).maybeSingle(),
-  );
-  const first = item?.source_message_ids?.[0];
-  if (!item || !first) return { item, messages: [] };
-  const messages = await run<ContextMessage[]>(
-    db.rpc("message_context", { p_message_id: first, p_before: before, p_after: 10 }),
-  );
-  return { item, messages };
+  const [item, history] = await Promise.all([
+    run<(Provenance & Record<string, unknown>) | null>(db.from(ITEM_TABLES[kind]).select("*").eq("id", id).maybeSingle()),
+    run<ItemChange[]>(
+      db
+        .from("item_changes")
+        .select("id, op, changes, source_message_ids, rationale, created_at")
+        .eq("item_type", kind)
+        .eq("item_id", id)
+        .order("created_at", { ascending: true }),
+    ),
+  ]);
+  if (!item) return { item, messages: [], history: [], sources: [] };
+  const ids = [...new Set([...(item.source_message_ids ?? []), ...history.flatMap((h) => h.source_message_ids)])];
+  if (ids.length === 0) return { item, messages: [], history, sources: [] };
+  const sources = await run<ContextMessage[]>(db.from("messages").select(SOURCE_COLUMNS).in("id", ids).order("sent_at", { ascending: true }));
+  // The conversation around the newest source: that is where the current state comes from.
+  const newest = sources.at(-1)?.id ?? ids[0]!;
+  const messages = await run<ContextMessage[]>(db.rpc("message_context", { p_message_id: newest, p_before: before, p_after: 10 }));
+  return { item, messages, history, sources };
 }
 
 export function confidenceLabel(confidence: number | null): string {

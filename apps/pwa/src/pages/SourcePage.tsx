@@ -2,8 +2,18 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { LoadError, Loading } from "../components/ui";
-import { dayLabel, warsawDay, warsawTime } from "../lib/dates";
-import { confidenceLabel, fetchSource, itemTitle, ITEM_TABLES, type ItemKind } from "../lib/items";
+import { dayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
+import {
+  confidenceLabel,
+  fetchSource,
+  formatAmount,
+  itemTitle,
+  ITEM_TABLES,
+  type ContextMessage,
+  type ItemChange,
+  type ItemKind,
+  type SourceData,
+} from "../lib/items";
 import { useLoader } from "../lib/useLoader";
 
 const KIND_LABELS: Record<ItemKind, string> = {
@@ -23,7 +33,7 @@ export function SourcePage() {
   const [before, setBefore] = useState(10);
   const validKind = kind in ITEM_TABLES ? (kind as ItemKind) : null;
   const { data, error, loading, reload } = useLoader(
-    () => (validKind ? fetchSource(client, validKind, id, before) : Promise.resolve({ item: null, messages: [] })),
+    () => (validKind ? fetchSource(client, validKind, id, before) : Promise.resolve<SourceData>({ item: null, messages: [], history: [], sources: [] })),
     [client, validKind, id, before],
   );
 
@@ -31,7 +41,8 @@ export function SourcePage() {
   if (!data) return <Loading />;
   if (!validKind || !data.item) return <p className="text-slate-600">Nie znaleziono elementu.</p>;
 
-  const sources = new Set(data.item.source_message_ids);
+  const sources = new Set([...data.item.source_message_ids, ...data.sources.map((m) => m.id)]);
+  const byId = new Map(data.sources.map((m) => [m.id, m]));
   const today = warsawDay(new Date());
 
   return (
@@ -50,6 +61,30 @@ export function SourcePage() {
         {data.item.rationale && <p className="text-slate-700">{data.item.rationale}</p>}
         {data.item.status === "needs_review" && <p className="text-sm text-amber-700">Czeka na sprawdzenie przez administratora.</p>}
       </div>
+
+      {data.history.length > 0 ? (
+        <section aria-label="Historia zmian" className="space-y-2">
+          <h2 className="font-display text-xl font-bold text-ink">Historia zmian</h2>
+          <ol className="space-y-2">
+            {[...data.history].reverse().map((change) => (
+              <ChangeEntry key={change.id} change={change} sources={change.source_message_ids.map((sid) => byId.get(sid)).filter((m) => m != null)} today={today} />
+            ))}
+          </ol>
+        </section>
+      ) : (
+        data.sources.length > 1 && (
+          <section aria-label="Wiadomości źródłowe" className="space-y-2">
+            <h2 className="font-display text-xl font-bold text-ink">Wiadomości źródłowe</h2>
+            <ol className="space-y-2">
+              {data.sources.map((m) => (
+                <li key={m.id} className="rounded-2xl bg-white p-3 shadow-sm">
+                  <SourceQuote message={m} today={today} />
+                </li>
+              ))}
+            </ol>
+          </section>
+        )
+      )}
 
       {data.messages.length === 0 ? (
         <p className="text-slate-500">Brak wiadomości źródłowej.</p>
@@ -87,5 +122,87 @@ export function SourcePage() {
         </section>
       )}
     </article>
+  );
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  title: "Nazwa",
+  start: "Początek",
+  end: "Koniec",
+  all_day: "Cały dzień",
+  location: "Miejsce",
+  whole_kindergarten: "Całe przedszkole",
+  description: "Opis",
+  due_date: "Termin",
+  amount_pln: "Kwota",
+  question: "Pytanie",
+  date_from: "Od",
+  date_to: "Do",
+  reason: "Powód",
+  category: "Kategoria",
+  label: "Nazwa",
+  value: "Wartość",
+  children: "Dzieci",
+};
+
+const OP_LABELS: Record<ItemChange["op"], string> = { create: "Utworzono", update: "Zmieniono", cancel: "Odwołano" };
+
+/** A stored value as the family reads it: dates and times in Polish, yes/no, amounts. */
+function formatValue(field: string, value: unknown): string {
+  if (value == null || value === "") return "—";
+  if (typeof value === "boolean") return value ? "tak" : "nie";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
+  if (field === "amount_pln") return formatAmount(value as number);
+  if (typeof value === "string") {
+    const m = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/.exec(value);
+    if (m) return m[2] ? `${shortDate(m[1]!)} ${m[2]}` : shortDate(m[1]!);
+  }
+  return String(value);
+}
+
+function ChangeEntry({ change, sources, today }: { change: ItemChange; sources: ContextMessage[]; today: string }) {
+  const fields =
+    change.op === "update" && change.changes
+      ? Object.entries(change.changes as Record<string, { from: unknown; to: unknown }>)
+      : [];
+  return (
+    <li className="space-y-2 rounded-2xl bg-white p-3 shadow-sm">
+      <div className="flex justify-between gap-2 text-xs text-slate-500">
+        <span className="font-semibold text-slate-700">{OP_LABELS[change.op]}</span>
+        <span>
+          {dayLabel(warsawDay(change.created_at), today)} {warsawTime(change.created_at)}
+        </span>
+      </div>
+      {fields.length > 0 && (
+        <ul className="space-y-0.5 text-sm">
+          {fields.map(([field, { from, to }]) => (
+            <li key={field}>
+              <span className="text-slate-500">{FIELD_LABELS[field] ?? field}:</span> <span className="line-through">{formatValue(field, from)}</span>{" "}
+              → <span className="font-semibold">{formatValue(field, to)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {change.rationale && <p className="text-sm text-slate-700">{change.rationale}</p>}
+      {sources.map((m) => (
+        <blockquote key={m.id} className="border-l-4 border-accent pl-3">
+          <SourceQuote message={m} today={today} />
+        </blockquote>
+      ))}
+    </li>
+  );
+}
+
+function SourceQuote({ message, today }: { message: ContextMessage; today: string }) {
+  return (
+    <>
+      <div className="flex justify-between gap-2 text-xs text-slate-500">
+        <span className="font-semibold text-slate-700">{message.author}</span>
+        <span>
+          {dayLabel(warsawDay(message.sent_at), today)} {warsawTime(message.sent_at)}
+        </span>
+      </div>
+      <p className="mt-1 whitespace-pre-wrap text-sm">{message.text || (message.has_attachment ? "📎 załącznik" : "")}</p>
+    </>
   );
 }
