@@ -42,10 +42,38 @@ export const paymentDataSchema = z
   })
   .strict();
 
+/**
+ * What a family member can do with a "wymaga odpowiedzi" item (action-suggestions). The model
+ * proposes the kinds that fit the item; the database carries them out (apply_action_suggestion).
+ */
+export const ACTION_SUGGESTION_KINDS = ["bring", "payment", "event", "answer", "done", "not_applicable"] as const;
+export type ActionSuggestionKind = (typeof ACTION_SUGGESTION_KINDS)[number];
+
+export const actionSuggestionSchema = z
+  .object({
+    kind: z
+      .enum(ACTION_SUGGESTION_KINDS)
+      .describe(
+        "bring – przenieś do rzeczy do przyniesienia; payment – do płatności; event – do kalendarza; answer – odpowiedź rodziny (np. „Tak, zapisujemy”, „Nie”); done – zrobione; not_applicable – nie dotyczy",
+      ),
+    label: z.string().trim().min(1).max(40).describe("Krótki napis na przycisku, np. „Do przyniesienia”, „Tak, zapisujemy”"),
+    description: z.string().trim().min(1).max(200).nullable().describe("Dla bring/payment/event: co przynieść, za co zapłacić, nazwa wydarzenia"),
+    due_date: localDate.nullable().describe("Dla bring/payment/event: dzień (gdy inny niż termin sprawy)"),
+    amount_pln: z.number().nonnegative().nullable().describe("Dla payment: kwota w złotych"),
+  })
+  .strict();
+export type ActionSuggestion = z.infer<typeof actionSuggestionSchema>;
+
 export const actionRequiredDataSchema = z
   .object({
     question: z.string().trim().min(1).max(300).describe("Na co rodzice muszą odpowiedzieć lub co załatwić"),
     due_date: localDate.nullable(),
+    // Optional, not defaulted: an update without it keeps the stored suggestions.
+    suggestions: z
+      .array(actionSuggestionSchema)
+      .max(4)
+      .optional()
+      .describe("1–4 proponowane akcje dopasowane do sprawy, od najbardziej prawdopodobnej"),
   })
   .strict();
 
