@@ -80,6 +80,18 @@ describe("Admin → Grupy", () => {
     expect(rpc).toHaveBeenCalledWith("admin_update_group", { p_id: "g1", p_tracked: false, p_display_name: "Motylki" });
   });
 
+  it("dodaje grupę z palca, zanim przyjdzie z niej wiadomość", async () => {
+    const { rpc } = renderAt("/admin/grupy", { admin: true, tables });
+    const form = await screen.findByRole("form", { name: "Dodaj grupę" });
+    const add = within(form).getByRole("button", { name: "Dodaj i śledź" });
+    expect(add).toBeDisabled();
+    await userEvent.type(within(form).getByLabelText("Nazwa grupy w WhatsAppie"), "Rada rodziców 🌟");
+    await userEvent.type(within(form).getByLabelText("Nazwa wyświetlana nowej grupy"), "Rada");
+    await userEvent.click(add);
+    expect(rpc).toHaveBeenCalledWith("admin_add_group", { p_name: "Rada rodziców 🌟", p_display_name: "Rada" });
+    expect(within(form).getByLabelText("Nazwa grupy w WhatsAppie")).toHaveValue("");
+  });
+
   it("jest niedostępny dla członka rodziny", async () => {
     renderAt("/admin/grupy", { tables });
     expect(await screen.findByRole("heading", { name: "Dziś i jutro" })).toBeInTheDocument();

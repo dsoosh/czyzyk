@@ -45,10 +45,10 @@ const EXPORT = [
   "Plan na październik",
 ].join("\n");
 
-async function post(body: unknown, sub: string | null = adminId) {
+async function post(body: unknown, sub: string | null = adminId, url = "/import/chat") {
   return app().inject({
     method: "POST",
-    url: "/import/chat",
+    url,
     payload: body as object,
     headers: sub ? { authorization: `Bearer ${await jwt(sub)}` } : {},
   });
@@ -140,5 +140,62 @@ describe("POST /import/chat", () => {
     const res = await post({ group_id: groupId, text: lines.join("\n"), extract_days: 0 });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ messages: 6000, inserted: 6000, for_extraction: 0 });
+  });
+});
+
+describe("POST /import/message", () => {
+  const paste = (body: unknown, sub: string | null = adminId) => post(body, sub, "/import/message");
+
+  it("pojedyncza wiadomość: autor i czas z formularza, od razu do analizy", async () => {
+    const res = await paste({ group_id: groupId, text: "  Jutro zbiórka o 8:00  ", author: "Pani Ania", sent_at: "2026-10-20T13:30:00+02:00" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ messages: 1, inserted: 1, duplicates: 0 });
+    const { rows } = await db.client.query(
+      "select author, sent_at, text, source, processed_at is null as pending, received_at < now() - interval '1 hour' as due from messages",
+    );
+    expect(rows).toEqual([
+      { author: "Pani Ania", sent_at: new Date("2026-10-20T11:30:00Z"), text: "Jutro zbiórka o 8:00", source: "manual", pending: true, due: true },
+    ]);
+  });
+
+  it("bez autora i czasu: nieznany nadawca, teraz", async () => {
+    await paste({ group_id: groupId, text: "Zebranie w czwartek" });
+    const { rows } = await db.client.query("select author, sent_at from messages");
+    expect(rows).toEqual([{ author: "Nieznany nadawca", sent_at: new Date(NOW) }]);
+  });
+
+  it("skopiowane wiadomości z nagłówkami: autorzy i czasy z tekstu, bez duplikatu z powiadomienia", async () => {
+    const sentAt = new Date("2026-10-07T16:02:00Z");
+    await db.client.query(
+      `insert into messages (group_id, author, sent_at, text, source, dedupe_key) values ($1, 'Pani Ania', $2, 'W piątek bal', 'notification', $3)`,
+      [groupId, sentAt, dedupeKey({ groupId, author: "Pani Ania", sentAt, text: "W piątek bal" })],
+    );
+    const text = "[18:02, 7.10.2026] Pani Ania: W piątek bal\n[18:05, 7.10.2026] Mama Zosi: Czy trzeba przebranie?";
+    const res = await paste({ group_id: groupId, text, author: "ignorowany" });
+    expect(res.json()).toEqual({ messages: 2, inserted: 1, duplicates: 1 });
+    const { rows } = await db.client.query("select author, source from messages order by sent_at");
+    expect(rows).toEqual([
+      { author: "Pani Ania", source: "notification" },
+      { author: "Mama Zosi", source: "manual" },
+    ]);
+  });
+
+  it("dziennik i logi bez treści i autorów", async () => {
+    await paste({ group_id: groupId, text: "Bal jesienny w piątek", author: "Pani Ania" });
+    const { rows } = await db.client.query("select kind, details from sync_log");
+    expect(rows).toEqual([{ kind: "manual", details: expect.objectContaining({ inserted: 1, origin: "pwa" }) }]);
+    const all = JSON.stringify(rows) + logs.join("");
+    for (const secret of ["Bal jesienny", "Pani Ania"]) expect(all).not.toContain(secret);
+  });
+
+  it("tylko admin, tylko śledzona grupa, poprawne dane", async () => {
+    const body = { group_id: groupId, text: "x" };
+    expect((await paste(body, null)).statusCode).toBe(401);
+    expect((await paste(body, familyId)).statusCode).toBe(403);
+    expect((await paste({ group_id: groupId, text: "   " })).statusCode).toBe(400);
+    expect((await paste({ ...body, sent_at: "wczoraj" })).statusCode).toBe(400);
+    await db.client.query("update wa_groups set tracked = false");
+    expect((await paste(body)).statusCode).toBe(422);
+    expect((await db.client.query("select count(*)::int as n from messages")).rows[0].n).toBe(0);
   });
 });

@@ -85,6 +85,29 @@ describe("admin_update_group", () => {
   });
 });
 
+describe("admin_add_group", () => {
+  it("admin dodaje śledzoną grupę pod znormalizowaną nazwą", async () => {
+    const [row] = await rpc(adminId, "select * from public.admin_add_group($1, ' Biedronki ')", ["\u2068Grupa  Biedronki\u2069 "]);
+    expect(row).toMatchObject({ wa_name: "Grupa Biedronki", display_name: "Biedronki", tracked: true });
+  });
+
+  it("istniejąca grupa zostaje włączona, bez duplikatu i bez utraty nazwy", async () => {
+    await db.client.query("insert into wa_groups (wa_name, display_name) values ('Sąsiedzi', 'Osiedle')");
+    const [row] = await rpc(adminId, "select * from public.admin_add_group('Sąsiedzi', null)");
+    expect(row).toMatchObject({ tracked: true, display_name: "Osiedle" });
+    const { rows } = await db.client.query("select count(*)::int as n from wa_groups where wa_name = 'Sąsiedzi'");
+    expect(rows[0].n).toBe(1);
+  });
+
+  it("odrzuca pustą nazwę", async () => {
+    await expect(rpc(adminId, "select * from public.admin_add_group('  ', null)")).rejects.toMatchObject({ code: "22023" });
+  });
+
+  it("członek rodziny nie dodaje grup", async () => {
+    await expect(rpc(familyId, "select * from public.admin_add_group('X', null)")).rejects.toMatchObject({ code: "42501" });
+  });
+});
+
 describe("message_context", () => {
   it("zwraca 10 wiadomości przed i po w kolejności", async () => {
     const rows = await rpc(familyId, "select * from public.message_context($1)", [messageIds[15]]);

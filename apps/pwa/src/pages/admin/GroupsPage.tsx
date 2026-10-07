@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
 import type { Group } from "../../lib/items";
@@ -44,6 +44,55 @@ function GroupRow({ group, onSave }: { group: Group; onSave: (tracked: boolean, 
   );
 }
 
+/** A group added by name before its first notification (manual-entry). */
+function AddGroupForm({ onAdd }: { onAdd: (name: string, displayName: string) => Promise<boolean> }) {
+  const [name, setName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setBusy(true);
+    if (await onAdd(name, displayName)) {
+      setName("");
+      setDisplayName("");
+    }
+    setBusy(false);
+  };
+  return (
+    <form onSubmit={submit} aria-label="Dodaj grupę" className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+      <h2 className="font-semibold">Dodaj grupę</h2>
+      <p className="text-sm text-slate-600">
+        Nazwa dokładnie taka jak w WhatsAppie (wielkość liter, emoji). Grupa od razu będzie śledzona; telefon zacznie ją zapisywać po
+        odświeżeniu listy grup.
+      </p>
+      <input
+        aria-label="Nazwa grupy w WhatsAppie"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        maxLength={200}
+        required
+        placeholder="Nazwa grupy w WhatsAppie"
+        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+      />
+      <input
+        aria-label="Nazwa wyświetlana nowej grupy"
+        value={displayName}
+        onChange={(e) => setDisplayName(e.target.value)}
+        placeholder="Nazwa wyświetlana (opcjonalnie), np. Motylki"
+        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+      />
+      <button
+        type="submit"
+        disabled={busy || !name.trim()}
+        className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+      >
+        Dodaj i śledź
+      </button>
+    </form>
+  );
+}
+
 export function GroupsPage() {
   const { client } = useAuth();
   const [actionError, setActionError] = useState<string | null>(null);
@@ -60,22 +109,31 @@ export function GroupsPage() {
     reload();
   };
 
+  const add = async (name: string, displayName: string) => {
+    setActionError(null);
+    const { error: err } = await client.rpc("admin_add_group", { p_name: name, p_display_name: displayName });
+    if (err) setActionError(err.message);
+    reload();
+    return !err;
+  };
+
   return (
     <section className="space-y-4">
       <h1 className="font-display text-4xl font-bold text-ink">Grupy</h1>
       <p className="text-sm text-slate-600">
-        Grupy WhatsApp wykryte na telefonie. Treść trafia na serwer tylko ze śledzonych grup; telefon pobiera zmiany w ciągu 15 minut.
+        Grupy WhatsApp wykryte na telefonie lub dodane ręcznie. Treść trafia na serwer tylko ze śledzonych grup; telefon pobiera zmiany w ciągu 15 minut.
       </p>
       {actionError && (
         <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
           {actionError}
         </p>
       )}
+      <AddGroupForm onAdd={add} />
       {error && <LoadError message={error} onRetry={reload} />}
       {!data && loading && <Loading />}
       {data && (
         <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-sm">
-          {data.length === 0 && <li className="p-4 text-slate-500">Telefon nie zgłosił jeszcze żadnych grup.</li>}
+          {data.length === 0 && <li className="p-4 text-slate-500">Telefon nie zgłosił jeszcze żadnych grup. Możesz dodać grupę powyżej.</li>}
           {data.map((g) => (
             <GroupRow key={`${g.id}:${g.display_name}:${g.tracked}`} group={g} onSave={(t, n) => save(g, t, n)} />
           ))}

@@ -1,6 +1,6 @@
 import cors from "@fastify/cors";
 import { dedupeKey, parseChatExport } from "@czyzyk/shared";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type pg from "pg";
 import { z } from "zod";
 import type { RateLimiter } from "../rateLimit.js";
@@ -19,6 +19,29 @@ export const importChatSchema = z
     extract_days: z.number().int().min(0).max(3650),
   })
   .strict();
+
+/** Messages copied from WhatsApp and pasted by the admin (manual-entry). */
+const MAX_PASTED_TEXT = 20_000;
+const MAX_PASTED_MESSAGES = 200;
+
+export const pastedMessagesSchema = z
+  .object({
+    group_id: z.uuid(),
+    text: z.string().trim().min(1).max(MAX_PASTED_TEXT),
+    /** For a single message without a WhatsApp header; copied headers carry their own author. */
+    author: z.string().trim().max(200).optional(),
+    sent_at: z.iso.datetime({ offset: true }).optional(),
+  })
+  .strict();
+
+/** Author of a pasted message whose sender the admin did not give. */
+export const UNKNOWN_AUTHOR = "Nieznany nadawca";
+
+export interface PasteSummary {
+  messages: number;
+  inserted: number;
+  duplicates: number;
+}
 
 export interface ImportSummary {
   messages: number;
@@ -41,19 +64,25 @@ export async function importRoutes(
   const now = opts.now ?? Date.now;
   await app.register(cors, { origin: opts.origins, methods: ["POST"], allowedHeaders: ["authorization", "content-type"], maxAge: 3600 });
 
-  app.post("/chat", { bodyLimit: MAX_TEXT_BYTES + 64 * 1024 }, async (request, reply) => {
-    if (!opts.perIp.hit(`import:${request.ip}`)) return reply.code(429).send({ error: "rate_limited" });
-    if (!opts.verify) return reply.code(503).send({ error: "import_not_configured" });
+  /** Admin session from the PWA, or the HTTP error to answer with. */
+  const authorize = async (request: FastifyRequest): Promise<{ code: number; error: string } | null> => {
+    if (!opts.perIp.hit(`import:${request.ip}`)) return { code: 429, error: "rate_limited" };
+    if (!opts.verify) return { code: 503, error: "import_not_configured" };
     const header = request.headers.authorization ?? "";
     let userId: string;
     try {
       if (!header.startsWith("Bearer ")) throw new Error("missing token");
       userId = await opts.verify(header.slice(7).trim());
     } catch {
-      return reply.code(401).send({ error: "unauthorized" });
+      return { code: 401, error: "unauthorized" };
     }
     const { rowCount: isAdmin } = await db.query("select 1 from public.profiles where id = $1 and role = 'admin'", [userId]);
-    if (!isAdmin) return reply.code(403).send({ error: "forbidden" });
+    return isAdmin ? null : { code: 403, error: "forbidden" };
+  };
+
+  app.post("/chat", { bodyLimit: MAX_TEXT_BYTES + 64 * 1024 }, async (request, reply) => {
+    const denied = await authorize(request);
+    if (denied) return reply.code(denied.code).send({ error: denied.error });
 
     const parsed = importChatSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -115,6 +144,75 @@ export async function importRoutes(
     }
 
     request.log.info({ groupId, ...summary }, "chat export imported");
+    return summary;
+  });
+
+  /**
+   * Messages copied from WhatsApp and pasted by the admin (manual-entry). Copied headers
+   * ("[18:02, 7.10.2026] Pani Ania: …") give author and time; plain text is one message with
+   * the author and time from the form. All go to extraction right away.
+   */
+  app.post("/message", async (request, reply) => {
+    const denied = await authorize(request);
+    if (denied) return reply.code(denied.code).send({ error: denied.error });
+
+    const parsed = pastedMessagesSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_request", fields: [...new Set(parsed.error.issues.map((i) => i.path.join(".")))] });
+    }
+    const { group_id: groupId, text } = parsed.data;
+
+    const { rows: groups } = await db.query<{ tracked: boolean }>("select tracked from public.wa_groups where id = $1", [groupId]);
+    if (!groups[0]) return reply.code(404).send({ error: "group_not_found" });
+    if (!groups[0].tracked) return reply.code(422).send({ error: "group_not_tracked" });
+
+    const copied = parseChatExport(text).messages;
+    const messages = copied.length
+      ? copied.map((m) => ({ author: m.author, sentAt: m.sentAt, text: m.text, hasAttachment: m.hasAttachment }))
+      : [
+          {
+            author: parsed.data.author || UNKNOWN_AUTHOR,
+            sentAt: parsed.data.sent_at ? new Date(parsed.data.sent_at) : new Date(now()),
+            text,
+            hasAttachment: false,
+          },
+        ];
+    if (messages.length > MAX_PASTED_MESSAGES) return reply.code(413).send({ error: "too_many_messages" });
+
+    const client = await db.connect();
+    let summary: PasteSummary;
+    try {
+      await client.query("begin");
+      const { rowCount } = await client.query(
+        `insert into public.messages (group_id, author, sent_at, text, source, dedupe_key, has_attachment, received_at)
+         select $1, x.author, x.sent_at, x.text, 'manual', x.key, x.attachment,
+                -- A day in the past: the worker's quiet-period scan picks the group up right away.
+                now() - interval '1 day'
+           from unnest($2::text[], $3::timestamptz[], $4::text[], $5::text[], $6::boolean[]) as x(author, sent_at, text, key, attachment)
+         on conflict do nothing`,
+        [
+          groupId,
+          messages.map((m) => m.author),
+          messages.map((m) => m.sentAt.toISOString()),
+          messages.map((m) => m.text),
+          messages.map((m) => dedupeKey({ groupId, author: m.author, sentAt: m.sentAt, text: m.text })),
+          messages.map((m) => m.hasAttachment),
+        ],
+      );
+      const inserted = rowCount ?? 0;
+      summary = { messages: messages.length, inserted, duplicates: messages.length - inserted };
+      await client.query("insert into public.sync_log (kind, status, details) values ('manual', 'ok', $1)", [
+        { group_id: groupId, origin: "pwa", copied_headers: copied.length > 0, ...summary },
+      ]);
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    request.log.info({ groupId, ...summary }, "pasted messages added");
     return summary;
   });
 }

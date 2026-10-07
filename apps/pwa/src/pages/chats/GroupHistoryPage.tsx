@@ -63,6 +63,11 @@ function GroupHistory({ id }: { id: string }) {
         ← Czaty
       </Link>
       <h1 className="font-display text-4xl font-bold text-ink">{name}</h1>
+      {isAdmin && (
+        <Link to={`/admin/import?grupa=${data.group.id}`} className="inline-block text-sm font-semibold text-brand-700">
+          + Wklej wiadomość z WhatsAppa
+        </Link>
+      )}
 
       <form role="search" onSubmit={search} className="flex gap-2">
         <input

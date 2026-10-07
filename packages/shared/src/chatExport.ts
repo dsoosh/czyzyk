@@ -6,6 +6,7 @@
  *   07.10.2026, 18:02 - Pani Ania: text            Android, day first
  *   10/9/26, 8:15 PM - Anna: text                  Android, US (month first)
  *   [07.10.2026, 18:02:11] Pani Ania: text         iOS
+ *   [18:02, 7.10.2026] Pani Ania: text             Android, messages copied to the clipboard
  * A line without a header continues the previous message.
  */
 
@@ -28,6 +29,8 @@ const DATE_TIME =
   String.raw`(\d{1,2})[./-](\d{1,2})[./-](\d{2,4}),? (\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?(?: ?([AaPp])\.? ?[Mm]\.?)?`;
 const ANDROID = new RegExp(`^${DATE_TIME} [-–] (.*)$`);
 const IOS = new RegExp(`^\\[${DATE_TIME}\\] (.*)$`);
+/** "Copy" of selected messages on Android puts the time before the date. */
+const COPIED = /^\[(\d{1,2})[:.](\d{2})(?: ?([AaPp])\.? ?[Mm]\.?)?, (\d{1,2})[./-](\d{1,2})[./-](\d{2,4})\] (.*)$/;
 
 /** Invisible marks WhatsApp puts around system lines, attachments and in "8:15 PM". */
 const LRM = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
@@ -98,6 +101,21 @@ interface Header {
 }
 
 function matchHeader(line: string): Header | null {
+  const c = COPIED.exec(line);
+  if (c) {
+    const year = Number(c[6]);
+    return {
+      a: Number(c[4]),
+      b: Number(c[5]),
+      year: year < 100 ? 2000 + year : year,
+      hour: Number(c[1]),
+      minute: Number(c[2]),
+      second: 0,
+      ampm: c[3] ? (c[3].toLowerCase() as "a" | "p") : null,
+      slash: c[0].slice(0, 22).includes("/"),
+      rest: c[7]!,
+    };
+  }
   const m = ANDROID.exec(line) ?? IOS.exec(line);
   if (!m) return null;
   const year = Number(m[3]);
