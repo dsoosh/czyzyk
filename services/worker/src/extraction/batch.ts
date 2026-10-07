@@ -38,6 +38,10 @@ export interface ExtractionBatch {
   children: FamilyChild[];
   /** Description of the kindergarten written by the family admin (empty when not set). */
   kindergarten: string;
+  /** First names of the family members. */
+  family: string[];
+  /** The admin's extraction prompt template, or null for the default (llm-prompts). */
+  promptTemplate: string | null;
 }
 
 type Queryable = Pick<pg.PoolClient, "query">;
@@ -129,7 +133,9 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     [groupId, MAX_NEW_MESSAGES],
   );
   const newMessages = fresh.map(toMessage);
-  if (newMessages.length === 0) return { group, newMessages, contextMessages: [], items: [], children: [], kindergarten: "" };
+  if (newMessages.length === 0) {
+    return { group, newMessages, contextMessages: [], items: [], children: [], kindergarten: "", family: [], promptTemplate: null };
+  }
 
   const { rows: earlier } = await db.query(
     `select * from (
@@ -160,6 +166,20 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
   );
 
   const { rows: profile } = await db.query<{ content: string }>("select content from public.kindergarten_profile");
+  const { rows: family } = await db.query<{ name: string }>(
+    `select coalesce(nullif(split_part(btrim(display_name), ' ', 1), ''), split_part(email, '@', 1)) as name
+       from public.profiles order by 1`,
+  );
+  const { rows: prompt } = await db.query<{ template: string }>("select template from public.llm_prompts where key = 'extraction'");
 
-  return { group, newMessages, contextMessages: earlier.map(toMessage), items, children, kindergarten: profile[0]?.content ?? "" };
+  return {
+    group,
+    newMessages,
+    contextMessages: earlier.map(toMessage),
+    items,
+    children,
+    kindergarten: profile[0]?.content ?? "",
+    family: family.map((f) => f.name),
+    promptTemplate: prompt[0]?.template ?? null,
+  };
 }

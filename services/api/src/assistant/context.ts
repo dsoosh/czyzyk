@@ -1,4 +1,4 @@
-import type { AssistantView } from "@czyzyk/shared";
+import { buildSystemPrompt, type AssistantView } from "@czyzyk/shared";
 import type pg from "pg";
 
 type Db = Pick<pg.Pool, "query">;
@@ -274,27 +274,31 @@ const MONTHS = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec", "l
  * only active items (no needs_review or cancelled), group history only for tracked groups.
  */
 export async function loadViewContext(db: Db, view: AssistantView, now: Date): Promise<ViewContext> {
-  const [names, profile] = await Promise.all([
+  return viewContext(db, view, now, await loadNames(db));
+}
+
+/**
+ * The assistant's system prompt (llm-prompts): the admin's template or the default, filled
+ * with the kindergarten description, the children, the family and the asking member's name.
+ */
+export async function loadAssistantSystem(db: Db, userId: string): Promise<string> {
+  const [names, profile, prompt] = await Promise.all([
     loadNames(db),
     db.query<{ content: string }>("select content from public.kindergarten_profile"),
+    db.query<{ template: string }>("select template from public.llm_prompts where key = 'assistant'"),
   ]);
-  const context = await viewContext(db, view, now, names);
-  const parts: string[] = [];
-  // Written by the family admin (kindergarten-profile): background for every view.
-  const about = profile.rows[0]?.content.trim();
-  if (about) parts.push(`## O przedszkolu\n${about}`);
-  if (names.children.length) {
-    parts.push(
-      section(
-        "Dzieci rodziny",
-        names.children.map(
-          (c) =>
-            `- ${c.name}${c.aliases.length ? ` (też: ${c.aliases.join(", ")})` : ""}${c.group_id ? ` (grupa ${names.groups.get(c.group_id) ?? "?"})` : ""}`,
-        ),
-      ),
-    );
-  }
-  return parts.length ? { ...context, data: `${parts.join("\n\n")}\n\n${context.data}` } : context;
+  return buildSystemPrompt("assistant", prompt.rows[0]?.template ?? null, {
+    // Written by the family admin (kindergarten-profile); cannot close its block.
+    przedszkole: (profile.rows[0]?.content ?? "").replaceAll("</przedszkole>", "<\\/przedszkole>"),
+    dzieci: names.children
+      .map(
+        (c) =>
+          `- ${c.name}${c.aliases.length ? ` (też: ${c.aliases.join(", ")})` : ""}${c.group_id ? ` (grupa ${names.groups.get(c.group_id) ?? "?"})` : ""}`,
+      )
+      .join("\n"),
+    rodzina: [...new Set(names.people.values())].sort((a, b) => a.localeCompare(b, "pl")).join(", "),
+    uzytkownik: names.people.get(userId) ?? "członek rodziny",
+  });
 }
 
 async function viewContext(db: Db, view: AssistantView, now: Date, names: Names): Promise<ViewContext> {

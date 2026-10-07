@@ -6,7 +6,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
 import { buildApp, type AppDeps } from "../app.js";
 import { createSessionVerifier } from "../push/session.js";
-import { loadViewContext } from "./context.js";
+import { FIXED_PROMPT_PARTS } from "@czyzyk/shared";
+import { loadAssistantSystem, loadViewContext } from "./context.js";
 import type { AssistantModel } from "./model.js";
 import { NO_ANSWER } from "./routes.js";
 
@@ -254,7 +255,7 @@ describe("loadViewContext", () => {
 
   it("historia grupy nieśledzonej jest niedostępna", async () => {
     const { data } = await loadViewContext(pool, { kind: "group", id: sasiedzi }, NOW);
-    expect(data.endsWith("\n\nNie znaleziono śledzonej grupy.")).toBe(true);
+    expect(data).toBe("Nie znaleziono śledzonej grupy.");
     expect(data).not.toContain("prywatna rozmowa");
   });
 
@@ -285,7 +286,7 @@ describe("loadViewContext", () => {
     expect(data).toContain("Bal");
   });
 
-  it("dzieci rodziny: lista na początku i imię przy elementach (wprost albo z grupy)", async () => {
+  it("dzieci rodziny: lista w prompcie systemowym i imię przy elementach (wprost albo z grupy)", async () => {
     const { rows } = await db.client.query<{ id: string }>(
       "insert into children (name, group_id, aliases) values ('Zosia', $1, '{Zofia,Zosieńka}'), ('Antek', null, '{}') returning id",
       [motylki],
@@ -293,8 +294,7 @@ describe("loadViewContext", () => {
     try {
       await db.client.query("update payments set child_ids = $1 where id = $2", [[rows[1]!.id], paymentId]);
       const { data } = await loadViewContext(pool, { kind: "today" }, NOW);
-      expect(data).toContain("## Dzieci rodziny\n- Antek\n- Zosia (też: Zofia, Zosieńka) (grupa Motylki)");
-      expect(data.indexOf("## O przedszkolu")).toBeLessThan(data.indexOf("## Dzieci rodziny"));
+      expect(await loadAssistantSystem(pool, olaId)).toContain("Dzieci rodziny:\n- Antek\n- Zosia (też: Zofia, Zosieńka) (grupa Motylki)");
       expect(data).toContain("Do przyniesienia: przebranie; na piątek 2026-10-09; na wydarzenie „Bal”; jeszcze nie spakowane; grupa Motylki; dziecko: Zosia");
       expect(data).toContain("Płatność: teatrzyk; 12,50 zł; termin poniedziałek 2026-10-12; niezapłacone; grupa Motylki; dziecko: Antek");
     } finally {
@@ -302,10 +302,23 @@ describe("loadViewContext", () => {
     }
   });
 
-  it("każdy widok zaczyna się opisem przedszkola od rodziny", async () => {
+  it("prompt systemowy: opis przedszkola, rodzina, pytający i stałe zasady", async () => {
+    const system = await loadAssistantSystem(pool, olaId);
+    expect(system).toContain("<przedszkole>\nPlacówka: Leśne Przedszkole i Leśna Klasa „Cztery Żywioły”");
+    expect(system).toContain("„Baza” – główna siedziba przedszkola i leśnej klasy: Golędzinów");
+    expect(system).toContain("Pytanie zadaje: Ola.");
+    expect(system.endsWith(FIXED_PROMPT_PARTS.assistant)).toBe(true);
     const { data } = await loadViewContext(pool, { kind: "list", list: "bring" }, NOW);
-    expect(data.startsWith("## O przedszkolu\nPlacówka: Leśne Przedszkole i Leśna Klasa „Cztery Żywioły”")).toBe(true);
-    expect(data).toContain("„Baza” – główna siedziba przedszkola i leśnej klasy: Golędzinów");
+    expect(data).not.toContain("Golędzinów");
+  });
+
+  it("prompt systemowy z szablonu admina, stałe zasady zawsze na końcu", async () => {
+    await db.client.query("insert into llm_prompts (key, template) values ('assistant', 'Mów do {{uzytkownik}} po imieniu.')");
+    try {
+      expect(await loadAssistantSystem(pool, olaId)).toBe(`Mów do Ola po imieniu.\n\n${FIXED_PROMPT_PARTS.assistant}`);
+    } finally {
+      await db.client.query("delete from llm_prompts");
+    }
   });
 
   it("dane nie mogą zamknąć bloku <dane>", async () => {

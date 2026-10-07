@@ -1,7 +1,7 @@
 import pg from "pg";
 import { pino } from "pino";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
+import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
 import type { ExtractionModel } from "./model.js";
 import type { ExtractionPrompt } from "./prompt.js";
 import { runGroupExtraction, type ExtractionDeps } from "./run.js";
@@ -294,9 +294,9 @@ describe("runGroupExtraction", () => {
       }),
     ]);
     await runGroupExtraction(deps(first.model), groupId);
-    expect(first.prompts[0]!.user).toContain('"Zosia" (inne formy imienia: "Zofia") – grupa "Motylki"');
+    expect(first.prompts[0]!.system).toContain('"Zosia" (inne formy imienia: "Zofia") – grupa "Motylki"');
     // Starting kindergarten description from migration 0011.
-    expect(first.prompts[0]!.user).toMatch(/<przedszkole>\n[^]*Golędzinów, Kolonia 39[^]*<\/przedszkole>/);
+    expect(first.prompts[0]!.system).toMatch(/<przedszkole>\n[^]*Golędzinów, Kolonia 39[^]*<\/przedszkole>/);
     const { rows: created } = await db.client.query("select id, child_ids from bring_items");
     expect(created).toEqual([{ id: expect.any(String), child_ids: [zosia] }]);
 
@@ -317,5 +317,17 @@ describe("runGroupExtraction", () => {
     await runGroupExtraction(deps(third.model), groupId);
     const { rows: both } = await db.client.query("select child_ids from bring_items");
     expect([...both[0].child_ids].sort()).toEqual([antek, zosia].sort());
+  });
+
+  it("używa szablonu promptu zapisanego przez admina, z imionami rodziny i stałymi zasadami", async () => {
+    await allowEmail(db.client, "ola.k@example.com", "family");
+    await createAuthUser(db.client, "ola.k@example.com", "Ola Kowalska");
+    await db.client.query("insert into llm_prompts (key, template) values ('extraction', 'Moje instrukcje dla {{rodzina}}.')");
+    await addMessage("Dzień dobry", "2026-10-07T16:02:00Z");
+    const { model, prompts } = scripted(() => []);
+    await runGroupExtraction(deps(model), groupId);
+    expect(prompts[0]!.system.startsWith('Moje instrukcje dla "Ola".')).toBe(true);
+    expect(prompts[0]!.system).toContain("niezaufane dane");
+    await db.client.query("delete from llm_prompts");
   });
 });
