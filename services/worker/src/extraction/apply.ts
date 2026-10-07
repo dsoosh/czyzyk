@@ -251,6 +251,20 @@ async function applyOne(
   const existing = await loadItem(client, op.type, op.targetId);
   if (!existing) throw new ApplyRejection("target item no longer exists");
 
+  // Filling in suggested actions (action-suggestions) changes nothing the family or an admin
+  // decided: store them directly, keeping status, confidence and any review.
+  if (op.op === "update" && op.type === "action_required" && op.children.length === 0) {
+    const keys = Object.keys(op.data as Record<string, unknown>);
+    if (keys.length === 1 && keys[0] === "suggestions") {
+      const { suggestions } = checkData("action_required", { ...(existing.data as object), ...(op.data as object) }) as ItemData["action_required"];
+      await client.query("update public.action_required set suggested_actions = $2::jsonb where id = $1", [
+        op.targetId,
+        JSON.stringify(suggestions ?? []),
+      ]);
+      return { id: op.targetId };
+    }
+  }
+
   // An admin already decided about this item: never overwrite, queue a proposal instead.
   const { rows: reviewed } = await client.query<{ reviewed: boolean }>(
     `select reviewed_at is not null as reviewed from ${table} where id = $1`,

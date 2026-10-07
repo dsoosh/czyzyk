@@ -351,4 +351,24 @@ describe("runGroupExtraction", () => {
     const { rows } = await db.client.query("select to_char(due_date, 'YYYY-MM-DD') as due, suggested_actions from action_required");
     expect(rows[0]).toEqual({ due: "2026-10-07", suggested_actions: suggestions });
   });
+
+  it("uzupełnia propozycje akcji istniejącej sprawy bez zmiany statusu, pewności i przeglądu", async () => {
+    const { rows } = await db.client.query<{ id: string }>(
+      `insert into action_required (group_id, question, due_date, confidence, status, reviewed_at)
+       values ($1, 'Zakup sprayu przeciwko insektom', '2026-10-06', 0.9, 'active', now()) returning id`,
+      [groupId],
+    );
+    await addMessage("Prośba o zakup i doniesienie sprayu przeciwko insektom", "2026-10-05T10:47:00Z");
+    const suggestions = [{ kind: "bring", label: "Do przyniesienia", description: "spray przeciwko insektom", due_date: null, amount_pln: null }];
+    const { model, prompts } = scripted((p) => [
+      op({ op: "update", type: "action_required", target: "E1", data: { suggestions }, source_messages: [lastAlias(p)], confidence: 0.5 }),
+    ]);
+    await runGroupExtraction(deps(model), groupId);
+    expect(prompts[0]!.user).toContain('"suggestions":[]');
+    const { rows: after } = await db.client.query(
+      "select suggested_actions, status, confidence, pending_patch from action_required where id = $1",
+      [rows[0]!.id],
+    );
+    expect(after[0]).toEqual({ suggested_actions: suggestions, status: "active", confidence: 0.9, pending_patch: null });
+  });
 });
