@@ -1,0 +1,108 @@
+import { useAuth } from "../../auth/AuthProvider";
+import { LoadError, Loading } from "../../components/ui";
+import { shortDate, warsawDay, warsawTime } from "../../lib/dates";
+import { fetchGroupNames, groupLabel, run } from "../../lib/items";
+import { useLoader, useOnForeground } from "../../lib/useLoader";
+
+const PAGE = 50;
+
+interface LlmCall {
+  id: string;
+  group_id: string | null;
+  model: string | null;
+  request: { system?: string; user?: string };
+  response: { operations?: unknown[] } | null;
+  error: string | null;
+  usage: { input_tokens?: number; output_tokens?: number } | null;
+  duration_ms: number | null;
+  created_at: string;
+}
+
+/** Admin's log of the extraction model's calls: what went to the model and what came back (llm-call-log). */
+export function LlmCallsPage() {
+  const { client } = useAuth();
+  const { data, error, reload } = useLoader(async () => {
+    const [calls, groups] = await Promise.all([
+      run<LlmCall[]>(
+        client
+          .from("llm_calls")
+          .select("id, group_id, model, request, response, error, usage, duration_ms, created_at")
+          .order("created_at", { ascending: false })
+          .limit(PAGE),
+      ),
+      fetchGroupNames(client),
+    ]);
+    return { calls, groups };
+  }, [client]);
+  useOnForeground(reload);
+  if (error) return <LoadError message={error} onRetry={reload} />;
+  if (!data) return <Loading />;
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <h1 className="font-display text-4xl font-bold text-ink">Wywołania LLM</h1>
+        <p className="text-sm text-muted">
+          Co trafiło do modelu przy analizie wiadomości i co odpowiedział. Ostatnie {PAGE} wywołań; wpisy starsze niż 14 dni są usuwane.
+          Rozmowy z asystentem „Zapytaj” są prywatne i tu nie trafiają.
+        </p>
+      </div>
+      {data.calls.length === 0 ? (
+        <p className="text-slate-600">Brak wywołań w ostatnich 14 dniach.</p>
+      ) : (
+        <ul className="space-y-3">
+          {data.calls.map((c) => (
+            <li key={c.id} className="rounded-2xl bg-white p-4 shadow-sm">
+              <details>
+                <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <span className="font-semibold text-ink">
+                    {shortDate(warsawDay(c.created_at))} {warsawTime(c.created_at)}
+                  </span>
+                  <span>{groupLabel(data.groups, c.group_id)}</span>
+                  {c.error ? (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">błąd</span>
+                  ) : (
+                    <span className="rounded-full bg-sand px-2 py-0.5 text-xs font-semibold text-ink">
+                      {operationsLabel(c.response?.operations?.length ?? 0)}
+                    </span>
+                  )}
+                  <span className="text-xs text-slate-500">{usageLabel(c)}</span>
+                </summary>
+                <div className="mt-3 space-y-3 text-sm">
+                  {c.model && <p className="text-xs text-slate-500">Model: {c.model}</p>}
+                  {c.error && <p className="text-red-800">Błąd: {c.error}</p>}
+                  <Block title="Zapytanie (wiadomości)" text={c.request.user ?? ""} open />
+                  {c.response && <Block title="Odpowiedź modelu" text={JSON.stringify(c.response.operations ?? c.response, null, 2)} open />}
+                  <Block title="Prompt systemowy" text={c.request.system ?? ""} />
+                </div>
+              </details>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function Block({ title, text, open = false }: { title: string; text: string; open?: boolean }) {
+  return (
+    <details open={open}>
+      <summary className="cursor-pointer font-semibold text-ink">{title}</summary>
+      <pre className="mt-1 max-h-96 overflow-auto rounded-lg bg-slate-50 p-2 text-xs whitespace-pre-wrap break-words">{text}</pre>
+    </details>
+  );
+}
+
+function operationsLabel(n: number): string {
+  if (n === 0) return "bez operacji";
+  if (n === 1) return "1 operacja";
+  const lastTwo = n % 100;
+  return n % 10 >= 2 && n % 10 <= 4 && (lastTwo < 12 || lastTwo > 14) ? `${n} operacje` : `${n} operacji`;
+}
+
+function usageLabel(c: LlmCall): string {
+  const parts: string[] = [];
+  if (c.usage?.input_tokens != null) parts.push(`${c.usage.input_tokens} → ${c.usage.output_tokens ?? 0} tokenów`);
+  if (c.duration_ms != null) parts.push(`${(c.duration_ms / 1000).toFixed(1)} s`);
+  return parts.join(" · ");
+}
