@@ -3,7 +3,7 @@ import { useAuth, useProfile } from "../auth/AuthProvider";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
 import { childNames } from "../lib/children";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
-import { fetchToday, formatAmount, groupLabel, type Closure } from "../lib/items";
+import { fetchToday, formatAmount, groupLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
 import { doneLabel } from "../lib/tracking";
 import { useLoader, useOnForeground } from "../lib/useLoader";
 import { useMarkDone } from "../lib/useMarkDone";
@@ -18,6 +18,38 @@ function closureBanner(c: Closure, today: string): string {
   }
   const when = c.date_from === c.date_to ? longDayLabel(c.date_from) : `${shortDate(c.date_from)}–${shortDate(c.date_to)}`;
   return `${when} – przedszkole nieczynne${reason}`;
+}
+
+/**
+ * Packing checklist rows (an array, so Section can count them and show its empty state);
+ * withDay labels each item with its day ("jutro", "pt 16.10").
+ */
+function bringRows(
+  items: BringItem[],
+  { data, today, me, mark, withDay = false }: { data: TodayData; today: string; me: string; mark: ReturnType<typeof useMarkDone>; withDay?: boolean },
+) {
+  return items.map((b) => (
+    <Row key={b.id}>
+      <div className="flex items-start gap-3">
+        <DoneToggle
+          checked={b.packed_at != null}
+          label={b.description}
+          disabled={mark.pending === b.id}
+          onToggle={() => void mark.toggle(b.id, b.packed_at == null)}
+        />
+        <div className="flex flex-1 flex-col gap-1">
+          <span className={b.packed_at ? "text-muted line-through" : "font-semibold"}>{b.description}</span>
+          <Meta>
+            {withDay && b.due_date && <span className="font-semibold text-ink">{dayLabel(b.due_date, today)}</span>}
+            {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
+            <ChildTag names={childNames(data.children, b)} />
+            <span>{groupLabel(data.groups, b.group_id)}</span>
+            <SourceLink kind="bring_item" id={b.id} />
+          </Meta>
+        </div>
+      </div>
+    </Row>
+  ));
 }
 
 export function TodayPage() {
@@ -60,30 +92,14 @@ export function TodayPage() {
         </p>
       )}
 
-      {/* Phone: one column; desktop: the four sections in a 2×2 grid. */}
+      {/* Phone: one column; desktop: the sections in a two-column grid. */}
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8 lg:gap-y-8 lg:space-y-0">
-        <Section title="Na jutro przynieść" empty="Na jutro nic do przyniesienia" stripe="earth">
-          {data.bringTomorrow.map((b) => (
-            <Row key={b.id}>
-              <div className="flex items-start gap-3">
-                <DoneToggle
-                  checked={b.packed_at != null}
-                  label={b.description}
-                  disabled={mark.pending === b.id}
-                  onToggle={() => void mark.toggle(b.id, b.packed_at == null)}
-                />
-                <div className="flex flex-1 flex-col gap-1">
-                  <span className={b.packed_at ? "text-muted line-through" : "font-semibold"}>{b.description}</span>
-                  <Meta>
-                    {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
-                    <ChildTag names={childNames(data.children, b)} />
-                    <span>{g(b.group_id)}</span>
-                    <SourceLink kind="bring_item" id={b.id} />
-                  </Meta>
-                </div>
-              </div>
-            </Row>
-          ))}
+        <Section title="Na dziś przynieść" empty="Na dziś nic do przyniesienia" stripe="earth">
+          {bringRows(data.bringToday, { data, today, me, mark })}
+        </Section>
+
+        <Section title="W najbliższych dniach" empty="W najbliższych dniach nic do przyniesienia" stripe="earth">
+          {bringRows(data.bringWeek, { data, today, me, mark, withDay: true })}
         </Section>
 
         <Section title="Wydarzenia" empty="Brak wydarzeń w najbliższym tygodniu" stripe="sun">

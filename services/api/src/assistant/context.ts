@@ -297,8 +297,8 @@ async function viewContext(db: Db, view: AssistantView, now: Date, names: Names)
     }
 
     case "today": {
-      const tomorrow = addDays(today, 1);
-      const parts = await upcoming(db, names, today, tomorrow);
+      // The screen lists things to bring and events for the next 7 days (today-view).
+      const parts = await upcoming(db, names, today, addDays(today, 7));
       const closures = await db.query<ClosureRow>(
         `${CLOSURE_SELECT} where status = 'active' and date_to >= $1 and date_from <= $2 order by date_from`,
         [today, addDays(today, 14)],
