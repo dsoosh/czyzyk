@@ -47,12 +47,17 @@ export function PushSettingsSection() {
     );
     void client
       .from("push_settings")
-      .select("digest_enabled, digest_time, alert_closures, alert_actions, alert_payments")
+      .select("digest_enabled, digest_time, alert_closures, alert_actions, alert_payments, morning_enabled, morning_time, reminders_enabled")
       .maybeSingle()
       .then(({ data }) => {
         if (alive && data) {
           const row = data as PushSettings;
-          setSettings({ ...row, digest_time: row.digest_time.slice(0, 5) });
+          setSettings({
+            ...DEFAULT_PUSH_SETTINGS,
+            ...row,
+            digest_time: row.digest_time.slice(0, 5),
+            morning_time: (row.morning_time ?? DEFAULT_PUSH_SETTINGS.morning_time).slice(0, 5),
+          });
         }
       });
     return () => {
@@ -149,6 +154,26 @@ export function PushSettingsSection() {
 
       {subscribed && (
         <form onSubmit={save} aria-label="Ustawienia powiadomień" className="space-y-2 border-t border-slate-100 pt-3 text-sm">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={settings.morning_enabled} onChange={toggle("morning_enabled")} />
+            Poranny skrót na dziś
+          </label>
+          <label className="flex items-center gap-2 pl-6">
+            Godzina rano
+            <input
+              type="time"
+              step={60}
+              required
+              value={settings.morning_time}
+              disabled={!settings.morning_enabled && !settings.reminders_enabled}
+              onChange={(e) => setSettings((s) => ({ ...s, morning_time: e.target.value }))}
+              className="rounded-lg border border-slate-300 px-2 py-1"
+            />
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={settings.reminders_enabled} onChange={toggle("reminders_enabled")} />
+            Przypomnienia o terminach płatności i odpowiedzi (dzień przed i w dniu terminu, rano)
+          </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={settings.digest_enabled} onChange={toggle("digest_enabled")} />
             Wieczorny skrót na jutro

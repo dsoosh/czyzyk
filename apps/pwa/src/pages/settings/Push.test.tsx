@@ -71,7 +71,16 @@ describe("Powiadomienia w ustawieniach", () => {
     expect(fetchMock).toHaveBeenCalledWith("https://api.czyzyk.example/push/settings", {
       method: "PUT",
       headers: { authorization: "Bearer test-access-token", "content-type": "application/json" },
-      body: JSON.stringify({ digest_enabled: true, digest_time: "20:30", alert_closures: true, alert_actions: false, alert_payments: true }),
+      body: JSON.stringify({
+        digest_enabled: true,
+        digest_time: "20:30",
+        alert_closures: true,
+        alert_actions: false,
+        alert_payments: true,
+        morning_enabled: true,
+        morning_time: "06:45",
+        reminders_enabled: true,
+      }),
     });
     expect(within(section).getByRole("status")).toHaveTextContent("Zapisano ustawienia powiadomień.");
   });
@@ -105,6 +114,37 @@ describe("Powiadomienia w ustawieniach", () => {
     const section = await screen.findByRole("region", { name: "Powiadomienia" });
     expect(await within(section).findByDisplayValue("20:30")).toBeInTheDocument();
     expect(within(section).getByLabelText("Alert: dzień wolny")).not.toBeChecked();
+    // Settings saved before the morning push existed get its defaults.
+    expect(within(section).getByLabelText("Godzina rano")).toHaveValue("06:45");
+    expect(within(section).getByLabelText("Poranny skrót na dziś")).toBeChecked();
+  });
+
+  it("poranny skrót o 7:15, bez przypomnień o terminach", async () => {
+    vi.mocked(push.currentSubscription).mockResolvedValue({} as PushSubscription);
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
+    renderAt("/ustawienia", {
+      tables: {
+        ical_tokens: [],
+        push_settings: [
+          {
+            digest_enabled: true,
+            digest_time: "19:00:00",
+            alert_closures: true,
+            alert_actions: true,
+            alert_payments: true,
+            morning_enabled: true,
+            morning_time: "06:45:00",
+            reminders_enabled: true,
+          },
+        ],
+      },
+    });
+    const section = await screen.findByRole("region", { name: "Powiadomienia" });
+    fireEvent.change(await within(section).findByLabelText("Godzina rano"), { target: { value: "07:15" } });
+    fireEvent.click(within(section).getByLabelText(/Przypomnienia o terminach/));
+    await act(async () => fireEvent.click(within(section).getByRole("button", { name: "Zapisz" })));
+    const body = JSON.parse(String((fetchMock.mock.calls.at(-1)![1] as RequestInit).body));
+    expect(body).toMatchObject({ morning_enabled: true, morning_time: "07:15", reminders_enabled: false });
   });
 });
 

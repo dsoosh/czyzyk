@@ -4,19 +4,21 @@ import type { PgBoss } from "pg-boss";
 import type { Logger } from "pino";
 import { BACKGROUND_POLL_SECONDS } from "../polling.js";
 import { handleAlert } from "./alerts.js";
-import { runDigest } from "./digest.js";
+import { runDigest, runMorning } from "./digest.js";
 import type { PushSender } from "./send.js";
 
 export const DIGEST_QUEUE = "push-digest";
 
 export interface PushJobs {
-  /** Runs the digest check now (the schedule does it every 5 minutes). */
+  /** Runs the evening digest check now (the schedule does it every 5 minutes). */
   digestNow(): Promise<Awaited<ReturnType<typeof runDigest>>>;
+  /** Runs the morning plan and deadline reminders check now (same schedule). */
+  morningNow(): Promise<Awaited<ReturnType<typeof runMorning>>>;
 }
 
 /**
- * Web Push jobs on the worker's pg-boss instance: the evening digest (scheduled every
- * 5 minutes) and push-alert jobs enqueued after extractions.
+ * Web Push jobs on the worker's pg-boss instance: the morning plan, deadline reminders and
+ * the evening digest (checked every 5 minutes) and push-alert jobs enqueued after extractions.
  */
 export async function registerPushJobs(
   boss: PgBoss,
@@ -30,8 +32,11 @@ export async function registerPushJobs(
   // createQueue leaves an existing queue as it is; turn NOTIFY on for queues created before it existed.
   await boss.updateQueue(PUSH_ALERT_QUEUE, { notify: PUSH_ALERT_QUEUE_OPTIONS.notify });
 
-  const digestNow = () => runDigest({ db: pool, sender: deps.sender, logger, windowMinutes: deps.digestWindowMinutes }, now());
+  const digestDeps = { db: pool, sender: deps.sender, logger, windowMinutes: deps.digestWindowMinutes };
+  const digestNow = () => runDigest(digestDeps, now());
+  const morningNow = () => runMorning(digestDeps, now());
   await boss.work(DIGEST_QUEUE, { pollingIntervalSeconds: BACKGROUND_POLL_SECONDS }, async () => {
+    await morningNow();
     await digestNow();
   });
   if (deps.digestSchedule !== null) await boss.schedule(DIGEST_QUEUE, deps.digestSchedule ?? "*/5 * * * *");
@@ -41,5 +46,5 @@ export async function registerPushJobs(
   });
 
   logger.info("push jobs started");
-  return { digestNow };
+  return { digestNow, morningNow };
 }
