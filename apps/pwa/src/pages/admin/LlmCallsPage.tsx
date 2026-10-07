@@ -8,10 +8,11 @@ const PAGE = 50;
 
 interface LlmCall {
   id: string;
+  kind: "extraction" | "document";
   group_id: string | null;
   model: string | null;
-  request: { system?: string; user?: string };
-  response: { operations?: unknown[] } | null;
+  request: { system?: string; user?: string; images?: string[] };
+  response: { operations?: unknown[]; containsPeople?: boolean } | null;
   error: string | null;
   usage: { input_tokens?: number; output_tokens?: number } | null;
   duration_ms: number | null;
@@ -26,7 +27,7 @@ export function LlmCallsPage() {
       run<LlmCall[]>(
         client
           .from("llm_calls")
-          .select("id, group_id, model, request, response, error, usage, duration_ms, created_at")
+          .select("id, kind, group_id, model, request, response, error, usage, duration_ms, created_at")
           .order("created_at", { ascending: false })
           .limit(PAGE),
       ),
@@ -59,19 +60,19 @@ export function LlmCallsPage() {
                     {shortDate(warsawDay(c.created_at))} {warsawTime(c.created_at)}
                   </span>
                   <span>{groupLabel(data.groups, c.group_id)}</span>
+                  {c.kind === "document" && <span className="text-xs text-slate-500">kontrola zdjęcia</span>}
                   {c.error ? (
                     <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800">błąd</span>
                   ) : (
-                    <span className="rounded-full bg-sand px-2 py-0.5 text-xs font-semibold text-ink">
-                      {operationsLabel(c.response?.operations?.length ?? 0)}
-                    </span>
+                    <span className="rounded-full bg-sand px-2 py-0.5 text-xs font-semibold text-ink">{resultLabel(c)}</span>
                   )}
                   <span className="text-xs text-slate-500">{usageLabel(c)}</span>
                 </summary>
                 <div className="mt-3 space-y-3 text-sm">
                   {c.model && <p className="text-xs text-slate-500">Model: {c.model}</p>}
                   {c.error && <p className="text-red-800">Błąd: {c.error}</p>}
-                  <Block title="Zapytanie (wiadomości)" text={c.request.user ?? ""} open />
+                  {c.request.user ? <Block title="Zapytanie (wiadomości)" text={c.request.user} open /> : null}
+                  {c.request.images?.length ? <p className="text-xs text-slate-600">Dołączone obrazy: {c.request.images.join(" · ")}</p> : null}
                   {c.response && <Block title="Odpowiedź modelu" text={JSON.stringify(c.response.operations ?? c.response, null, 2)} open />}
                   <Block title="Prompt systemowy" text={c.request.system ?? ""} />
                 </div>
@@ -91,6 +92,11 @@ function Block({ title, text, open = false }: { title: string; text: string; ope
       <pre className="mt-1 max-h-96 overflow-auto rounded-lg bg-slate-50 p-2 text-xs whitespace-pre-wrap break-words">{text}</pre>
     </details>
   );
+}
+
+function resultLabel(c: LlmCall): string {
+  if (c.kind === "document") return c.response?.containsPeople ? "widać ludzi – obraz usunięty" : "dokument bez ludzi";
+  return operationsLabel(c.response?.operations?.length ?? 0);
 }
 
 function operationsLabel(n: number): string {

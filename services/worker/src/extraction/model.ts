@@ -11,7 +11,14 @@ export interface ExtractionModelResult {
 export interface ExtractionModel {
   /** Model name from configuration, for the admin's LLM call log. */
   readonly name?: string;
-  extract(prompt: { system: string; user: string }): Promise<ExtractionModelResult>;
+  extract(prompt: ModelPrompt): Promise<ExtractionModelResult>;
+}
+
+export interface ModelPrompt {
+  system: string;
+  user: string;
+  /** Document images (JPEG, base64), each shown after its label. */
+  images?: { label: string; data: string }[];
 }
 
 /** A model answer we cannot use; the job fails and is retried by the queue. */
@@ -43,7 +50,7 @@ export class AnthropicExtractionModel implements ExtractionModel {
     return this.model;
   }
 
-  async extract(prompt: { system: string; user: string }): Promise<ExtractionModelResult> {
+  async extract(prompt: ModelPrompt): Promise<ExtractionModelResult> {
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: 16000,
@@ -51,7 +58,7 @@ export class AnthropicExtractionModel implements ExtractionModel {
       tools: [TOOL],
       // Forced tool choice is rejected by some newer models and the model is configurable.
       tool_choice: { type: "auto" },
-      messages: [{ role: "user", content: prompt.user }],
+      messages: [{ role: "user", content: userContent(prompt) }],
     });
 
     if (response.stop_reason === "refusal") throw new ExtractionError("refusal");
@@ -69,4 +76,16 @@ export class AnthropicExtractionModel implements ExtractionModel {
       usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
     };
   }
+}
+
+/** Text first, then each document image after its label. */
+export function userContent(prompt: ModelPrompt): string | Anthropic.ContentBlockParam[] {
+  if (!prompt.images?.length) return prompt.user;
+  return [
+    { type: "text", text: prompt.user },
+    ...prompt.images.flatMap((image): Anthropic.ContentBlockParam[] => [
+      { type: "text", text: image.label },
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: image.data } },
+    ]),
+  ];
 }

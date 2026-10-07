@@ -2,6 +2,8 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { applyOperations, type ApplySummary } from "./apply.js";
 import { loadBatch } from "./batch.js";
+import { checkPendingDocuments, type DocumentChecker } from "./documents.js";
+import { errorLabel, logLlmCall } from "./llmLog.js";
 import type { ExtractionModel } from "./model.js";
 import { buildExtractionPrompt } from "./prompt.js";
 import { resolveOperations } from "./resolve.js";
@@ -10,6 +12,8 @@ import { warsawDate } from "./time.js";
 export interface ExtractionDeps {
   db: pg.Pool;
   model: ExtractionModel;
+  /** Server-side check of document images (document-import); without it images are removed. */
+  documents?: DocumentChecker;
   logger: Logger;
   now: () => Date;
   confidenceThreshold: number;
@@ -25,29 +29,6 @@ export type RunResult =
 
 async function logSync(db: pg.Pool | pg.PoolClient, status: string, details: Record<string, unknown>) {
   await db.query("insert into public.sync_log (kind, status, details) values ('extraction', $1, $2)", [status, details]);
-}
-
-/** Entries older than this are removed from the admin's LLM call log (llm-call-log). */
-const LLM_LOG_RETENTION_DAYS = 14;
-
-/**
- * Stores one model call for the admin's log. The log holds message content and is readable by
- * admins only; failing to write it never stops the extraction (and logs no content).
- */
-async function logLlmCall(
-  deps: ExtractionDeps,
-  entry: { groupId: string; request: { system: string; user: string }; response?: unknown; error?: string; usage?: unknown; durationMs: number },
-) {
-  try {
-    await deps.db.query(
-      `insert into public.llm_calls (kind, group_id, model, request, response, error, usage, duration_ms)
-       values ('extraction', $1, $2, $3, $4, $5, $6, $7)`,
-      [entry.groupId, deps.model.name ?? null, entry.request, entry.response ?? null, entry.error ?? null, entry.usage ?? null, entry.durationMs],
-    );
-    await deps.db.query("delete from public.llm_calls where created_at < now() - make_interval(days => $1)", [LLM_LOG_RETENTION_DAYS]);
-  } catch (error) {
-    deps.logger.warn({ groupId: entry.groupId, error: error instanceof Error ? error.name : "Error" }, "llm call log failed");
-  }
 }
 
 /**
@@ -67,12 +48,27 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
     if (!rows[0]?.locked) return { status: "locked" };
 
     try {
+      // Document images are checked before any of them reaches the extraction prompt.
+      await checkPendingDocuments(deps.db, deps.documents, groupId, deps.logger);
       const now = deps.now();
       const batch = await loadBatch(client, groupId, warsawDate(now), deps.contextMessages);
       if (!batch || batch.newMessages.length === 0) return { status: "nothing_to_do" };
 
       const prompt = buildExtractionPrompt(batch, now);
-      const request = { system: prompt.system, user: prompt.user };
+      const request = {
+        system: prompt.system,
+        user: prompt.user,
+        ...(prompt.images?.length ? { images: prompt.images.map((i) => i.label) } : {}),
+      };
+      const log = (entry: { response?: unknown; error?: string; usage?: unknown }) =>
+        logLlmCall(deps.db, deps.logger, {
+          kind: "extraction",
+          groupId,
+          model: deps.model.name ?? null,
+          request,
+          ...entry,
+          durationMs: Date.now() - started,
+        });
       const started = Date.now();
       let result;
       try {
@@ -80,19 +76,13 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
       } catch (error) {
         const name = error instanceof Error ? error.name : "Error";
         const reason = (error as { reason?: string; status?: number }).reason ?? (error as { status?: number }).status;
-        await logLlmCall(deps, { groupId, request, error: reason === undefined ? name : `${name}: ${reason}`, durationMs: Date.now() - started });
+        await log({ error: errorLabel(error) });
         await logSync(client, "error", { group_id: groupId, messages: prompt.newMessageIds.length, error: name, reason });
         deps.logger.warn({ groupId, error: name, reason }, "extraction failed");
         throw error;
       }
 
-      await logLlmCall(deps, {
-        groupId,
-        request,
-        response: { operations: result.operations },
-        usage: result.usage,
-        durationMs: Date.now() - started,
-      });
+      await log({ response: { operations: result.operations }, usage: result.usage });
 
       const { accepted, rejected } = resolveOperations(result.operations, prompt.aliases);
       await client.query("begin");

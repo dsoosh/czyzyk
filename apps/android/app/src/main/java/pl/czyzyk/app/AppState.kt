@@ -71,12 +71,26 @@ class AppState(private val prefs: SharedPreferences) {
             else putLong(KEY_UPDATE_CODE, v.versionCode).putString(KEY_UPDATE_NAME, v.versionName).putString(KEY_UPDATE_SHA, v.sha256)
         }.apply()
 
+    /** The user turned on screening of WhatsApp photos from tracked groups (document-import). */
+    var photosEnabled: Boolean
+        get() = prefs.getBoolean(KEY_PHOTOS, false)
+        set(v) = prefs.edit().putBoolean(KEY_PHOTOS, v).apply()
+
+    /** Documents delivered to the server and photos kept on the phone, for the status screen. */
+    val documentsSent: Int get() = prefs.getInt(KEY_DOCUMENTS_SENT, 0)
+    val photosWithheld: Int get() = prefs.getInt(KEY_PHOTOS_WITHHELD, 0)
+    @Synchronized fun incrementDocumentsSent() = prefs.edit().putInt(KEY_DOCUMENTS_SENT, documentsSent + 1).apply()
+    @Synchronized fun incrementPhotosWithheld() = prefs.edit().putInt(KEY_PHOTOS_WITHHELD, photosWithheld + 1).apply()
+
     var lastDeliveredAt: Long
         get() = prefs.getLong(KEY_LAST_DELIVERED, 0)
         set(v) = prefs.edit().putLong(KEY_LAST_DELIVERED, v).apply()
 
     companion object {
         const val DEFAULT_TTL_MILLIS = 15 * 60 * 1000L
+        private const val KEY_PHOTOS = "photos_enabled"
+        private const val KEY_DOCUMENTS_SENT = "documents_sent"
+        private const val KEY_PHOTOS_WITHHELD = "photos_withheld"
         private const val KEY_TRACKED = "tracked_groups"
         private const val KEY_TRACKED_AT = "tracked_groups_at"
         private const val KEY_TTL = "config_ttl"

@@ -40,6 +40,16 @@ describe("AnthropicExtractionModel", () => {
     expect((requests[0]!.body.tools as { name: string }[])[0]!.name).toBe("zapisz_operacje");
   });
 
+  it("sends document images after the text, each after its label", async () => {
+    const { client, requests } = clientWith([{ status: 200, body: message([toolUse({ operations: [] })]) }]);
+    await new AnthropicExtractionModel(client, "m").extract({ ...prompt, images: [{ label: "Obraz z W2:", data: "/9j/AA==" }] });
+    expect((requests[0]!.body.messages as { content: unknown }[])[0]!.content).toEqual([
+      { type: "text", text: "user" },
+      { type: "text", text: "Obraz z W2:" },
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "/9j/AA==" } },
+    ]);
+  });
+
   it("fails when the model does not call the tool", async () => {
     const { client } = clientWith([{ status: 200, body: message([{ type: "text", text: "Brak operacji." }], "end_turn") }]);
     await expect(new AnthropicExtractionModel(client, "m").extract(prompt)).rejects.toEqual(new ExtractionError("no_tool_call"));

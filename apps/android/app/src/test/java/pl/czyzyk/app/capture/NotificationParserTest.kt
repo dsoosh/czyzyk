@@ -109,4 +109,25 @@ class NotificationParserTest {
         listOf("Zdjęcia z wycieczki są super", "Photos tomorrow", "Film o dinozaurach w piątek", "W piątek bal 🎉")
             .forEach { assertFalse(it, NotificationParser.isAttachmentPlaceholder(it)) }
     }
+
+    @Test
+    fun photoNoticesComeFromGroupsAndPrivateChatsWithTheMessageKey() {
+        val group = notification("Motylki", true, Triple("Pani Ania", "📷 Zdjęcie", 1000), Triple("Pani Ania", "Jadłospis w załączniku", 2000))
+        val notice = NotificationParser.photoNotices("com.whatsapp", group).single()
+        val message = (NotificationParser.parse("com.whatsapp", group) as ParseResult.Group).messages.first()
+        assertEquals(PhotoNotice(message.idempotencyKey, "Motylki", 1000), notice)
+
+        val private = notification("Mama", false, Triple("Mama", "📷 Photo", 3000))
+        val privateNotice = NotificationParser.photoNotices("com.whatsapp", private).single()
+        assertEquals(null, privateNotice.groupName)
+
+        assertTrue(NotificationParser.photoNotices("com.whatsapp", notification("Motylki", true, Triple("A", "🎥 Film", 1))).isEmpty())
+        assertTrue(NotificationParser.photoNotices("org.telegram", group).isEmpty())
+    }
+
+    @Test
+    fun recognisesPhotoPlaceholdersOnly() {
+        listOf("📷 Zdjęcie", "📷 Photo", "📷 Dzisiejsze zajęcia", "Zdjęcie", "Photo").forEach { assertTrue(it, NotificationParser.isPhotoPlaceholder(it)) }
+        listOf("🎥 Film", "📄 plan.pdf", "Sticker", "Zdjęcia z wycieczki są super").forEach { assertFalse(it, NotificationParser.isPhotoPlaceholder(it)) }
+    }
 }

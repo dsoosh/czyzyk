@@ -198,3 +198,13 @@ Na telefonie z aplikacją Czyżyk eksport można też od razu **udostępnić do 
 # Aplikacja Czyżyk w aplikacji Android
 
 Aplikacja Android pokazuje PWA jako główny widok (WebView). Żeby działało w niej logowanie Google, w Supabase dodaj adres przekierowania: **Authentication → URL Configuration → Redirect URLs → `czyzyk://auth/callback`**. Adres PWA telefon dostaje z linku parowania (Admin → Urządzenia → Dodaj telefon); już sparowany telefon może go wpisać ręcznie w „Ustawieniach telefonu” albo sparować się ponownie.
+
+# Zdjęcia z grup (dokumenty)
+
+Czyżyk Connect może sprawdzać zdjęcia z obserwowanych grup i wysyłać tylko dokumenty – plany, jadłospisy, ogłoszenia. Zdjęcia, na których telefon wykryje ludzi, nie opuszczają telefonu; z plakatu z dziećmi trafia najwyżej odczytany tekst.
+
+1. W WhatsAppie włącz automatyczne pobieranie zdjęć: **Ustawienia → Pamięć i dane → Automatyczne pobieranie multimediów → Zdjęcia** (Wi-Fi i dane komórkowe).
+2. W Czyżyk Connect: **Ustawienia → Ustawienia telefonu → Zdjęcia z grup** → włącz i zezwól na dostęp do **wszystkich** zdjęć (dostęp do wybranych nie wystarczy).
+3. Telefon łączy plik z „WhatsApp Images” z wiadomością „📷 Zdjęcie” po czasie – tylko gdy w tych samych minutach nie przyszło zdjęcie z innego czatu (inaczej zdjęcie zostaje na telefonie). O innych czatach zapamiętuje wyłącznie czas zdjęcia.
+4. Na serwerze `worker` przed analizą sprawdza obraz jeszcze raz modelem z wizją (zmienna `DOCUMENT_MODEL`, domyślnie `EXTRACTION_MODEL`) – gdy zobaczy ludzi, usuwa obraz. Dokument (obraz i tekst) trafia do modelu razem z wiadomością.
+5. Liczniki „Wysłane dokumenty” i „Zdjęcia zostawione na telefonie” są na karcie **Zdjęcia z grup**; wywołania modelu widać w PWA w **Admin → LLM**.

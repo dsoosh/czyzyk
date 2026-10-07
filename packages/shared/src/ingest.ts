@@ -27,6 +27,32 @@ export const notificationIngestSchema = z.object({
 });
 export type NotificationIngest = z.infer<typeof notificationIngestSchema>;
 
+/** Largest document image the phone sends (JPEG re-encoded on the phone, no EXIF). */
+export const MAX_DOCUMENT_IMAGE_BYTES = 1536 * 1024;
+const MAX_DOCUMENT_IMAGE_BASE64 = Math.ceil(MAX_DOCUMENT_IMAGE_BYTES / 3) * 4;
+
+/**
+ * POST /ingest/document – a photo from a tracked group that the phone screened as an
+ * organisational document (document-import): the image when no people were found
+ * ("image"), otherwise only the text read on the phone ("text_only"). Photos of people
+ * never leave the phone, so "withheld" does not exist here.
+ */
+export const documentIngestSchema = z
+  .object({
+    /** The notification message the photo belongs to. */
+    idempotency_key: z.uuid(),
+    file_name: z.string().trim().min(1).max(200).regex(/^[^/\\]+$/),
+    screening: z.enum(["image", "text_only"]),
+    text: z.string().max(20_000),
+    image: z.string().max(MAX_DOCUMENT_IMAGE_BASE64).optional(),
+  })
+  .strict()
+  .refine((d) => (d.screening === "image" ? d.image !== undefined : d.image === undefined && d.text.trim() !== ""), {
+    message: "image goes with screening image only; text_only needs text",
+    path: ["image"],
+  });
+export type DocumentIngest = z.infer<typeof documentIngestSchema>;
+
 /** POST /ingest/seen-groups – only group names, never message content. */
 export const seenGroupsSchema = z.object({
   names: z.array(groupName).min(1).max(100),

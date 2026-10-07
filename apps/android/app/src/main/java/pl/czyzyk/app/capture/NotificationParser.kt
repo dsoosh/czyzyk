@@ -15,6 +15,19 @@ data class CapturedMessage(
     val idempotencyKey: String,
 )
 
+/**
+ * A photo seen in any WhatsApp notification, also from private chats and untracked groups
+ * (document-import): only its time and the group it came from, never content. It lets the
+ * phone tell which chat a new file in "WhatsApp Images" belongs to.
+ */
+data class PhotoNotice(
+    /** Same key as the captured message for a group photo. */
+    val key: String,
+    /** Group name, or null for a private chat. */
+    val groupName: String?,
+    val sentAtMillis: Long,
+)
+
 sealed interface ParseResult {
     data class Group(val groupName: String, val messages: List<CapturedMessage>) : ParseResult
     data class Skip(val reason: String) : ParseResult
@@ -63,6 +76,31 @@ object NotificationParser {
         }
         if (messages.isEmpty()) return ParseResult.Skip("no messages")
         return ParseResult.Group(title, messages)
+    }
+
+    /** "📷 Zdjęcie", "📷 caption", "Photo" – a photo, not a video, sticker or document. */
+    private val PHOTO = Regex("""^\s*(?:📷|🖼)|^(?:Zdjęcie|Photo|Obraz|Image)$""", RegexOption.IGNORE_CASE)
+
+    fun isPhotoPlaceholder(text: String): Boolean = PHOTO.containsMatchIn(text.trim())
+
+    /** Photos in a WhatsApp notification of any chat (group or private). */
+    fun photoNotices(packageName: String, notification: Notification): List<PhotoNotice> {
+        if (packageName !in WHATSAPP_PACKAGES) return emptyList()
+        if (notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return emptyList()
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification) ?: return emptyList()
+        val group = style.isGroupConversation
+        val title = style.conversationTitle?.toString()?.let { COUNT_SUFFIX.replace(GroupNames.normalize(it), "").trim() }
+        return style.messages.mapNotNull { m ->
+            val text = m.text?.toString() ?: return@mapNotNull null
+            if (!isPhotoPlaceholder(text)) return@mapNotNull null
+            val author = m.person?.name?.toString()?.trim().orEmpty()
+            val chat = (if (group) title else null) ?: author
+            PhotoNotice(
+                key = Uuid5.of(Uuid5.MESSAGES, listOf(packageName, chat, author, m.timestamp, text).joinToString("\u0000")).toString(),
+                groupName = if (group && !title.isNullOrEmpty()) title else null,
+                sentAtMillis = m.timestamp,
+            )
+        }
     }
 
     fun isAttachmentPlaceholder(text: String): Boolean =

@@ -2,6 +2,7 @@ import pg from "pg";
 import { pino } from "pino";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
+import type { DocumentChecker } from "./documents.js";
 import type { ExtractionModel } from "./model.js";
 import type { ExtractionPrompt } from "./prompt.js";
 import { runGroupExtraction, type ExtractionDeps } from "./run.js";
@@ -422,5 +423,91 @@ describe("runGroupExtraction", () => {
     expect(user).toMatch(/<wiadomosci_nowe>\n[^<]*Prośba o spray[^<]*<\/wiadomosci_nowe>/);
     expect(user).toMatch(/<wiadomosci_pozniejsze>\n[^<]*Spray wystarczy do piątku[^<]*<\/wiadomosci_pozniejsze>/);
     expect(prompts[0]!.newMessageIds).toHaveLength(1);
+  });
+});
+
+describe("dokumenty ze zdjęć", () => {
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9, 9]);
+
+  async function photoWithDocument(text = "Jadłospis: piątek – ryba") {
+    const id = await addMessage("📷 Zdjęcie", "2026-10-07T10:00:00Z");
+    const { rows } = await db.client.query(
+      `insert into attachments (message_id, file_name, mime, screening, doc_text, sha256, doc_status)
+       values ($1, 'IMG-1.jpg', 'image/jpeg', 'image', $2, repeat('a', 64), 'pending') returning id`,
+      [id, text],
+    );
+    await db.client.query("insert into attachment_files (attachment_id, mime, bytes) values ($1, 'image/jpeg', $2)", [rows[0].id, JPEG]);
+    return { messageId: id, attachmentId: rows[0].id as string };
+  }
+
+  const checker = (containsPeople: boolean): DocumentChecker & { calls: number } => ({
+    calls: 0,
+    async check(data) {
+      this.calls++;
+      expect(data).toBe(JPEG.toString("base64"));
+      return { containsPeople, description: "Jadłospis na tydzień." };
+    },
+  });
+
+  it("dokument bez ludzi: obraz i tekst trafiają do modelu przy swojej wiadomości", async () => {
+    await photoWithDocument();
+    const { model, prompts } = scripted(() => []);
+    const docs = checker(false);
+    await runGroupExtraction({ ...deps(model), documents: docs }, groupId);
+    expect(docs.calls).toBe(1);
+    expect(prompts[0]!.user).toContain('[dokument "IMG-1.jpg" (obraz poniżej): "Jadłospis: piątek – ryba"]');
+    expect(prompts[0]!.images).toEqual([{ label: 'Obraz dokumentu "IMG-1.jpg" z wiadomości W1:', data: JPEG.toString("base64") }]);
+    const { rows } = await db.client.query("select doc_status, description from attachments");
+    expect(rows).toEqual([{ doc_status: "ready", description: "Jadłospis na tydzień." }]);
+    const { rows: calls } = await db.client.query("select kind, request->'images' as images, response from llm_calls order by created_at, kind");
+    expect(calls).toEqual([
+      { kind: "document", images: ["Zdjęcie dokumentu"], response: { containsPeople: false, description: "Jadłospis na tydzień." } },
+      { kind: "extraction", images: ['Obraz dokumentu "IMG-1.jpg" z wiadomości W1:'], response: { operations: [] } },
+    ]);
+  });
+
+  it("kontrola zapasowa widzi ludzi: obraz usunięty, do modelu idzie tylko tekst", async () => {
+    await photoWithDocument();
+    const { model, prompts } = scripted(() => []);
+    await runGroupExtraction({ ...deps(model), documents: checker(true) }, groupId);
+    expect(prompts[0]!.images).toBeUndefined();
+    expect(prompts[0]!.user).toContain('[dokument "IMG-1.jpg": "Jadłospis: piątek – ryba"]');
+    expect((await db.client.query("select count(*)::int as n from attachment_files")).rows[0].n).toBe(0);
+    expect((await db.client.query("select screening, doc_status, mime from attachments")).rows).toEqual([
+      { screening: "text_only", doc_status: "ready", mime: null },
+    ]);
+  });
+
+  it("bez kontroli zapasowej obraz nie zostaje na serwerze", async () => {
+    await photoWithDocument();
+    const { model, prompts } = scripted(() => []);
+    await runGroupExtraction(deps(model), groupId);
+    expect(prompts[0]!.images).toBeUndefined();
+    expect((await db.client.query("select count(*)::int as n from attachment_files")).rows[0].n).toBe(0);
+  });
+
+  it("błąd kontroli zapasowej: ekstrakcja się powtórzy, dokument czeka", async () => {
+    await photoWithDocument();
+    const { model, prompts } = scripted(() => []);
+    const failing: DocumentChecker = {
+      async check() {
+        throw new Error("overloaded");
+      },
+    };
+    await expect(runGroupExtraction({ ...deps(model), documents: failing }, groupId)).rejects.toThrow("overloaded");
+    expect(prompts).toHaveLength(0);
+    expect((await db.client.query("select doc_status from attachments")).rows).toEqual([{ doc_status: "pending" }]);
+    expect((await db.client.query("select count(*)::int as n from messages where processed_at is null")).rows[0].n).toBe(1);
+  });
+
+  it("tekst dokumentu przy wiadomości z kontekstu też jest widoczny, bez obrazu", async () => {
+    const { messageId } = await photoWithDocument("Plan: 15.10 teatrzyk");
+    await db.client.query("update attachments set doc_status = 'ready'");
+    await db.client.query("update messages set processed_at = now() where id = $1", [messageId]);
+    await addMessage("Przypominam o teatrzyku", "2026-10-07T12:00:00Z");
+    const { model, prompts } = scripted(() => []);
+    await runGroupExtraction(deps(model), groupId);
+    expect(prompts[0]!.user).toContain('[dokument "IMG-1.jpg": "Plan: 15.10 teatrzyk"]');
+    expect(prompts[0]!.images).toBeUndefined();
   });
 });

@@ -14,6 +14,7 @@ import android.webkit.WebChromeClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -38,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,6 +62,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
+import pl.czyzyk.app.photos.PhotoWorker
 import pl.czyzyk.app.update.ApkInstaller
 import pl.czyzyk.app.update.Updates
 import pl.czyzyk.app.web.PwaWebView
@@ -392,6 +395,10 @@ private data class Status(
     val trackedFetchedAt: Long,
     val installAllowed: Boolean,
     val lastUpdateCheckAt: Long,
+    val photosEnabled: Boolean,
+    val photosPermission: Boolean,
+    val documentsSent: Int,
+    val photosWithheld: Int,
 )
 
 private fun readStatus(context: Context): Status {
@@ -411,6 +418,10 @@ private fun readStatus(context: Context): Status {
         trackedFetchedAt = state.trackedFetchedAt,
         installAllowed = ApkInstaller.allowed(context),
         lastUpdateCheckAt = state.lastUpdateCheckAt,
+        photosEnabled = state.photosEnabled,
+        photosPermission = PhotoWorker.canReadImages(context),
+        documentsSent = state.documentsSent,
+        photosWithheld = state.photosWithheld,
     )
 }
 
@@ -445,6 +456,7 @@ fun CzyzykApp(
                 PairingCard(status, onPairLink)
                 PermissionsCard(status)
                 QueueCard(status)
+                PhotosCard(status) { status = readStatus(context) }
                 SyncCard(status) { status = readStatus(context) }
                 UpdatesCard(status, updates)
                 TipsCard()
@@ -552,6 +564,61 @@ private fun QueueCard(status: Status) {
             Text("Wiadomości w kolejce: ${status.queueSize}")
             Text("Zaległe załączniki: ${status.pendingAttachments}")
             Text("Ostatnia wysyłka: " + formatTime(status.lastDeliveredAt))
+        }
+    }
+}
+
+/** Photos from tracked groups, screened on the phone (document-import). */
+@Composable
+private fun PhotosCard(status: Status, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            Deps.state(context).photosEnabled = true
+            Work.enqueuePhotos(context)
+        }
+        onChanged()
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Zdjęcia z grup", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                Switch(
+                    checked = status.photosEnabled && status.photosPermission,
+                    onCheckedChange = { on ->
+                        if (!on) {
+                            Deps.state(context).photosEnabled = false
+                            onChanged()
+                        } else if (status.photosPermission) {
+                            Deps.state(context).photosEnabled = true
+                            Work.enqueuePhotos(context)
+                            onChanged()
+                        } else {
+                            askPermission.launch(PhotoWorker.imagePermission())
+                        }
+                    },
+                )
+            }
+            Text(
+                "Telefon sprawdza zdjęcia z obserwowanych grup (z folderu WhatsApp Images) i wysyła tylko dokumenty: " +
+                    "plany, jadłospisy, ogłoszenia. Zdjęcia, na których telefon wykryje ludzi, nie opuszczają telefonu – " +
+                    "z plakatu z dziećmi idzie najwyżej odczytany tekst. Sprawdzanie działa na telefonie, bez internetu.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (status.photosEnabled && !status.photosPermission) {
+                StatusLine(false, "Brak dostępu do zdjęć – zezwól na wszystkie zdjęcia")
+                OutlinedButton(onClick = {
+                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
+                }) { Text("Otwórz uprawnienia aplikacji") }
+            }
+            if (status.photosEnabled) {
+                Text("Wysłane dokumenty: ${status.documentsSent}")
+                Text("Zdjęcia zostawione na telefonie: ${status.photosWithheld}")
+                Text(
+                    "WhatsApp musi pobierać zdjęcia automatycznie (Ustawienia → Pamięć i dane → Automatyczne pobieranie).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }

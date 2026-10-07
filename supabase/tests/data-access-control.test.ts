@@ -37,7 +37,8 @@ beforeAll(async () => {
     [groupId],
   );
   const messageId = m[0].id;
-  await c.query("insert into attachments (message_id, mime) values ($1, 'image/jpeg')", [messageId]);
+  const { rows: a } = await c.query("insert into attachments (message_id, mime) values ($1, 'image/jpeg') returning id", [messageId]);
+  await c.query("insert into attachment_files (attachment_id, mime, bytes) values ($1, 'image/jpeg', '\\xffd8ff')", [a[0].id]);
   const { rows: e } = await c.query(
     "insert into events (group_id, title, starts_at, all_day, source_message_ids) values ($1, 'Bal', now(), true, array[$2::uuid]) returning id",
     [groupId, messageId],
@@ -130,6 +131,14 @@ describe("Dane administracyjne tylko dla admina", () => {
 
   it.each(ADMIN_TABLES)("admin czyta %s", async (table) => {
     expect(await count(user(adminId), table)).toBeGreaterThan(0);
+  });
+});
+
+describe("Obrazy dokumentów tylko dla serwera", () => {
+  it("anon, członek rodziny i admin nie czytają attachment_files", async () => {
+    for (const actor of [anon, user(familyId), user(adminId)]) {
+      expect(await count(actor, "attachment_files")).toBe("denied");
+    }
   });
 });
 

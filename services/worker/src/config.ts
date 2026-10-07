@@ -10,6 +10,8 @@ export const workerEnvSchema = baseEnvSchema.extend({
   ANTHROPIC_API_KEY: z.string().min(1),
   /** Model name lives only in configuration (see CLAUDE.md). */
   EXTRACTION_MODEL: z.string().min(1),
+  /** Vision model checking document images for people (document-import); defaults to EXTRACTION_MODEL. */
+  DOCUMENT_MODEL: z.string().min(1).optional(),
   /** Seconds between a new message and its extraction; messages arriving meanwhile join the same run. */
   EXTRACTION_DELAY_SECONDS: z.coerce.number().min(0).max(3600).default(15),
   /** Operations below this confidence produce items with status needs_review. */

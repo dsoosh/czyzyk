@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { pino } from "pino";
 import { loadWorkerConfig } from "./config.js";
+import { AnthropicDocumentChecker } from "./extraction/documents.js";
 import { AnthropicExtractionModel } from "./extraction/model.js";
 import { pushConfig } from "./push/config.js";
 import { webPushSender } from "./push/send.js";
@@ -13,6 +14,7 @@ const anthropic = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY, maxRetries: 
 const push = pushConfig(config);
 const worker = await startWorker(config, logger, {
   model: new AnthropicExtractionModel(anthropic, config.EXTRACTION_MODEL),
+  documents: new AnthropicDocumentChecker(anthropic, config.DOCUMENT_MODEL ?? config.EXTRACTION_MODEL),
   push: push && {
     sender: webPushSender({ subject: push.VAPID_SUBJECT, publicKey: push.VAPID_PUBLIC_KEY, privateKey: push.VAPID_PRIVATE_KEY }),
     digestWindowMinutes: push.DIGEST_WINDOW_MINUTES,

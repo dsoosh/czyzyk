@@ -40,6 +40,9 @@ private class FakeApi(var results: MutableList<SendResult> = mutableListOf()) : 
         return config
     }
 
+    override fun sendDocument(pairing: Pairing, document: pl.czyzyk.app.photos.PendingDocument, imageBase64: String?): SendResult =
+        SendResult.Delivered
+
     override fun reportGroups(pairing: Pairing, names: Collection<String>): SendResult {
         reported += names
         return SendResult.Delivered
