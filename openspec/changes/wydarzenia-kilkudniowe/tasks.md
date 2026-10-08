@@ -3,7 +3,7 @@
 ## 1. Kalendarz
 
 - [x] 1.1 `lib/spans.ts`: zakresy wpisów i scalanie kolejnych dni; weryfikacja: testy `spans.test.ts`
-- [x] 1.2 `CalendarPage`: lista pokazuje wpis kilkudniowy raz z zakresem, miesiąc oznacza każdy dzień; `fetchCalendar` pobiera trwające wydarzenia; weryfikacja: `CalendarPage.test.tsx`
+- [x] 1.2 `CalendarPage`: lista pokazuje wpis kilkudniowy raz, we własnej sekcji z zakresem w nagłówku, miesiąc oznacza każdy dzień; `fetchCalendar` pobiera trwające wydarzenia; weryfikacja: `CalendarPage.test.tsx`
 
 ## 2. Analiza
 

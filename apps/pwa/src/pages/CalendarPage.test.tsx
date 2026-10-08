@@ -49,19 +49,20 @@ describe("Kalendarz – wpisy kilkudniowe", () => {
     ],
   };
 
-  it("lista pokazuje wpis kilkudniowy raz, z zakresem dat", async () => {
+  it("lista pokazuje wpis kilkudniowy raz, w sekcji z zakresem dat w nagłówku", async () => {
     renderAt("/kalendarz", { tables: spanTables });
-    const today = await screen.findByRole("region", { name: "Środa 7.10" });
-    expect(within(today).getByText("Wycieczka")).toBeInTheDocument();
-    expect(within(today).getByText("pn 5.10 – czw 8.10")).toBeInTheDocument();
+    const trip = await screen.findByRole("region", { name: "Poniedziałek 5.10 – Czwartek 8.10" });
+    expect(within(trip).getByText("Wycieczka")).toBeInTheDocument();
+    expect(within(trip).getByRole("heading")).toHaveTextContent("Poniedziałek 5.10 – Czwartek 8.10 · trwa");
     expect(screen.queryByRole("region", { name: "Czwartek 8.10" })).not.toBeInTheDocument();
 
     expect(screen.getAllByText("Zielona szkoła – dzień 1")).toHaveLength(1);
     expect(screen.queryByText("Zielona szkoła – dzień 2")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Wtorek 20.10" })).toHaveTextContent("wt 20.10 – śr 21.10");
+    expect(screen.getByRole("region", { name: "Wtorek 20.10 – Środa 21.10" })).toHaveTextContent("Zielona szkoła – dzień 1");
 
     expect(screen.getAllByText("Przedszkole nieczynne – przerwa jesienna")).toHaveLength(1);
-    expect(screen.getByRole("region", { name: "Poniedziałek 26.10" })).toHaveTextContent("pn 26.10 – pt 30.10");
+    const autumn = screen.getByRole("region", { name: "Poniedziałek 26.10 – Piątek 30.10" });
+    expect(within(autumn).queryByText("pn 26.10 – pt 30.10")).not.toBeInTheDocument();
   });
 
   it("widok miesiąca oznacza każdy dzień wpisu", async () => {
