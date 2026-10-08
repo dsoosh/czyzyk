@@ -2,7 +2,6 @@ package pl.czyzyk.app.photos
 
 import android.content.ContentResolver
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import com.google.android.gms.tasks.Task
 import com.google.android.gms.tasks.Tasks
@@ -96,23 +95,7 @@ class DocumentScreener(private val resolver: ContentResolver) {
         }
     }
 
-    /** Scaled to at most [MAX_SIDE] px; the original is not kept, so its EXIF (GPS) never travels. */
-    private fun decode(uri: Uri): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_SIDE) sample *= 2
-        val decoded = resolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-        } ?: return null
-        val longest = maxOf(decoded.width, decoded.height)
-        if (longest <= MAX_SIDE) return decoded
-        val scale = MAX_SIDE.toFloat() / longest
-        return Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true).also {
-            if (it !== decoded) decoded.recycle()
-        }
-    }
+    private fun decode(uri: Uri): Bitmap? = PhotoDecoder.decode(resolver, uri, MAX_SIDE)
 
     /** JPEG small enough for the server limit (lower quality, then smaller size). */
     private fun jpeg(bitmap: Bitmap): ByteArray? {
