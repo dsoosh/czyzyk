@@ -31,6 +31,8 @@ class ListenerWatchdogTest {
 
     @Test
     fun doesNothingWithoutAccessOrWhenConnected() {
+        // An explicit empty value: NotificationManagerCompat caches the last non-null one across tests.
+        Settings.Secure.putString(context.contentResolver, "enabled_notification_listeners", "")
         assertFalse(ListenerWatchdog.ensureBound(context))
         grantAccess()
         ListenerWatchdog.connected = true
