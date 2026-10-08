@@ -676,6 +676,20 @@ describe("triaż wiadomości", () => {
     expect(rows).toEqual([{ kind: "triage", model: "tani-model", response: { relevant: false }, usage: { input_tokens: 300, output_tokens: 10 } }]);
   });
 
+  it("zdjęcie dokumentu zawsze idzie do pełnej analizy, bez triażu", async () => {
+    const id = await addMessage("", "2026-10-07T10:00:00Z");
+    await db.client.query(
+      `insert into attachments (message_id, file_name, screening, doc_text, doc_status)
+       values ($1, 'kalendarz.jpg', 'text_only', 'Kalendarz dni wolnych', 'ready')`,
+      [id],
+    );
+    const { model, prompts } = scripted(() => []);
+    const t = triage(false);
+    expect(await runGroupExtraction({ ...deps(model), triage: t }, groupId)).not.toMatchObject({ status: "skipped" });
+    expect(t.calls).toBe(0);
+    expect(prompts[0]!.user).toContain('[dokument "kalendarz.jpg": "Kalendarz dni wolnych"]');
+  });
+
   it("triaż mówi „tak” albo zawodzi – wiadomości idą do pełnej analizy", async () => {
     await addMessage("W piątek bal, przebrania", "2026-10-07T10:00:00Z");
     for (const verdict of [true, new Error("overloaded")]) {
