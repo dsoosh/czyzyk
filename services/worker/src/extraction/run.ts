@@ -55,7 +55,7 @@ async function triageSaysSkip(deps: ExtractionDeps, batch: ExtractionBatch, grou
     });
   try {
     const verdict = await deps.triage.triage(prompt);
-    await log({ response: { relevant: verdict.relevant }, usage: verdict.usage });
+    await log({ response: { relevant: verdict.relevant, rationale: verdict.rationale }, usage: verdict.usage });
     return !verdict.relevant;
   } catch (error) {
     await log({ error: errorLabel(error) });

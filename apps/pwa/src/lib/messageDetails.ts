@@ -15,7 +15,7 @@ export interface MessageItem {
 export interface MessageCall {
   id: string;
   kind: "extraction" | "document" | "triage";
-  response: { operations?: unknown[]; relevant?: boolean; containsPeople?: boolean } | null;
+  response: { operations?: unknown[]; relevant?: boolean; rationale?: string | null; containsPeople?: boolean } | null;
   error: string | null;
   created_at: string;
 }

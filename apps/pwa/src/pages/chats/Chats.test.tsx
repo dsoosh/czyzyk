@@ -103,7 +103,7 @@ describe("Czaty", () => {
       payments: [{ id: "p1", description: "Składka", status: "needs_review", source_message_ids: ["r1"] }],
       item_changes: [{ item_type: "event", item_id: "e1", op: "create", source_message_ids: ["r1"], created_at: "2026-10-07T18:01:00.000Z" }],
       llm_calls: [
-        { id: "c1", kind: "triage", response: { relevant: true }, error: null, created_at: "2026-10-07T18:00:30.000Z", message_ids: ["r1"] },
+        { id: "c1", kind: "triage", response: { relevant: true, rationale: "Nowy termin zebrania." }, error: null, created_at: "2026-10-07T18:00:30.000Z", message_ids: ["r1"] },
         { id: "c2", kind: "extraction", response: { operations: [{}, {}] }, error: null, created_at: "2026-10-07T18:01:00.000Z", message_ids: ["r1"] },
       ],
     };
@@ -115,6 +115,7 @@ describe("Czaty", () => {
     expect(within(details).getByText(/utworzone/)).toBeInTheDocument();
     expect(within(details).getByRole("link", { name: "Płatność: Składka" })).toHaveAttribute("href", "/zrodlo/payment/p1");
     expect(within(details).getByRole("link", { name: "Wstępna ocena: do analizy" })).toHaveAttribute("href", "/admin/llm?wywolanie=c1");
+    expect(within(details).getByText("Nowy termin zebrania.")).toBeInTheDocument();
     expect(within(details).getByRole("link", { name: "Analiza: 2 operacje" })).toBeInTheDocument();
 
     // A skipped chatter message: its verdict, no items.

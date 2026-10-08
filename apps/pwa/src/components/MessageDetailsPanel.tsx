@@ -72,6 +72,7 @@ export function MessageDetailsPanel({ message, admin }: { message: ContextMessag
                     {" "}
                     · {shortDate(warsawDay(c.created_at))} {warsawTime(c.created_at)}
                   </span>
+                  {c.kind === "triage" && c.response?.rationale && <p className="text-slate-600">{c.response.rationale}</p>}
                 </li>
               ))}
             </ul>
