@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Sends a captured message right away, also with the screen off (Doze defers WorkManager jobs). -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Re-binds the notification reader after a reboot (notification-capture). -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Sideloaded app (not Play Store): asks the user to exempt it from battery optimisation. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Self-update from GitHub releases (app-updates); the user grants "Install unknown apps" once. -->
@@ -70,6 +72,16 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- After a reboot or an update: make sure the notification reader is bound again. -->
+        <receiver
+            android:name=".capture.RestartReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Result of an update install session; only the system calls it through our PendingIntent. -->
         <receiver

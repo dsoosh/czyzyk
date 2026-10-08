@@ -97,6 +97,14 @@ class AppState(private val prefs: SharedPreferences) {
         .putInt(KEY_PREVIEW_MAX_SIDE, maxOf(previewMaxSide, shorterSide))
         .apply()
 
+    /** When the notification reader was last bound / unbound by Android (notification-capture). */
+    var listenerConnectedAt: Long
+        get() = prefs.getLong(KEY_LISTENER_CONNECTED, 0L)
+        set(value) = prefs.edit().putLong(KEY_LISTENER_CONNECTED, value).apply()
+    var listenerDisconnectedAt: Long
+        get() = prefs.getLong(KEY_LISTENER_DISCONNECTED, 0L)
+        set(value) = prefs.edit().putLong(KEY_LISTENER_DISCONNECTED, value).apply()
+
     var lastDeliveredAt: Long
         get() = prefs.getLong(KEY_LAST_DELIVERED, 0)
         set(v) = prefs.edit().putLong(KEY_LAST_DELIVERED, v).apply()
@@ -123,6 +131,8 @@ class AppState(private val prefs: SharedPreferences) {
         private const val KEY_UPDATE_CODE = "update_ready_code"
         private const val KEY_UPDATE_NAME = "update_ready_name"
         private const val KEY_UPDATE_SHA = "update_ready_sha256"
+        private const val KEY_LISTENER_CONNECTED = "listener_connected_at"
+        private const val KEY_LISTENER_DISCONNECTED = "listener_disconnected_at"
 
         @Volatile private var instance: AppState? = null
 

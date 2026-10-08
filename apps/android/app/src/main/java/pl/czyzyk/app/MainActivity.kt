@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
+import pl.czyzyk.app.capture.ListenerWatchdog
 import pl.czyzyk.app.photos.DocumentScreener
 import pl.czyzyk.app.photos.PhotoNote
 import pl.czyzyk.app.photos.PhotoWorker
@@ -138,6 +139,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        ListenerWatchdog.ensureBound(this)
         if (!Deps.updatesEnabled()) return
         update = Updates.ready(Deps.state(this), Updates.dir(this), Deps.versionCode())
         if (Updates.shouldCheckOnOpen(Deps.state(this))) checkForUpdate(manual = false)
@@ -506,6 +508,8 @@ private data class Status(
     val pairing: SecureStore.State,
     val server: String?,
     val notificationAccess: Boolean,
+    /** The reader is bound in this process right now (Android may unbind it silently). */
+    val listenerConnected: Boolean,
     val batteryUnrestricted: Boolean,
     val queueSize: Int,
     val pendingAttachments: Int,
@@ -533,6 +537,7 @@ private fun readStatus(context: Context): Status {
         pairing = store.state,
         server = store.pairing?.serverUrl,
         notificationAccess = context.packageName in NotificationManagerCompat.getEnabledListenerPackages(context),
+        listenerConnected = ListenerWatchdog.connected,
         batteryUnrestricted = power.isIgnoringBatteryOptimizations(context.packageName),
         queueSize = Deps.queue(context).size(),
         pendingAttachments = state.pendingAttachments,
@@ -660,6 +665,12 @@ private fun PermissionsCard(status: Status) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             StatusLine(status.notificationAccess, if (status.notificationAccess) "Dostęp do powiadomień włączony" else "Brak dostępu do powiadomień")
+            if (status.notificationAccess) {
+                StatusLine(
+                    status.listenerConnected,
+                    if (status.listenerConnected) "Czytnik powiadomień działa" else "System odłączył czytnik – łączę ponownie",
+                )
+            }
             if (!status.notificationAccess) {
                 Button(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) {
                     Text("Włącz dostęp do powiadomień")

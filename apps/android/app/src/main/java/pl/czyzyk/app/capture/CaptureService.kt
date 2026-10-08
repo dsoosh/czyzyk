@@ -1,5 +1,6 @@
 package pl.czyzyk.app.capture
 
+import android.content.ComponentName
 import android.graphics.BitmapFactory
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
@@ -20,9 +21,18 @@ import kotlin.concurrent.thread
 class CaptureService : NotificationListenerService() {
 
     override fun onListenerConnected() {
+        ListenerWatchdog.connected = true
+        Deps.state(this).listenerConnectedAt = System.currentTimeMillis()
         Work.schedulePeriodicSync(this)
         Work.enqueueSync(this)
         Work.enqueueSend(this)
+    }
+
+    /** Android unbound the reader (update, battery saving): ask to be bound again right away. */
+    override fun onListenerDisconnected() {
+        ListenerWatchdog.connected = false
+        Deps.state(this).listenerDisconnectedAt = System.currentTimeMillis()
+        requestRebind(ComponentName(this, CaptureService::class.java))
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
