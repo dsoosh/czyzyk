@@ -549,7 +549,8 @@ describe("runGroupExtraction", () => {
 });
 
 describe("dokumenty ze zdjęć", () => {
-  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9, 9]);
+  // Longer than 57 bytes: Postgres would break its base64 into lines, which the model API rejects.
+  const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 9)]);
 
   async function photoWithDocument(text = "Jadłospis: piątek – ryba") {
     const id = await addMessage("📷 Zdjęcie", "2026-10-07T10:00:00Z");

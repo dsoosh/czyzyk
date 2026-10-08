@@ -117,7 +117,7 @@ export async function checkPendingDocuments(
   logger: Logger,
 ): Promise<number> {
   const { rows } = await db.query<{ id: string; data: string | null }>(
-    `select a.id, encode(f.bytes, 'base64') as data
+    `select a.id, translate(encode(f.bytes, 'base64'), chr(10), '') as data
        from public.attachments a
        join public.messages m on m.id = a.message_id
        left join public.attachment_files f on f.attachment_id = a.id

@@ -6,6 +6,8 @@ let familyId: string;
 const strangerId = "22222222-2222-2222-2222-222222222222";
 let ready: string;
 let pending: string;
+// Longer than 57 bytes, so plain encode(…, 'base64') would break it into lines.
+const IMAGE = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 7)]);
 
 beforeAll(async () => {
   db = await createTestDb();
@@ -21,7 +23,7 @@ beforeAll(async () => {
       `insert into attachments (message_id, screening, doc_status, mime) values ($1, 'image', $2, 'image/jpeg') returning id`,
       [m[0].id, status],
     );
-    await db.client.query("insert into attachment_files (attachment_id, mime, bytes) values ($1, 'image/jpeg', '\\xffd8ffe0'::bytea)", [rows[0].id]);
+    await db.client.query("insert into attachment_files (attachment_id, mime, bytes) values ($1, 'image/jpeg', $2)", [rows[0].id, IMAGE]);
     return rows[0].id as string;
   };
   ready = await insert("ready");
@@ -37,7 +39,7 @@ const image = (actor: Parameters<typeof as>[1], id: string) =>
 
 describe("attachment_image", () => {
   it("członek rodziny dostaje sprawdzony obraz dokumentu", async () => {
-    expect(await image(user(familyId), ready)).toEqual([{ mime: "image/jpeg", data: "/9j/4A==" }]);
+    expect(await image(user(familyId), ready)).toEqual([{ mime: "image/jpeg", data: IMAGE.toString("base64") }]);
   });
 
   it("obraz przed kontrolą serwera nie jest wydawany", async () => {
