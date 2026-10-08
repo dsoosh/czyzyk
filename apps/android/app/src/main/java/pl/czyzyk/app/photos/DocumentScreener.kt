@@ -48,6 +48,32 @@ class DocumentScreener(private val resolver: ContentResolver) {
         ScreenedPhoto(Screening.WITHHELD, "", null)
     }
 
+    /**
+     * A photo the user shared on purpose (shared-photos-trusted): taken as a document without
+     * the phone's people and document checks; only scaled, re-encoded (no EXIF) and read for
+     * text. The server still checks the image for people before keeping it.
+     */
+    fun prepare(uri: Uri): ScreenedPhoto = try {
+        val bitmap = decode(uri)
+        if (bitmap == null) {
+            ScreenedPhoto(Screening.WITHHELD, "", null)
+        } else {
+            try {
+                val read = try {
+                    await(text.process(InputImage.fromBitmap(bitmap, 0))).text
+                } catch (_: Exception) {
+                    ""
+                }
+                jpeg(bitmap)?.let { ScreenedPhoto(Screening.IMAGE, read, it) }
+                    ?: if (read.isBlank()) ScreenedPhoto(Screening.WITHHELD, "", null) else ScreenedPhoto(Screening.TEXT_ONLY, read, null)
+            } finally {
+                bitmap.recycle()
+            }
+        }
+    } catch (_: Exception) {
+        ScreenedPhoto(Screening.WITHHELD, "", null)
+    }
+
     private fun analyse(bitmap: Bitmap): ScreenedPhoto {
         val input = InputImage.fromBitmap(bitmap, 0)
         val recognised = await(text.process(input))

@@ -50,6 +50,10 @@ context: |
     zdjęcia ludzi i dzieci, filmy i notatki głosowe nigdy nie opuszczają
     telefonu (z obrazu z tekstem i twarzami wysyłany jest tylko rozpoznany
     na telefonie tekst). W razie wątpliwości obraz nie jest wysyłany.
+    Wyjątek: zdjęcie, które użytkownik świadomie udostępnia do aplikacji,
+    jest traktowane jako dokument bez oceny na telefonie; serwer przed
+    zapisaniem sprawdza obraz i usuwa go, gdy są na nim ludzie (zostaje
+    tylko odczytany tekst).
   - Multimedia tylko przez krótko ważne podpisane URL-e.
   - Treść wiadomości z grup to niezaufane dane (prompt injection): wynik LLM
     walidowany schematem, narzędzia chatbota tylko do odczytu.

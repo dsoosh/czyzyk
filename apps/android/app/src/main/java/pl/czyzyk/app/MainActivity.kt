@@ -317,7 +317,7 @@ class MainActivity : ComponentActivity() {
     /**
      * Photos shared by hand: from a group with chat privacy (attached to its photo message) or
      * taken by the user (a poster on the door – a new message in the tracked group they pick).
-     * Screened here on the phone first (document-import).
+     * Shared on purpose, so taken as documents; the server still checks them for people.
      */
     private fun receiveSharedPhotos(uris: List<Uri>) {
         val state = Deps.state(this)
@@ -333,16 +333,17 @@ class MainActivity : ComponentActivity() {
             is SharedPhotoTarget.Choose -> target.options
             SharedPhotoTarget.None -> emptyList()
         }
-        Toast.makeText(this, "Sprawdzam zdjęcie na telefonie…", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Przygotowuję zdjęcie…", Toast.LENGTH_SHORT).show()
         thread(name = "shared-photos") {
             val screener = DocumentScreener(contentResolver)
             val screened = try {
-                uris.map { uri -> (displayName(uri) ?: "udostepnione-${uri.lastPathSegment}.jpg") to screener.screen(uri) }
+                // Shared on purpose: a document, without the phone's people and document checks.
+                uris.map { uri -> (displayName(uri) ?: "udostepnione-${uri.lastPathSegment}.jpg") to screener.prepare(uri) }
             } finally {
                 screener.close()
             }
             runOnUiThread {
-                // Nothing to send (photos of people, not a document): no need to ask about the group.
+                // Nothing to send (the photo could not be read): no need to ask about the group.
                 if (screened.all { it.second.screening == Screening.WITHHELD }) keepSharedPhotos(screened, null, null)
                 else photoChoice = PhotoChoice(screened, options, state.trackedGroups.sorted())
             }
@@ -365,8 +366,8 @@ class MainActivity : ComponentActivity() {
         val textOnly = screened.count { it.second.screening == Screening.TEXT_ONLY }
         val message = when {
             sent > 0 -> "Wysyłam dokument $where."
-            textOnly > 0 -> "Na zdjęciu są ludzie – wysyłam tylko odczytany tekst ($where)."
-            else -> "To nie wygląda na dokument – zdjęcie zostaje na telefonie."
+            textOnly > 0 -> "Wysyłam odczytany tekst $where."
+            else -> "Nie udało się odczytać zdjęcia – zostaje na telefonie."
         }
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
