@@ -249,6 +249,8 @@ export interface ContextMessage {
   status: string;
   /** Which triage step skipped the message (message-triage); null once analysed. */
   triage?: "rules" | "model" | null;
+  /** When the message went through the analysis (or was skipped); null while it waits. */
+  processed_at?: string | null;
 }
 
 /** One entry of an item's history (item-history). */

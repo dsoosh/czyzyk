@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
+import { MessageText } from "../components/MessageText";
 import { LoadError, Loading } from "../components/ui";
 import { dayLabel, warsawDay, warsawTime } from "../lib/dates";
 import {
@@ -113,7 +114,7 @@ export function SourcePage() {
                       {dayLabel(warsawDay(m.sent_at), today)} {warsawTime(m.sent_at)}
                     </span>
                   </div>
-                  <p className="mt-1 whitespace-pre-wrap">{m.text || (m.has_attachment ? "📎 załącznik" : "")}</p>
+                  <MessageText className="mt-1" text={m.text || (m.has_attachment ? "📎 załącznik" : "")} />
                   {m.status === "deleted_suspected" && <p className="mt-1 text-xs text-red-700">Prawdopodobnie usunięta z grupy</p>}
                 </li>
               );
@@ -167,7 +168,7 @@ function SourceQuote({ message, today }: { message: ContextMessage; today: strin
           {dayLabel(warsawDay(message.sent_at), today)} {warsawTime(message.sent_at)}
         </span>
       </div>
-      <p className="mt-1 whitespace-pre-wrap text-sm">{message.text || (message.has_attachment ? "📎 załącznik" : "")}</p>
+      <MessageText className="mt-1 text-sm" text={message.text || (message.has_attachment ? "📎 załącznik" : "")} />
     </>
   );
 }

@@ -272,7 +272,7 @@ describe("runGroupExtraction", () => {
     await db.client.query(
       `insert into llm_calls (kind, request, created_at) values ('extraction', '{}', now() - interval '15 days')`,
     );
-    await addMessage("W piątek bal", "2026-10-07T10:00:00Z");
+    const messageId = await addMessage("W piątek bal", "2026-10-07T10:00:00Z");
     const model: ExtractionModel = {
       name: "model-z-konfiguracji",
       async extract() {
@@ -280,11 +280,12 @@ describe("runGroupExtraction", () => {
       },
     };
     await runGroupExtraction(deps(model), groupId);
-    const { rows } = await db.client.query("select kind, group_id, model, request, response, error, usage, duration_ms from llm_calls");
+    const { rows } = await db.client.query("select kind, group_id, model, request, response, error, usage, duration_ms, message_ids from llm_calls");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       kind: "extraction",
       group_id: groupId,
+      message_ids: [messageId],
       model: "model-z-konfiguracji",
       response: { operations: [] },
       error: null,

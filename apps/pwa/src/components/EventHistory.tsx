@@ -11,6 +11,7 @@ import {
   type MessageDocument,
 } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
+import { MessageText } from "./MessageText";
 import { LoadError, Loading } from "./ui";
 
 type Entry = { at: string; message: ContextMessage } | { at: string; change: EventChange };
@@ -72,7 +73,7 @@ function MessageEntry({ message, documents, today }: { message: ContextMessage; 
         <When at={message.sent_at} today={today} />
       </div>
       {(message.text || documents.length === 0) && (
-        <p className="whitespace-pre-wrap">{message.text || (message.has_attachment ? "📎 załącznik" : "")}</p>
+        <MessageText text={message.text || (message.has_attachment ? "📎 załącznik" : "")} />
       )}
       {documents.map((d) => (
         <DocumentView key={d.id} document={d} />

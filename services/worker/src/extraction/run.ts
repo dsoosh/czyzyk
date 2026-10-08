@@ -47,6 +47,7 @@ async function triageSaysSkip(deps: ExtractionDeps, batch: ExtractionBatch, grou
     logLlmCall(deps.db, deps.logger, {
       kind: "triage",
       groupId,
+      messageIds: batch.newMessages.map((m) => m.id),
       model: deps.triage?.name ?? null,
       request: { system: prompt.system, user: prompt.user },
       ...entry,
@@ -107,6 +108,7 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
         logLlmCall(deps.db, deps.logger, {
           kind: "extraction",
           groupId,
+          messageIds: prompt.newMessageIds,
           model: deps.model.name ?? null,
           request,
           ...entry,

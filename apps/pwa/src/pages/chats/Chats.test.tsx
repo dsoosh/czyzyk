@@ -82,6 +82,60 @@ describe("Czaty", () => {
     expect(await screen.findByText("<b>zebranie</b>")).toBeInTheDocument();
   });
 
+  it("linki w treści są klikalne, z krótką nazwą i pełnym adresem w podpowiedzi", async () => {
+    const text = "Film: https://m.youtube.com/watch?v=abc. Zapisy: https://forms.gle/xyz";
+    renderAt("/czaty/g2", { tables: { wa_groups: groups, messages: [{ ...messages.find((m) => m.id === "r1")!, text }] } });
+    const youtube = await screen.findByRole("link", { name: "🔗 YouTube" });
+    expect(youtube).toHaveAttribute("href", "https://m.youtube.com/watch?v=abc");
+    expect(youtube).toHaveAttribute("title", "https://m.youtube.com/watch?v=abc");
+    expect(youtube).toHaveAttribute("rel", "noopener noreferrer nofollow");
+    expect(screen.getByRole("link", { name: "🔗 Formularz Google" })).toHaveAttribute("href", "https://forms.gle/xyz");
+  });
+
+  it("po kliknięciu wiadomości: werdykt, sprawy z niej i (dla admina) wywołania modelu", async () => {
+    const tables = {
+      wa_groups: groups,
+      messages: [
+        { ...messages.find((m) => m.id === "r1")!, processed_at: "2026-10-07T18:01:00.000Z" },
+        { ...messages.find((m) => m.id === "r2")!, processed_at: "2026-10-07T17:56:00.000Z" },
+      ],
+      events: [{ id: "e1", title: "Zebranie", status: "active", source_message_ids: ["r1"] }],
+      payments: [{ id: "p1", description: "Składka", status: "needs_review", source_message_ids: ["r1"] }],
+      item_changes: [{ item_type: "event", item_id: "e1", op: "create", source_message_ids: ["r1"], created_at: "2026-10-07T18:01:00.000Z" }],
+      llm_calls: [
+        { id: "c1", kind: "triage", response: { relevant: true }, error: null, created_at: "2026-10-07T18:00:30.000Z", message_ids: ["r1"] },
+        { id: "c2", kind: "extraction", response: { operations: [{}, {}] }, error: null, created_at: "2026-10-07T18:01:00.000Z", message_ids: ["r1"] },
+      ],
+    };
+    renderAt("/czaty/g2", { admin: true, tables });
+    await userEvent.click(await screen.findByText("Zebranie w czwartek"));
+    const details = await screen.findByLabelText("Szczegóły wiadomości");
+    expect(details).toHaveTextContent("Analiza: Przeanalizowana");
+    expect(await within(details).findByRole("link", { name: "Wydarzenie: Zebranie" })).toHaveAttribute("href", "/kalendarz/wydarzenie/e1");
+    expect(within(details).getByText(/utworzone/)).toBeInTheDocument();
+    expect(within(details).getByRole("link", { name: "Płatność: Składka" })).toHaveAttribute("href", "/zrodlo/payment/p1");
+    expect(within(details).getByRole("link", { name: "Wstępna ocena: do analizy" })).toHaveAttribute("href", "/admin/llm?wywolanie=c1");
+    expect(within(details).getByRole("link", { name: "Analiza: 2 operacje" })).toBeInTheDocument();
+
+    // A skipped chatter message: its verdict, no items.
+    await userEvent.click(screen.getByText("Dziękuję!"));
+    expect(await screen.findByText("Pominięta – sama pogawędka (reguły)")).toBeInTheDocument();
+  });
+
+  it("członek rodziny widzi werdykt i sprawy, bez wywołań modelu", async () => {
+    renderAt("/czaty/g2", {
+      tables: {
+        wa_groups: groups,
+        messages: [{ ...messages.find((m) => m.id === "r1")!, processed_at: null }],
+        llm_calls: [{ id: "c1", kind: "triage", response: { relevant: true }, error: null, created_at: "2026-10-07T18:00:30.000Z", message_ids: ["r1"] }],
+      },
+    });
+    await userEvent.click(await screen.findByText("Zebranie w czwartek"));
+    const details = await screen.findByLabelText("Szczegóły wiadomości");
+    expect(details).toHaveTextContent("Czeka na analizę");
+    expect(within(details).queryByRole("link", { name: /Wstępna ocena/ })).not.toBeInTheDocument();
+  });
+
   it("admin wysyła wiadomość do ponownej analizy; zwykły członek rodziny nie widzi przycisku", async () => {
     const { rpc } = renderAt("/czaty/g2", { admin: true, tables: { wa_groups: groups, messages }, rpc: { admin_reprocess_message: () => null } });
     const message = (await screen.findByText("Zebranie w czwartek")).closest("li")!;

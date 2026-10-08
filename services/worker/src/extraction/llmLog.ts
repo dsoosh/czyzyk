@@ -7,6 +7,8 @@ const LLM_LOG_RETENTION_DAYS = 14;
 export interface LlmCallEntry {
   kind: "extraction" | "document" | "triage";
   groupId: string;
+  /** Messages the call was about (the new messages of a batch, the message of a document). */
+  messageIds?: string[];
   model: string | null;
   /** What went to the model; images are listed by label, never stored again here. */
   request: { system: string; user: string; images?: string[] };
@@ -23,9 +25,19 @@ export interface LlmCallEntry {
 export async function logLlmCall(db: Pick<pg.Pool, "query">, logger: Logger, entry: LlmCallEntry): Promise<void> {
   try {
     await db.query(
-      `insert into public.llm_calls (kind, group_id, model, request, response, error, usage, duration_ms)
-       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [entry.kind, entry.groupId, entry.model, entry.request, entry.response ?? null, entry.error ?? null, entry.usage ?? null, entry.durationMs],
+      `insert into public.llm_calls (kind, group_id, model, request, response, error, usage, duration_ms, message_ids)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::uuid[])`,
+      [
+        entry.kind,
+        entry.groupId,
+        entry.model,
+        entry.request,
+        entry.response ?? null,
+        entry.error ?? null,
+        entry.usage ?? null,
+        entry.durationMs,
+        entry.messageIds ?? [],
+      ],
     );
     await db.query("delete from public.llm_calls where created_at < now() - make_interval(days => $1)", [LLM_LOG_RETENTION_DAYS]);
   } catch (error) {
