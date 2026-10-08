@@ -60,6 +60,7 @@ export function TodayPage() {
   const [today, setToday] = useState(() => warsawDay(new Date()));
   const { data, error, loading, reload } = useLoader(() => fetchToday(client, today), [client, today]);
   const mark = useMarkDone("bring_item", reload);
+  const pay = useMarkDone("payment", reload);
   const [applied, setApplied] = useState<string | null>(null);
 
   // Returning to the app (e.g. after midnight) recomputes "today" and refreshes the data.
@@ -95,9 +96,9 @@ export function TodayPage() {
         </p>
       )}
 
-      {mark.error && (
+      {(mark.error ?? pay.error) && (
         <p role="alert" className="text-red-700">
-          {mark.error}
+          {mark.error ?? pay.error}
         </p>
       )}
 
@@ -138,6 +139,13 @@ export function TodayPage() {
             return (
               <Row key={p.id}>
                 <div className="flex items-center gap-3">
+                  {/* Paid: the payment leaves "Dziś" and moves to Listy → Płatności → Zapłacone. */}
+                  <DoneToggle
+                    checked={false}
+                    label={`${p.description}: zapłacone`}
+                    disabled={pay.pending === p.id}
+                    onToggle={() => void pay.toggle(p.id, true)}
+                  />
                   <div className="flex flex-1 flex-col gap-1">
                     <span className="font-semibold">{p.description}</span>
                     <Meta>

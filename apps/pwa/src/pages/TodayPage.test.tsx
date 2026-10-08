@@ -116,6 +116,14 @@ describe("Dziś i jutro", () => {
     expect(within(payments).getByText("całe przedszkole")).toBeInTheDocument();
   });
 
+  it("płatność oznaczona jako zapłacona znika z „Dziś”", async () => {
+    const { rpc } = renderAt("/", { tables: { wa_groups: f.groups, payments: [f.payment()] } });
+    const box = await screen.findByRole("checkbox", { name: "teatrzyk: zapłacone" });
+    await act(async () => fireEvent.click(box));
+    expect(rpc).toHaveBeenCalledWith("mark_paid", { p_id: "p1", p_done: true });
+    expect(await within(section("Płatności")).findByText("Brak płatności z bliskim terminem")).toBeInTheDocument();
+  });
+
   it("po powrocie do aplikacji po północy przelicza „dziś” i „jutro”", async () => {
     const { from } = renderAt("/", {
       tables: { wa_groups: f.groups, bring_items: [f.bring(), f.bring({ id: "b2", description: "kalosze", due_date: "2026-10-10" })] },
