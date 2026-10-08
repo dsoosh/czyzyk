@@ -25,8 +25,9 @@ interface DayEntries {
 }
 
 /**
- * Entries by day (school-calendar). A span of several days is listed once, under its first
- * day in range ("first"), or marks every day it covers ("each", the month view).
+ * Entries by day (school-calendar). In the list ("first") a span of several days gets its own
+ * section keyed "shown|to|from": the day it is listed under (its first day in range), then its
+ * real days; one-day entries are keyed "day|day|day". In the month view ("each") a span marks every day it covers, keyed by the day.
  */
 function byDay(data: CalendarData, from: string, to: string, mode: "first" | "each"): Map<string, DayEntries> {
   const map = new Map<string, DayEntries>();
@@ -38,19 +39,26 @@ function byDay(data: CalendarData, from: string, to: string, mode: "first" | "ea
     const first = s.from > from ? s.from : from;
     const last = s.to < to ? s.to : to;
     if (first > last) return [];
-    return mode === "first" ? [first] : daysBetween(first, last);
+    return mode === "first" ? [`${first}|${s.to}|${s.from}`] : daysBetween(first, last);
   };
   for (const s of eventSpans(data.events)) for (const day of days(s)) entry(day).events.push(s);
   for (const s of closureSpans(data.closures)) for (const day of days(s)) entry(day).closures.push(s);
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
-function DayItems({ entries, groups }: { entries: DayEntries; groups: Map<string, string> }) {
+/** "Środa 23.12" or, for several days, "Środa 23.12 – Czwartek 31.12". */
+function sectionTitle(key: string): string {
+  const [, last, first] = key.split("|") as [string, string, string];
+  return first === last ? longDayLabel(first) : `${longDayLabel(first)} – ${longDayLabel(last)}`;
+}
+
+/** `ranges`: show each entry's date range (not needed under a heading that already has it). */
+function DayItems({ entries, groups, ranges = true }: { entries: DayEntries; groups: Map<string, string>; ranges?: boolean }) {
   return (
     <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-sm">
       {entries.closures.map((s) => {
         const c = s.item;
-        const range = rangeLabel(s);
+        const range = ranges ? rangeLabel(s) : null;
         return (
           <li key={c.id} className="flex flex-col gap-1 bg-amber-50 p-4">
             <span className="font-medium text-amber-900">Przedszkole nieczynne{c.reason ? ` – ${c.reason}` : ""}</span>
@@ -64,7 +72,7 @@ function DayItems({ entries, groups }: { entries: DayEntries; groups: Map<string
       })}
       {entries.events.map((s) => {
         const e = s.item;
-        const range = rangeLabel(s);
+        const range = ranges ? rangeLabel(s) : null;
         return (
           <li key={eventKey(e)} className="flex flex-col gap-1 p-4">
             <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-medium hover:underline">
@@ -72,7 +80,7 @@ function DayItems({ entries, groups }: { entries: DayEntries; groups: Map<string
             </Link>
             <Meta>
               {range && <span>{range}</span>}
-              {e.all_day ? !range && <span>cały dzień</span> : <span>{warsawTime(e.starts_at)}</span>}
+              {e.all_day ? s.from === s.to && <span>cały dzień</span> : <span>{warsawTime(e.starts_at)}</span>}
               {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
               {e.location && <span>{e.location}</span>}
               <span>{groupLabel(groups, e.group_id)}</span>
@@ -100,15 +108,19 @@ function ListView({ today }: { today: string }) {
         Pokaż wcześniejsze
       </button>
       {days.size === 0 && <p className="rounded-2xl bg-white p-4 text-slate-500 shadow-sm">Brak zaplanowanych wydarzeń</p>}
-      {[...days].map(([day, entries]) => (
-        <section key={day} aria-label={longDayLabel(day)} className="space-y-2">
-          <h2 className={`font-display text-2xl font-bold ${day === today ? "text-brand-700" : "text-ink"}`}>
-            {longDayLabel(day)}
-            {day === today && " · dziś"}
-          </h2>
-          <DayItems entries={entries} groups={data.groups} />
-        </section>
-      ))}
+      {[...days].map(([key, entries]) => {
+        const [, last, first] = key.split("|") as [string, string, string];
+        const now = first <= today && today <= last;
+        return (
+          <section key={key} aria-label={sectionTitle(key)} className="space-y-2">
+            <h2 className={`font-display text-2xl font-bold ${now ? "text-brand-700" : "text-ink"}`}>
+              {sectionTitle(key)}
+              {now && (first === last ? " · dziś" : " · trwa")}
+            </h2>
+            <DayItems entries={entries} groups={data.groups} ranges={false} />
+          </section>
+        );
+      })}
     </div>
   );
 }

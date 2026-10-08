@@ -8,7 +8,7 @@ Zmiana na prośbę użytkownika. **Gotowe, gdy:** wpis kilkudniowy pojawia się 
 
 ## What Changes
 
-- Kalendarz (PWA), lista: dzień wolny od–do i wydarzenie trwające kilka dni są pokazane raz, pod pierwszym dniem (albo pod pierwszym dniem widocznego zakresu, jeśli zaczęły się wcześniej), z zakresem dat, np. „pn 12.10 – śr 14.10”.
+- Kalendarz (PWA), lista: dzień wolny od–do i wydarzenie trwające kilka dni są pokazane raz, we własnej sekcji z zakresem dat w nagłówku, np. „Środa 23.12 – Czwartek 31.12”. Sekcja stoi w miejscu pierwszego dnia (albo pierwszego dnia widocznego zakresu, jeśli wpis zaczął się wcześniej). Trwający wpis ma dopisek „trwa”.
 - Widok miesiąca oznacza każdy dzień wpisu kilkudniowego. Po wybraniu dnia wpis jest pokazany z zakresem dat.
 - Kalendarz scala osobne wpisy tej samej grupy w jeden, gdy dotyczą kolejnych dni (dopuszczalna przerwa na weekend):
   - dni wolne z tym samym powodem;
