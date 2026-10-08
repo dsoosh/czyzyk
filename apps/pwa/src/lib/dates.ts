@@ -15,7 +15,7 @@ const partsFmt = new Intl.DateTimeFormat("en-US", {
   second: "2-digit",
 });
 
-const WEEKDAYS_SHORT = ["nd", "pn", "wt", "śr", "czw", "pt", "sob"];
+export const WEEKDAYS_SHORT = ["nd", "pn", "wt", "śr", "czw", "pt", "sob"];
 const WEEKDAYS_LONG = ["Niedziela", "Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota"];
 export const MONTHS = [
   "styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec",
