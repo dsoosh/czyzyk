@@ -284,7 +284,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     [all.map((m) => m.id)],
   );
   const { rows: images } = await db.query<{ message_id: string; file_name: string; data: string }>(
-    `select a.message_id, a.file_name, encode(f.bytes, 'base64') as data
+    `select a.message_id, a.file_name, translate(encode(f.bytes, 'base64'), chr(10), '') as data
        from public.attachments a join public.attachment_files f on f.attachment_id = a.id
       where a.message_id = any($1::uuid[]) and a.doc_status = 'ready'
       order by a.created_at, a.id
