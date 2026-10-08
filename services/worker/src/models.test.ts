@@ -62,8 +62,11 @@ describe("modele OpenAI", () => {
   });
 
   it("triaż i kontrola zdjęcia", async () => {
-    const triage = clientAnswering(toolAnswer("ocen_wiadomosci", { relevant: false }));
-    expect(await new OpenAiTriageModel(triage.client, "o").triage({ system: "s", user: "u" })).toMatchObject({ relevant: false });
+    const triage = clientAnswering(toolAnswer("ocen_wiadomosci", { relevant: false, rationale: " Same podziękowania. " }));
+    expect(await new OpenAiTriageModel(triage.client, "o").triage({ system: "s", user: "u" })).toMatchObject({
+      relevant: false,
+      rationale: "Same podziękowania.",
+    });
     const docs = clientAnswering(toolAnswer("ocen_dokument", { contains_people: true, description: "Plakat." }));
     expect(await new OpenAiDocumentChecker(docs.client, "o").check("AAAA")).toEqual({ containsPeople: true, description: "Plakat." });
     expect(JSON.stringify(docs.requests[0])).toContain("data:image/jpeg;base64,AAAA");

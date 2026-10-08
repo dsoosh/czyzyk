@@ -643,7 +643,7 @@ describe("triaż wiadomości", () => {
     async triage() {
       this.calls++;
       if (relevant instanceof Error) throw relevant;
-      return { relevant, usage: { input_tokens: 300, output_tokens: 10 } };
+      return { relevant, rationale: relevant ? "Termin wycieczki." : "Same podziękowania.", usage: { input_tokens: 300, output_tokens: 10 } };
     },
   });
 
@@ -674,7 +674,7 @@ describe("triaż wiadomości", () => {
     await runGroupExtraction(deps(model), groupId);
     expect((await db.client.query("select triage from messages")).rows).toEqual([{ triage: null }]);
     const { rows } = await db.client.query("select kind, model, response, usage from llm_calls where kind = 'triage'");
-    expect(rows).toEqual([{ kind: "triage", model: "tani-model", response: { relevant: false }, usage: { input_tokens: 300, output_tokens: 10 } }]);
+    expect(rows).toEqual([{ kind: "triage", model: "tani-model", response: { relevant: false, rationale: "Same podziękowania." }, usage: { input_tokens: 300, output_tokens: 10 } }]);
   });
 
   it("zdjęcie dokumentu zawsze idzie do pełnej analizy, bez triażu", async () => {

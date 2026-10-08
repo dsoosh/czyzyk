@@ -13,7 +13,7 @@ interface LlmCall {
   group_id: string | null;
   model: string | null;
   request: { system?: string; user?: string; images?: string[] };
-  response: { operations?: unknown[]; containsPeople?: boolean; relevant?: boolean } | null;
+  response: { operations?: unknown[]; containsPeople?: boolean; relevant?: boolean; rationale?: string | null } | null;
   error: string | null;
   usage: { input_tokens?: number; output_tokens?: number } | null;
   duration_ms: number | null;
@@ -75,6 +75,7 @@ export function LlmCallsPage() {
                     <span className="rounded-full bg-sand px-2 py-0.5 text-xs font-semibold text-ink">{resultLabel(c)}</span>
                   )}
                   <span className="text-xs text-slate-500">{usageLabel(c)}</span>
+                  {c.kind === "triage" && c.response?.rationale && <span className="w-full text-xs text-slate-600">{c.response.rationale}</span>}
                 </summary>
                 <div className="mt-3 space-y-3 text-sm">
                   {c.model && <p className="text-xs text-slate-500">Model: {c.model}</p>}

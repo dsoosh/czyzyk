@@ -10,7 +10,7 @@ const calls = [
     group_id: "g1",
     model: "tani",
     request: { system: "Wstępnie oceniasz", user: "Dziękuję!" },
-    response: { relevant: false },
+    response: { relevant: false, rationale: "Same podziękowania." },
     error: null,
     usage: { input_tokens: 300, output_tokens: 20 },
     duration_ms: 500,
@@ -61,6 +61,7 @@ describe("Admin → LLM", () => {
     expect(listed).toHaveLength(4);
     expect(within(listed[0]!).getByText("wstępna ocena")).toBeInTheDocument();
     expect(within(listed[0]!).getByText("pominięte")).toBeInTheDocument();
+    expect(within(listed[0]!).getByText("Same podziękowania.")).toBeInTheDocument();
     const all = listed.slice(1);
     expect(within(all[0]!).getByText("kontrola zdjęcia")).toBeInTheDocument();
     expect(within(all[0]!).getByText("widać ludzi – obraz usunięty")).toBeInTheDocument();

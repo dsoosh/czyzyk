@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BatchMessage, ExtractionBatch } from "./batch.js";
-import { buildTriagePrompt, isChatter, onlyChatter } from "./triage.js";
+import { buildTriagePrompt, isChatter, onlyChatter, parseVerdict } from "./triage.js";
 
 const msg = (text: string, extra: Partial<BatchMessage> = {}): BatchMessage => ({
   id: "m",
@@ -41,6 +41,16 @@ describe("isChatter", () => {
   it("paczka jest pomijana tylko, gdy wszystkie wiadomości są pogawędką", () => {
     expect(onlyChatter({ newMessages: [msg("Dzięki"), msg("👍")], contactRoles: roles })).toBe(true);
     expect(onlyChatter({ newMessages: [msg("Dzięki"), msg("Jutro bal")], contactRoles: roles })).toBe(false);
+  });
+});
+
+describe("parseVerdict", () => {
+  it("ocena z uzasadnieniem; brak uzasadnienia nie unieważnia oceny", () => {
+    expect(parseVerdict({ relevant: true, rationale: "Nowy termin zebrania." })).toEqual({ relevant: true, rationale: "Nowy termin zebrania." });
+    expect(parseVerdict({ relevant: false })).toEqual({ relevant: false, rationale: null });
+    expect(parseVerdict({ relevant: false, rationale: 5 })).toEqual({ relevant: false, rationale: null });
+    expect(parseVerdict({ relevant: true, rationale: "x".repeat(400) }).rationale).toHaveLength(300);
+    expect(() => parseVerdict({ rationale: "?" })).toThrow();
   });
 });
 
