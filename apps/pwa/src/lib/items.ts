@@ -2,6 +2,7 @@ import type { ActionSuggestion } from "@czyzyk/shared/extraction";
 import { fetchChildren, type Child } from "./children";
 import { addDays, startOfWarsawDay } from "./dates";
 import { withOccurrences } from "./recurrence";
+import { lastDay } from "./spans";
 import type { Db } from "./supabase";
 
 export type ItemKind = "event" | "bring_item" | "payment" | "action_required" | "closure" | "fact";
@@ -189,6 +190,9 @@ export interface CalendarData {
 }
 
 /** Active events and closures between two days (inclusive). */
+/** How far back the calendar looks for an event of several days that is still on. */
+const MAX_SPAN_DAYS = 31;
+
 export async function fetchCalendar(db: Db, fromDay: string, toDay: string): Promise<CalendarData> {
   const [oneOff, recurring, closures, groups] = await Promise.all([
     run<EventItem[]>(
@@ -197,7 +201,8 @@ export async function fetchCalendar(db: Db, fromDay: string, toDay: string): Pro
         .select(EVENT_COLUMNS)
         .eq("status", "active")
         .is("repeat_weekdays", null)
-        .gte("starts_at", startOfWarsawDay(fromDay).toISOString())
+        // Also events of several days that started earlier and are still on (school-calendar).
+        .gte("starts_at", startOfWarsawDay(addDays(fromDay, -MAX_SPAN_DAYS)).toISOString())
         .lt("starts_at", startOfWarsawDay(addDays(toDay, 1)).toISOString())
         .order("starts_at")
         .limit(500),
@@ -214,7 +219,8 @@ export async function fetchCalendar(db: Db, fromDay: string, toDay: string): Pro
     ),
     fetchGroupNames(db),
   ]);
-  return { events: withOccurrences(oneOff, recurring, closures, fromDay, toDay), closures, groups };
+  const current = oneOff.filter((e) => lastDay(e) >= fromDay);
+  return { events: withOccurrences(current, recurring, closures, fromDay, toDay), closures, groups };
 }
 
 /** Active recurring events that start by `toDay` (lib/recurrence expands and trims them). */

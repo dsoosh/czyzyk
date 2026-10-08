@@ -15,55 +15,72 @@ import {
 import { fetchCalendar, groupLabel, type CalendarData, type Closure, type EventItem } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
 import { eventKey, repeatLabel } from "../lib/recurrence";
+import { closureSpans, eventSpans, rangeLabel, type Span } from "../lib/spans";
 
 type View = "list" | "month";
 
 interface DayEntries {
-  events: EventItem[];
-  closures: Closure[];
+  events: Span<EventItem>[];
+  closures: Span<Closure>[];
 }
 
-function byDay(data: CalendarData, from: string, to: string): Map<string, DayEntries> {
+/**
+ * Entries by day (school-calendar). A span of several days is listed once, under its first
+ * day in range ("first"), or marks every day it covers ("each", the month view).
+ */
+function byDay(data: CalendarData, from: string, to: string, mode: "first" | "each"): Map<string, DayEntries> {
   const map = new Map<string, DayEntries>();
   const entry = (day: string) => {
     if (!map.has(day)) map.set(day, { events: [], closures: [] });
     return map.get(day)!;
   };
-  for (const e of data.events) entry(warsawDay(e.starts_at)).events.push(e);
-  for (const c of data.closures) {
-    for (const day of daysBetween(c.date_from > from ? c.date_from : from, c.date_to < to ? c.date_to : to)) {
-      entry(day).closures.push(c);
-    }
-  }
+  const days = (s: Span<unknown>) => {
+    const first = s.from > from ? s.from : from;
+    const last = s.to < to ? s.to : to;
+    if (first > last) return [];
+    return mode === "first" ? [first] : daysBetween(first, last);
+  };
+  for (const s of eventSpans(data.events)) for (const day of days(s)) entry(day).events.push(s);
+  for (const s of closureSpans(data.closures)) for (const day of days(s)) entry(day).closures.push(s);
   return new Map([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
 }
 
 function DayItems({ entries, groups }: { entries: DayEntries; groups: Map<string, string> }) {
   return (
     <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-sm">
-      {entries.closures.map((c) => (
-        <li key={c.id} className="flex flex-col gap-1 bg-amber-50 p-4">
-          <span className="font-medium text-amber-900">Przedszkole nieczynne{c.reason ? ` – ${c.reason}` : ""}</span>
-          <Meta>
-            <span>{groupLabel(groups, c.group_id)}</span>
-            <SourceLink kind="closure" id={c.id} />
-          </Meta>
-        </li>
-      ))}
-      {entries.events.map((e) => (
-        <li key={eventKey(e)} className="flex flex-col gap-1 p-4">
-          <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-medium hover:underline">
-            {e.title}
-          </Link>
-          <Meta>
-            <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
-            {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
-            {e.location && <span>{e.location}</span>}
-            <span>{groupLabel(groups, e.group_id)}</span>
-            <SourceLink kind="event" id={e.id} />
-          </Meta>
-        </li>
-      ))}
+      {entries.closures.map((s) => {
+        const c = s.item;
+        const range = rangeLabel(s);
+        return (
+          <li key={c.id} className="flex flex-col gap-1 bg-amber-50 p-4">
+            <span className="font-medium text-amber-900">Przedszkole nieczynne{c.reason ? ` – ${c.reason}` : ""}</span>
+            <Meta>
+              {range && <span>{range}</span>}
+              <span>{groupLabel(groups, c.group_id)}</span>
+              <SourceLink kind="closure" id={c.id} />
+            </Meta>
+          </li>
+        );
+      })}
+      {entries.events.map((s) => {
+        const e = s.item;
+        const range = rangeLabel(s);
+        return (
+          <li key={eventKey(e)} className="flex flex-col gap-1 p-4">
+            <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-medium hover:underline">
+              {e.title}
+            </Link>
+            <Meta>
+              {range && <span>{range}</span>}
+              {e.all_day ? !range && <span>cały dzień</span> : <span>{warsawTime(e.starts_at)}</span>}
+              {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
+              {e.location && <span>{e.location}</span>}
+              <span>{groupLabel(groups, e.group_id)}</span>
+              <SourceLink kind="event" id={e.id} />
+            </Meta>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -75,7 +92,7 @@ function ListView({ today }: { today: string }) {
   const { data, error, loading, reload } = useLoader(() => fetchCalendar(client, from, to), [client, from, to]);
   if (error) return <LoadError message={error} onRetry={reload} />;
   if (!data) return loading ? <Loading /> : null;
-  const days = byDay(data, from, to);
+  const days = byDay(data, from, to, "first");
 
   return (
     <div className="space-y-4">
@@ -111,7 +128,7 @@ function MonthView({ today }: { today: string }) {
   const from = `${month}-01`;
   const to = addDays(addMonths(month, 1) + "-01", -1);
   const { data, error, loading, reload } = useLoader(() => fetchCalendar(client, from, to), [client, from, to]);
-  const days = data ? byDay(data, from, to) : new Map<string, DayEntries>();
+  const days = data ? byDay(data, from, to, "each") : new Map<string, DayEntries>();
 
   return (
     <div className="space-y-4">

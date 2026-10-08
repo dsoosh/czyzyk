@@ -35,6 +35,45 @@ describe("Kalendarz – lista", () => {
   });
 });
 
+describe("Kalendarz – wpisy kilkudniowe", () => {
+  const spanTables = {
+    ...tables,
+    events: [
+      f.event({ id: "w", title: "Wycieczka", starts_at: "2026-10-04T22:00:00.000Z", ends_at: "2026-10-07T22:00:00.000Z" }),
+      f.event({ id: "z1", title: "Zielona szkoła – dzień 1", starts_at: "2026-10-19T22:00:00.000Z" }),
+      f.event({ id: "z2", title: "Zielona szkoła – dzień 2", starts_at: "2026-10-20T22:00:00.000Z" }),
+    ],
+    closures: [
+      f.closure({ id: "c1", date_from: "2026-10-26", date_to: "2026-10-28", reason: "przerwa jesienna" }),
+      f.closure({ id: "c2", date_from: "2026-10-29", date_to: "2026-10-30", reason: "przerwa jesienna" }),
+    ],
+  };
+
+  it("lista pokazuje wpis kilkudniowy raz, z zakresem dat", async () => {
+    renderAt("/kalendarz", { tables: spanTables });
+    const today = await screen.findByRole("region", { name: "Środa 7.10" });
+    expect(within(today).getByText("Wycieczka")).toBeInTheDocument();
+    expect(within(today).getByText("pn 5.10 – czw 8.10")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Czwartek 8.10" })).not.toBeInTheDocument();
+
+    expect(screen.getAllByText("Zielona szkoła – dzień 1")).toHaveLength(1);
+    expect(screen.queryByText("Zielona szkoła – dzień 2")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Wtorek 20.10" })).toHaveTextContent("wt 20.10 – śr 21.10");
+
+    expect(screen.getAllByText("Przedszkole nieczynne – przerwa jesienna")).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "Poniedziałek 26.10" })).toHaveTextContent("pn 26.10 – pt 30.10");
+  });
+
+  it("widok miesiąca oznacza każdy dzień wpisu", async () => {
+    renderAt("/kalendarz?miesiac=2026-10", { tables: spanTables });
+    expect(await screen.findByRole("button", { name: /^Czwartek 8\.10, 1 wpisy/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Poniedziałek 5\.10, 1 wpisy/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Środa 21\.10, 1 wpisy/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Czwartek 29\.10, 1 wpisy/ }));
+    expect(within(screen.getByRole("region", { name: "Wybrany dzień Czwartek 29.10" })).getByText("pn 26.10 – pt 30.10")).toBeInTheDocument();
+  });
+});
+
 describe("Kalendarz – miesiąc", () => {
   it("pokazuje elementy wybranego dnia i przełącza miesiące", async () => {
     renderAt("/kalendarz", { tables });
