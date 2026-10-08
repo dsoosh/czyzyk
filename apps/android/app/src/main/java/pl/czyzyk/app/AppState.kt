@@ -71,6 +71,11 @@ class AppState(private val prefs: SharedPreferences) {
             else putLong(KEY_UPDATE_CODE, v.versionCode).putString(KEY_UPDATE_NAME, v.versionName).putString(KEY_UPDATE_SHA, v.sha256)
         }.apply()
 
+    /** The foreground service that keeps the notification reader alive (notification-capture); on by default. */
+    var readerServiceEnabled: Boolean
+        get() = prefs.getBoolean(KEY_READER_SERVICE, true)
+        set(v) = prefs.edit().putBoolean(KEY_READER_SERVICE, v).apply()
+
     /** The user turned on screening of WhatsApp photos from tracked groups (document-import). */
     var photosEnabled: Boolean
         get() = prefs.getBoolean(KEY_PHOTOS, false)
@@ -132,6 +137,7 @@ class AppState(private val prefs: SharedPreferences) {
         private const val KEY_UPDATE_NAME = "update_ready_name"
         private const val KEY_UPDATE_SHA = "update_ready_sha256"
         private const val KEY_LISTENER_CONNECTED = "listener_connected_at"
+        private const val KEY_READER_SERVICE = "reader_service_enabled"
         private const val KEY_LISTENER_DISCONNECTED = "listener_disconnected_at"
 
         @Volatile private var instance: AppState? = null

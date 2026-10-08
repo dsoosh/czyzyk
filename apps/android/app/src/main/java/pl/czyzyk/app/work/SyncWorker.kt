@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import pl.czyzyk.app.capture.ListenerWatchdog
+import pl.czyzyk.app.capture.ReaderService
 import pl.czyzyk.app.net.SendResult
 import pl.czyzyk.app.net.UnauthorizedException
 
@@ -13,6 +14,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         // The periodic sync also checks that Android still delivers notifications to the reader.
         ListenerWatchdog.ensureBound(applicationContext)
+        ReaderService.start(applicationContext)
         val store = Deps.store(applicationContext)
         val pairing = store.pairing ?: return Result.success()
         val state = Deps.state(applicationContext)
