@@ -50,6 +50,14 @@ class PhotoLogTest {
     }
 
     @Test
+    fun ownPhotoRemembersItsGroup() {
+        val log = PhotoLog(context, "own.db")
+        assertTrue(log.enqueueDocument("u1", "plakat.jpg", Screening.IMAGE, "Bal", "/files/p.jpg", now, groupName = "Motylki"))
+        assertEquals("Motylki", log.pendingDocuments().single().groupName)
+        log.close()
+    }
+
+    @Test
     fun previewsWaitAndMatchedMessagesAreRemembered() {
         val log = PhotoLog(context, "previews.db")
         assertTrue(log.addNote(PhotoNote("k1", now, "k1", "Motylki")))

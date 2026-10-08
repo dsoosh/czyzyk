@@ -244,6 +244,29 @@ describe("POST /ingest/document", () => {
     ).toBe(200);
   });
 
+  it("własne zdjęcie bez wiadomości: serwer tworzy jedną wiadomość w wybranej śledzonej grupie", async () => {
+    await app().inject({ method: "POST", url: "/ingest/notification", headers: auth(), payload: message() });
+    const { rows: g } = await db.client.query("select wa_name from wa_groups where tracked limit 1");
+    const key = randomUUID();
+    const own = (file: string, extra: Record<string, unknown> = {}) =>
+      doc(key, { group_name: `\u2068${g[0].wa_name}\u2069`, shared_at: "2026-10-08T09:15:00+02:00", file_name: file, ...extra });
+    expect((await app().inject({ method: "POST", url: "/ingest/document", headers: auth(), payload: own("plakat.jpg") })).statusCode).toBe(201);
+    // A second photo of the same share joins the same message.
+    const second = own("plakat-2.jpg", { image: Buffer.from([0xff, 0xd8, 0xff, 0xe1, 9]).toString("base64") });
+    expect((await app().inject({ method: "POST", url: "/ingest/document", headers: auth(), payload: second })).statusCode).toBe(201);
+    const { rows } = await db.client.query(
+      `select m.author, m.source, m.text, m.has_attachment, m.sent_at, m.processed_at is null as pending, count(a.id)::int as docs
+         from messages m join attachments a on a.message_id = m.id group by m.id`,
+    );
+    expect(rows).toEqual([
+      { author: "Zdjęcie z telefonu", source: "manual", text: "", has_attachment: true, sent_at: new Date("2026-10-08T07:15:00Z"), pending: true, docs: 2 },
+    ]);
+
+    await db.client.query("insert into wa_groups (wa_name) values ('Nieśledzona')");
+    const untracked = doc(randomUUID(), { group_name: "Nieśledzona" });
+    expect((await app().inject({ method: "POST", url: "/ingest/document", headers: auth(), payload: untracked })).statusCode).toBe(422);
+  });
+
   it("sam tekst z telefonu jest od razu gotowy, bez obrazu", async () => {
     const key = await photoMessage();
     const res = await app().inject({

@@ -125,13 +125,21 @@ class PhotoWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         private const val PREVIEW_WAIT_MILLIS = 60 * 1000L
 
         /** Queues a screened photo for upload; a withheld one only counts. */
-        fun keep(context: Context, log: PhotoLog, screened: ScreenedPhoto, idempotencyKey: String, fileName: String, fileId: String) {
+        fun keep(
+            context: Context,
+            log: PhotoLog,
+            screened: ScreenedPhoto,
+            idempotencyKey: String,
+            fileName: String,
+            fileId: String,
+            groupName: String? = null,
+        ) {
             if (screened.screening == Screening.WITHHELD) {
                 Deps.state(context).incrementPhotosWithheld()
                 return
             }
             val path = screened.jpeg?.let { bytes -> File(documentsDir(context), "$fileId.jpg").apply { writeBytes(bytes) }.absolutePath }
-            log.enqueueDocument(idempotencyKey, fileName, screened.screening, screened.text, path)
+            log.enqueueDocument(idempotencyKey, fileName, screened.screening, screened.text, path, groupName = groupName)
         }
 
         fun canReadImages(context: Context): Boolean = ContextCompat.checkSelfPermission(context, imagePermission()) == PackageManager.PERMISSION_GRANTED
