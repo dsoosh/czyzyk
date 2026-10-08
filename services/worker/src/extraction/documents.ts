@@ -116,8 +116,8 @@ export async function checkPendingDocuments(
   groupId: string,
   logger: Logger,
 ): Promise<number> {
-  const { rows } = await db.query<{ id: string; data: string | null }>(
-    `select a.id, translate(encode(f.bytes, 'base64'), chr(10), '') as data
+  const { rows } = await db.query<{ id: string; message_id: string; data: string | null }>(
+    `select a.id, a.message_id, translate(encode(f.bytes, 'base64'), chr(10), '') as data
        from public.attachments a
        join public.messages m on m.id = a.message_id
        left join public.attachment_files f on f.attachment_id = a.id
@@ -133,6 +133,7 @@ export async function checkPendingDocuments(
         logLlmCall(db, logger, {
           kind: "document",
           groupId,
+          messageIds: [row.message_id],
           model: checker.name ?? null,
           request: { system: DOCUMENT_CHECK_SYSTEM, user: "", images: ["Zdjęcie dokumentu"] },
           ...entry,

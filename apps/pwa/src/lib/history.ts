@@ -3,7 +3,7 @@ import type { Db } from "./supabase";
 
 export const HISTORY_PAGE = 50;
 
-const MESSAGE_COLUMNS = "id, group_id, author, sent_at, text, has_attachment, status, triage";
+const MESSAGE_COLUMNS = "id, group_id, author, sent_at, text, has_attachment, status, triage, processed_at";
 
 export interface GroupSummary {
   id: string;

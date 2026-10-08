@@ -2,6 +2,8 @@ import { CONTACT_ROLE_LABELS, mentionsFamily, roleOf } from "@czyzyk/shared/cont
 import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router";
 import { useAuth, useProfile } from "../../auth/AuthProvider";
+import { MessageDetailsPanel } from "../../components/MessageDetailsPanel";
+import { MessageText } from "../../components/MessageText";
 import { LoadError, Loading } from "../../components/ui";
 import { dayLabel, warsawDay, warsawTime } from "../../lib/dates";
 import { fetchContactRoles } from "../../lib/contacts";
@@ -24,6 +26,8 @@ function GroupHistory({ id }: { id: string }) {
   // Message id → state of an admin's "analyse again" request.
   const [reprocess, setReprocess] = useState<Record<string, "pending" | "queued" | "failed">>({});
   const [limit, setLimit] = useState(HISTORY_PAGE);
+  // The message whose details (verdict, items, model calls) are open.
+  const [open, setOpen] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const { data, error, loading, reload } = useLoader(
@@ -126,7 +130,11 @@ function GroupHistory({ id }: { id: string }) {
                     {dayLabel(day, today)}
                   </p>
                 )}
-                <div className={`rounded-2xl p-3 shadow-sm ${role?.role === "rodzina" ? "bg-sun/25" : toFamily ? "bg-air/40" : "bg-white"}`}>
+                <div
+                  aria-expanded={open === m.id}
+                  onClick={() => setOpen(open === m.id ? null : m.id)}
+                  className={`cursor-pointer rounded-2xl p-3 shadow-sm ${role?.role === "rodzina" ? "bg-sun/25" : toFamily ? "bg-air/40" : "bg-white"}`}
+                >
                   <div className="flex justify-between gap-2 text-xs text-slate-500">
                     <span className="flex flex-wrap items-center gap-1.5">
                       <span className="font-semibold text-slate-700">{m.author}</span>
@@ -139,7 +147,7 @@ function GroupHistory({ id }: { id: string }) {
                     </span>
                     <span>{warsawTime(m.sent_at)}</span>
                   </div>
-                  <p className="mt-1 whitespace-pre-wrap">{m.text || (m.has_attachment ? "📎 załącznik" : "")}</p>
+                  <MessageText className="mt-1" text={m.text || (m.has_attachment ? "📎 załącznik" : "")} />
                   {m.text && m.has_attachment && <p className="mt-1 text-xs text-slate-500">📎 załącznik</p>}
                   {m.status === "deleted_suspected" && <p className="mt-1 text-xs text-red-700">Prawdopodobnie usunięta z grupy</p>}
                   {isAdmin && m.status === "active" && (
@@ -157,7 +165,10 @@ function GroupHistory({ id }: { id: string }) {
                         <button
                           type="button"
                           disabled={reprocess[m.id] === "pending"}
-                          onClick={() => void analyseAgain(m.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void analyseAgain(m.id);
+                          }}
                           className="text-brand-700 underline disabled:opacity-50"
                         >
                           {reprocess[m.id] === "failed" ? "Nie udało się – spróbuj ponownie" : "Analizuj ponownie"}
@@ -165,6 +176,7 @@ function GroupHistory({ id }: { id: string }) {
                       )}
                     </div>
                   )}
+                  {open === m.id && <MessageDetailsPanel message={m} admin={isAdmin} />}
                 </div>
               </li>
             );

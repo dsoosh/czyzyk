@@ -75,6 +75,14 @@ describe("Admin → LLM", () => {
     expect(within(items[1]!).getByText("Błąd: ExtractionError: no_tool_call")).toBeInTheDocument();
   });
 
+  it("?wywolanie= pokazuje jedno, otwarte wywołanie (link z wiadomości w czacie)", async () => {
+    renderAt("/admin/llm?wywolanie=c2", { admin: true, tables: { llm_calls: calls, wa_groups: [] } });
+    expect(await screen.findByRole("link", { name: "← Wszystkie wywołania" })).toBeInTheDocument();
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(1);
+    expect(items[0]!.querySelector("details")).toHaveAttribute("open");
+  });
+
   it("zakładka LLM w panelu admina", async () => {
     renderAt("/admin/llm", { admin: true, tables: { llm_calls: [], wa_groups: [] } });
     expect(await screen.findByText("Brak wywołań w ostatnich 14 dniach.")).toBeInTheDocument();

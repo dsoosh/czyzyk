@@ -1,3 +1,4 @@
+import { Link, useSearchParams } from "react-router";
 import { useAuth } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
 import { shortDate, warsawDay, warsawTime } from "../../lib/dates";
@@ -22,19 +23,21 @@ interface LlmCall {
 /** Admin's log of the extraction model's calls: what went to the model and what came back (llm-call-log). */
 export function LlmCallsPage() {
   const { client } = useAuth();
+  // ?wywolanie=<id>: one call, opened from a message in the chat (message-details).
+  const [params] = useSearchParams();
+  const only = params.get("wywolanie");
   const { data, error, reload } = useLoader(async () => {
+    const columns = "id, kind, group_id, model, request, response, error, usage, duration_ms, created_at";
     const [calls, groups] = await Promise.all([
       run<LlmCall[]>(
-        client
-          .from("llm_calls")
-          .select("id, kind, group_id, model, request, response, error, usage, duration_ms, created_at")
-          .order("created_at", { ascending: false })
-          .limit(PAGE),
+        only
+          ? client.from("llm_calls").select(columns).eq("id", only)
+          : client.from("llm_calls").select(columns).order("created_at", { ascending: false }).limit(PAGE),
       ),
       fetchGroupNames(client),
     ]);
     return { calls, groups };
-  }, [client]);
+  }, [client, only]);
   useOnForeground(reload);
   if (error) return <LoadError message={error} onRetry={reload} />;
   if (!data) return <Loading />;
@@ -48,13 +51,18 @@ export function LlmCallsPage() {
           Rozmowy z asystentem „Zapytaj” są prywatne i tu nie trafiają.
         </p>
       </div>
+      {only && (
+        <Link to="/admin/llm" className="text-sm text-brand-700 underline">
+          ← Wszystkie wywołania
+        </Link>
+      )}
       {data.calls.length === 0 ? (
-        <p className="text-slate-600">Brak wywołań w ostatnich 14 dniach.</p>
+        <p className="text-slate-600">{only ? "Tego wywołania już nie ma (wpisy starsze niż 14 dni są usuwane)." : "Brak wywołań w ostatnich 14 dniach."}</p>
       ) : (
         <ul className="space-y-3">
           {data.calls.map((c) => (
             <li key={c.id} className="rounded-2xl bg-white p-4 shadow-sm">
-              <details>
+              <details open={only === c.id}>
                 <summary className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                   <span className="font-semibold text-ink">
                     {shortDate(warsawDay(c.created_at))} {warsawTime(c.created_at)}

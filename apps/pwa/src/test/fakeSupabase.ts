@@ -87,6 +87,7 @@ export function fakeSupabase(options: FakeOptions = {}) {
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), builder),
       neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), builder),
       in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), builder),
+      contains: (c: string, v: unknown[]) => (filters.push((r) => Array.isArray(r[c]) && v.every((x) => (r[c] as unknown[]).includes(x))), builder),
       gt: (c: string, v: unknown) => (filters.push((r) => r[c] != null && compare(r[c], v) > 0), builder),
       gte: (c: string, v: unknown) => (filters.push((r) => r[c] != null && compare(r[c], v) >= 0), builder),
       lt: (c: string, v: unknown) => (filters.push((r) => r[c] != null && compare(r[c], v) < 0), builder),
