@@ -80,6 +80,7 @@ import pl.czyzyk.app.work.SyncInterval
 import pl.czyzyk.app.work.Work
 import java.text.DateFormat
 import java.util.Date
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
@@ -207,9 +208,10 @@ class MainActivity : ComponentActivity() {
         photoChoice?.let { choice ->
             PhotoChoiceDialog(
                 options = choice.options,
-                onPick = { note ->
+                groups = choice.groups,
+                onPick = { note, group ->
                     photoChoice = null
-                    keepSharedPhotos(choice.photos, note)
+                    keepSharedPhotos(choice.photos, note, group)
                 },
                 onCancel = { photoChoice = null },
             )
@@ -313,9 +315,9 @@ class MainActivity : ComponentActivity() {
             ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
 
     /**
-     * Photos shared by hand from WhatsApp (groups with chat privacy never save them): screened
-     * here on the phone and attached to the newest photo message of a tracked group, or of the
-     * group the user picks when several sent photos recently (document-import).
+     * Photos shared by hand: from a group with chat privacy (attached to its photo message) or
+     * taken by the user (a poster on the door – a new message in the tracked group they pick).
+     * Screened here on the phone first (document-import).
      */
     private fun receiveSharedPhotos(uris: List<Uri>) {
         val state = Deps.state(this)
@@ -325,10 +327,11 @@ class MainActivity : ComponentActivity() {
             return
         }
         val now = System.currentTimeMillis()
-        val target = SharedPhotoTarget.choose(Deps.photos(this).trackedNotesSince(now - SharedPhotoTarget.WINDOW_MILLIS), now)
-        if (target == SharedPhotoTarget.None) {
-            Toast.makeText(this, "Nie widzę zdjęcia z obserwowanej grupy z ostatnich godzin – nie wiem, do której wiadomości je dołączyć.", Toast.LENGTH_LONG).show()
-            return
+        // Photo messages of tracked groups from the last hours; an own photo goes to any tracked group.
+        val options = when (val target = SharedPhotoTarget.choose(Deps.photos(this).trackedNotesSince(now - SharedPhotoTarget.WINDOW_MILLIS), now)) {
+            is SharedPhotoTarget.Single -> listOf(target.note)
+            is SharedPhotoTarget.Choose -> target.options
+            SharedPhotoTarget.None -> emptyList()
         }
         Toast.makeText(this, "Sprawdzam zdjęcie na telefonie…", Toast.LENGTH_SHORT).show()
         thread(name = "shared-photos") {
@@ -339,26 +342,30 @@ class MainActivity : ComponentActivity() {
                 screener.close()
             }
             runOnUiThread {
-                when (target) {
-                    is SharedPhotoTarget.Single -> keepSharedPhotos(screened, target.note)
-                    is SharedPhotoTarget.Choose -> photoChoice = PhotoChoice(screened, target.options)
-                    SharedPhotoTarget.None -> Unit
-                }
+                // Nothing to send (photos of people, not a document): no need to ask about the group.
+                if (screened.all { it.second.screening == Screening.WITHHELD }) keepSharedPhotos(screened, null, null)
+                else photoChoice = PhotoChoice(screened, options, state.trackedGroups.sorted())
             }
         }
     }
 
-    private fun keepSharedPhotos(screened: List<Pair<String, ScreenedPhoto>>, note: PhotoNote) {
+    /**
+     * Attached to the WhatsApp photo message [note], or – an own photo – to [group], where the
+     * server makes one new message for these photos (same idempotency key).
+     */
+    private fun keepSharedPhotos(screened: List<Pair<String, ScreenedPhoto>>, note: PhotoNote?, group: String?) {
         val log = Deps.photos(this)
+        val key = note?.trackedKey ?: UUID.randomUUID().toString()
         screened.forEachIndexed { i, (name, photo) ->
-            PhotoWorker.keep(this, log, photo, note.trackedKey ?: return@forEachIndexed, name, "s-${System.currentTimeMillis()}-$i")
+            PhotoWorker.keep(this, log, photo, key, name, "s-${System.currentTimeMillis()}-$i", groupName = if (note == null) group else null)
         }
+        val where = "do grupy ${note?.groupName ?: group}"
         Work.enqueuePhotos(this)
         val sent = screened.count { it.second.screening == Screening.IMAGE }
         val textOnly = screened.count { it.second.screening == Screening.TEXT_ONLY }
         val message = when {
-            sent > 0 -> "Wysyłam dokument do grupy ${note.groupName}."
-            textOnly > 0 -> "Na zdjęciu są ludzie – wysyłam tylko odczytany tekst (${note.groupName})."
+            sent > 0 -> "Wysyłam dokument $where."
+            textOnly > 0 -> "Na zdjęciu są ludzie – wysyłam tylko odczytany tekst ($where)."
             else -> "To nie wygląda na dokument – zdjęcie zostaje na telefonie."
         }
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
@@ -410,20 +417,29 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private class PhotoChoice(val photos: List<Pair<String, ScreenedPhoto>>, val options: List<PhotoNote>)
+private class PhotoChoice(val photos: List<Pair<String, ScreenedPhoto>>, val options: List<PhotoNote>, val groups: List<String>)
 
 @Composable
-private fun PhotoChoiceDialog(options: List<PhotoNote>, onPick: (PhotoNote) -> Unit, onCancel: () -> Unit) {
+private fun PhotoChoiceDialog(options: List<PhotoNote>, groups: List<String>, onPick: (PhotoNote?, String?) -> Unit, onCancel: () -> Unit) {
     MaterialTheme {
         AlertDialog(
             onDismissRequest = onCancel,
-            title = { Text("Z której grupy jest to zdjęcie?") },
+            title = { Text("Do której grupy dodać zdjęcie?") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    options.forEach { note ->
-                        TextButton(onClick = { onPick(note) }) {
-                            Text("${note.groupName} – zdjęcie z ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.seenAt))}")
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (options.isNotEmpty()) {
+                        Text("Zdjęcie z czatu", style = MaterialTheme.typography.labelLarge)
+                        options.forEach { note ->
+                            TextButton(onClick = { onPick(note, null) }) {
+                                Text("${note.groupName} – zdjęcie z ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(note.seenAt))}")
+                            }
                         }
+                    }
+                    // An own photo (a poster on the door): a new message in the chosen group.
+                    Text("Moje zdjęcie, bez wiadomości w czacie", style = MaterialTheme.typography.labelLarge)
+                    if (groups.isEmpty()) Text("Brak śledzonych grup – odśwież listę w ustawieniach telefonu.")
+                    groups.forEach { group ->
+                        TextButton(onClick = { onPick(null, group) }) { Text(group) }
                     }
                 }
             },

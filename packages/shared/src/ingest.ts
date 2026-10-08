@@ -39,8 +39,12 @@ const MAX_DOCUMENT_IMAGE_BASE64 = Math.ceil(MAX_DOCUMENT_IMAGE_BYTES / 3) * 4;
  */
 export const documentIngestSchema = z
   .object({
-    /** The notification message the photo belongs to. */
+    /** The notification message the photo belongs to; with group_name, the new message for an own photo. */
     idempotency_key: z.uuid(),
+    /** An own photo shared by hand (no WhatsApp message): the tracked group it goes to. */
+    group_name: groupName.optional(),
+    /** When it was shared; the time of the new message (with group_name). */
+    shared_at: z.iso.datetime({ offset: true }).optional(),
     file_name: z.string().trim().min(1).max(200).regex(/^[^/\\]+$/),
     screening: z.enum(["image", "text_only"]),
     text: z.string().max(20_000),

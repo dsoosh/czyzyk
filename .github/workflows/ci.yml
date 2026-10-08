@@ -57,7 +57,7 @@ jobs:
       - name: Unit test summary
         # Guards against tests being silently skipped: raise MIN_TESTS when adding tests.
         env:
-          MIN_TESTS: 79
+          MIN_TESTS: 80
         run: |
           total=0; failed=0
           for f in app/build/test-results/testDebugUnitTest/*.xml; do

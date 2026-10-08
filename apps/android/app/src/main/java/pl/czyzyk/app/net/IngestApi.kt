@@ -89,6 +89,11 @@ class HttpIngestApi(
             .put("screening", document.screening.wire)
             .put("text", document.text.take(MAX_DOCUMENT_TEXT))
         if (imageBase64 != null) body.put("image", imageBase64)
+        if (document.groupName != null) {
+            body.put("group_name", document.groupName)
+            val sharedAt = OffsetDateTime.ofInstant(Instant.ofEpochMilli(document.createdAt), zone)
+            body.put("shared_at", sharedAt.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+        }
         return post(pairing, "/ingest/document", body)
     }
 

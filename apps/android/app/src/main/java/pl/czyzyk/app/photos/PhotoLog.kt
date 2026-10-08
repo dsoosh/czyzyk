@@ -15,6 +15,8 @@ data class PendingDocument(
     val imagePath: String?,
     val attempts: Int,
     val createdAt: Long,
+    /** Own photo shared by hand to this tracked group: no WhatsApp message, the server makes one. */
+    val groupName: String? = null,
 )
 
 /**
@@ -39,6 +41,7 @@ class PhotoLog(context: Context, name: String? = DB_NAME) : SQLiteOpenHelper(con
               image_path text,
               attempts integer not null default 0,
               created_at integer not null,
+              group_name text,
               unique (idempotency_key, file_name)
             )
             """.trimIndent(),
@@ -47,6 +50,8 @@ class PhotoLog(context: Context, name: String? = DB_NAME) : SQLiteOpenHelper(con
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createV2(db)
+        // Version 3: own photos shared to a group, without a WhatsApp message.
+        if (oldVersion < 3) db.execSQL("alter table outbox add column group_name text")
     }
 
     /** Version 2: notification previews of tracked photos, and messages that already got a file. */
@@ -127,8 +132,17 @@ class PhotoLog(context: Context, name: String? = DB_NAME) : SQLiteOpenHelper(con
         writableDatabase.insertWithOnConflict("handled", null, values, SQLiteDatabase.CONFLICT_IGNORE)
     }
 
-    fun enqueueDocument(idempotencyKey: String, fileName: String, screening: Screening, text: String, imagePath: String?, now: Long = System.currentTimeMillis()): Boolean {
+    fun enqueueDocument(
+        idempotencyKey: String,
+        fileName: String,
+        screening: Screening,
+        text: String,
+        imagePath: String?,
+        now: Long = System.currentTimeMillis(),
+        groupName: String? = null,
+    ): Boolean {
         val values = ContentValues().apply {
+            put("group_name", groupName)
             put("idempotency_key", idempotencyKey)
             put("file_name", fileName)
             put("screening", screening.name)
@@ -154,6 +168,7 @@ class PhotoLog(context: Context, name: String? = DB_NAME) : SQLiteOpenHelper(con
                             imagePath = if (c.isNull(col("image_path"))) null else c.getString(col("image_path")),
                             attempts = c.getInt(col("attempts")),
                             createdAt = c.getLong(col("created_at")),
+                            groupName = if (c.isNull(col("group_name"))) null else c.getString(col("group_name")),
                         ),
                     )
                 }
@@ -177,7 +192,7 @@ class PhotoLog(context: Context, name: String? = DB_NAME) : SQLiteOpenHelper(con
 
     companion object {
         const val DB_NAME = "photos.db"
-        private const val VERSION = 2
+        private const val VERSION = 3
         /** WhatsApp images older than this are not looked at. */
         const val KEEP_MILLIS = 2 * 24 * 60 * 60 * 1000L
 

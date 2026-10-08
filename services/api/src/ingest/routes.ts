@@ -15,6 +15,9 @@ import { deviceAuth } from "./deviceAuth.js";
 
 const CONFIG_TTL_SECONDS = 900;
 
+/** Author of the message made for an own photo shared from the phone (document-import). */
+export const SHARED_PHOTO_AUTHOR = "Zdjęcie z telefonu";
+
 /** Field paths only: messages may contain message content and must not be echoed or logged. */
 function invalid(error: z.ZodError) {
   return { error: "invalid_request", fields: [...new Set(error.issues.map((i) => i.path.join(".") || "(root)"))] };
@@ -98,6 +101,18 @@ export async function ingestRoutes(
     const doc = parsed.data;
     const image = doc.image === undefined ? null : Buffer.from(doc.image, "base64");
     if (image && (!isJpeg(image) || image.length > MAX_DOCUMENT_IMAGE_BYTES)) return reply.code(400).send({ error: "invalid_image" });
+
+    // An own photo shared by hand (no WhatsApp message): the first document makes the message.
+    if (doc.group_name) {
+      const { rows: groups } = await db.query<{ id: string }>("select id from public.wa_groups where wa_name = $1 and tracked", [doc.group_name]);
+      if (!groups[0]) return reply.code(422).send({ error: "group_not_tracked" });
+      await db.query(
+        `insert into public.messages (group_id, author, sent_at, text, source, dedupe_key, has_attachment, idempotency_key)
+         values ($1, $2, $3, '', 'manual', $4, true, $5)
+         on conflict do nothing`,
+        [groups[0].id, SHARED_PHOTO_AUTHOR, doc.shared_at ? new Date(doc.shared_at) : new Date(), `shared:${doc.idempotency_key}`, doc.idempotency_key],
+      );
+    }
 
     const { rows: messages } = await db.query<{ id: string; group_id: string; tracked: boolean }>(
       `select m.id, m.group_id, g.tracked from public.messages m join public.wa_groups g on g.id = m.group_id
