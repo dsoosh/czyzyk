@@ -23,6 +23,7 @@ class CaptureService : NotificationListenerService() {
     override fun onListenerConnected() {
         ListenerWatchdog.connected = true
         Deps.state(this).listenerConnectedAt = System.currentTimeMillis()
+        ReaderService.start(this)
         Work.schedulePeriodicSync(this)
         Work.enqueueSync(this)
         Work.enqueueSend(this)

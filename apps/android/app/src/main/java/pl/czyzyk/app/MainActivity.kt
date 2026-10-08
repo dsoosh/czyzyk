@@ -63,6 +63,7 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
 import pl.czyzyk.app.capture.ListenerWatchdog
+import pl.czyzyk.app.capture.ReaderService
 import pl.czyzyk.app.photos.DocumentScreener
 import pl.czyzyk.app.photos.PhotoNote
 import pl.czyzyk.app.photos.PhotoWorker
@@ -140,6 +141,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         ListenerWatchdog.ensureBound(this)
+        ReaderService.start(this)
         if (!Deps.updatesEnabled()) return
         update = Updates.ready(Deps.state(this), Updates.dir(this), Deps.versionCode())
         if (Updates.shouldCheckOnOpen(Deps.state(this))) checkForUpdate(manual = false)
@@ -510,6 +512,7 @@ private data class Status(
     val notificationAccess: Boolean,
     /** The reader is bound in this process right now (Android may unbind it silently). */
     val listenerConnected: Boolean,
+    val readerServiceEnabled: Boolean,
     val batteryUnrestricted: Boolean,
     val queueSize: Int,
     val pendingAttachments: Int,
@@ -538,6 +541,7 @@ private fun readStatus(context: Context): Status {
         server = store.pairing?.serverUrl,
         notificationAccess = context.packageName in NotificationManagerCompat.getEnabledListenerPackages(context),
         listenerConnected = ListenerWatchdog.connected,
+        readerServiceEnabled = state.readerServiceEnabled,
         batteryUnrestricted = power.isIgnoringBatteryOptimizations(context.packageName),
         queueSize = Deps.queue(context).size(),
         pendingAttachments = state.pendingAttachments,
@@ -587,7 +591,7 @@ fun CzyzykApp(
                 Text(AppInfo.TAGLINE, style = MaterialTheme.typography.bodyMedium)
                 AppCard(appUrl, onSaveAppUrl, onOpenApp)
                 PairingCard(status, onPairLink)
-                PermissionsCard(status)
+                PermissionsCard(status) { status = readStatus(context) }
                 QueueCard(status)
                 PhotosCard(status) { status = readStatus(context) }
                 SyncCard(status) { status = readStatus(context) }
@@ -660,7 +664,7 @@ private fun PairingCard(status: Status, onPairLink: (String) -> Boolean) {
 }
 
 @Composable
-private fun PermissionsCard(status: Status) {
+private fun PermissionsCard(status: Status, onChanged: () -> Unit) {
     val context = LocalContext.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -670,6 +674,25 @@ private fun PermissionsCard(status: Status) {
                     status.listenerConnected,
                     if (status.listenerConnected) "Czytnik powiadomień działa" else "System odłączył czytnik – łączę ponownie",
                 )
+            }
+            if (status.notificationAccess) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Stała ochrona czytnika", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Ciche powiadomienie w tle, dzięki któremu Android nie wyłącza odczytu wiadomości. Zalecane.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(
+                        checked = status.readerServiceEnabled,
+                        onCheckedChange = { on ->
+                            Deps.state(context).readerServiceEnabled = on
+                            if (on) ReaderService.start(context) else ReaderService.stop(context)
+                            onChanged()
+                        },
+                    )
+                }
             }
             if (!status.notificationAccess) {
                 Button(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }) {
