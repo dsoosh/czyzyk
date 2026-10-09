@@ -691,6 +691,18 @@ describe("triaż wiadomości", () => {
     expect(prompts[0]!.user).toContain('[dokument "kalendarz.jpg": "Kalendarz dni wolnych"]');
   });
 
+  it("wiadomość wklejona ręcznie zawsze idzie do pełnej analizy, oznaczona w prompcie", async () => {
+    await addMessage("Zebranie w czwartek o 17, prosimy o…", "2026-10-07T10:00:00Z", true);
+    const id = await addMessage("Zebranie w czwartek o 17, prosimy o składkę 50 zł do piątku", "2026-10-07T10:00:00Z");
+    await db.client.query("update messages set source = 'manual' where id = $1", [id]);
+    const { model, prompts } = scripted(() => []);
+    const t = triage(false);
+    expect(await runGroupExtraction({ ...deps(model), triage: t }, groupId)).toMatchObject({ status: "ok" });
+    expect(t.calls).toBe(0);
+    expect(prompts[0]!.user).toContain('"Pani Ania" [wklejona ręcznie]: "Zebranie w czwartek o 17, prosimy o składkę 50 zł do piątku"');
+    expect(prompts[0]!.user).not.toContain('"Pani Ania" [wklejona ręcznie]: "Zebranie w czwartek o 17, prosimy o…"');
+  });
+
   it("triaż mówi „tak” albo zawodzi – wiadomości idą do pełnej analizy", async () => {
     await addMessage("W piątek bal, przebrania", "2026-10-07T10:00:00Z");
     for (const verdict of [true, new Error("overloaded")]) {

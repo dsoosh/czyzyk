@@ -8,6 +8,8 @@ export interface BatchMessage {
   sentAt: Date;
   text: string;
   hasAttachment: boolean;
+  /** Pasted by the family (manual-entry), often the full text of a notification cut short. */
+  manual?: boolean;
   /** Documents the phone found among the message's photos (document-import), checked by the server. */
   documents?: BatchDocument[];
 }
@@ -197,16 +199,17 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
   const group = groups[0];
   if (!group) return null;
 
-  const toMessage = (r: { id: string; author: string; sent_at: Date; text: string; has_attachment: boolean }): BatchMessage => ({
+  const toMessage = (r: { id: string; author: string; sent_at: Date; text: string; has_attachment: boolean; source: string }): BatchMessage => ({
     id: r.id,
     author: r.author,
     sentAt: r.sent_at,
     text: r.text,
     hasAttachment: r.has_attachment,
+    ...(r.source === "manual" ? { manual: true } : {}),
   });
 
   const { rows: fresh } = await db.query(
-    `select id, author, sent_at, text, has_attachment from public.messages
+    `select id, author, sent_at, text, has_attachment, source from public.messages
       where group_id = $1 and processed_at is null and status = 'active'
       order by sent_at, id
       limit $2`,
@@ -230,7 +233,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
 
   const { rows: earlier } = await db.query(
     `select * from (
-       select id, author, sent_at, text, has_attachment from public.messages
+       select id, author, sent_at, text, has_attachment, source from public.messages
         where group_id = $1 and processed_at is not null and status = 'active' and sent_at <= $2
         order by sent_at desc, id desc
         limit $3
@@ -238,7 +241,7 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     [groupId, newMessages[0]!.sentAt, contextSize],
   );
   const { rows: later } = await db.query(
-    `select id, author, sent_at, text, has_attachment from public.messages
+    `select id, author, sent_at, text, has_attachment, source from public.messages
       where group_id = $1 and processed_at is not null and status = 'active' and sent_at > $2
       order by sent_at, id
       limit $3`,
