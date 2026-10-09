@@ -8,6 +8,7 @@ export const FIELD_LABELS: Record<string, string> = {
   end: "Koniec",
   all_day: "Cały dzień",
   location: "Miejsce",
+  meeting_point: "Zbiórka",
   whole_kindergarten: "Całe przedszkole",
   description: "Opis",
   due_date: "Termin",

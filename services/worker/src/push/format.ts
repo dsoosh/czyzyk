@@ -25,3 +25,10 @@ export function paymentLabel(description: string, amount: number | string | null
 export function truncate(text: string, max = 180): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
+
+/** "Wycieczka 08:00 (ZOO; zbiórka: dworzec PKP)": an event in a digest, with its places when known (event-location). */
+export function eventLabel(e: { title: string; all_day: boolean; time: string; location: string | null; meeting_point?: string | null }): string {
+  const label = e.all_day ? e.title : `${e.title} ${e.time}`;
+  const places = [e.location, e.meeting_point ? `zbiórka: ${e.meeting_point}` : null].filter(Boolean);
+  return places.length ? `${label} (${places.join("; ")})` : label;
+}

@@ -13,7 +13,7 @@ const tables = {
   wa_groups: f.groups,
   events: [
     f.event(),
-    f.event({ id: "e2", title: "Zebranie", starts_at: "2026-10-15T15:30:00.000Z", all_day: false, location: "sala Motylków" }),
+    f.event({ id: "e2", title: "Zebranie", starts_at: "2026-10-15T15:30:00.000Z", all_day: false, location: "sala Motylków", meeting_point: "dworzec PKP" }),
     f.event({ id: "e3", title: "Teatrzyk", starts_at: "2026-10-13T22:00:00.000Z", status: "cancelled" }),
     f.event({ id: "e4", title: "Andrzejki", starts_at: "2026-11-26T23:00:00.000Z" }),
   ],
@@ -29,7 +29,8 @@ describe("Kalendarz – lista", () => {
     expect(within(friday).getByText("cały dzień")).toBeInTheDocument();
     const thursday = screen.getByRole("region", { name: "Czwartek 15.10" });
     expect(within(thursday).getByText("17:30")).toBeInTheDocument();
-    expect(within(thursday).getByText("sala Motylków")).toBeInTheDocument();
+    expect(within(thursday).getByText("📍 sala Motylków")).toBeInTheDocument();
+    expect(within(thursday).getByText("zbiórka: dworzec PKP")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Poniedziałek 12.10" })).toHaveTextContent("Przedszkole nieczynne – dzień nauczyciela");
     expect(screen.queryByText("Teatrzyk")).not.toBeInTheDocument();
   });
@@ -107,8 +108,21 @@ describe("Szczegóły wydarzenia", () => {
     expect(await screen.findByRole("heading", { name: "Bal" })).toBeInTheDocument();
     expect(screen.getByText("Piątek 9.10, cały dzień")).toBeInTheDocument();
     expect(screen.getByText("Motylki")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Mapa" })).not.toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Do przyniesienia" })).getByText("przebranie")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "skąd to wiem" }).map((a) => a.getAttribute("href"))).toContain("/zrodlo/event/e1");
+  });
+
+  it("miejsce wydarzenia z linkiem do mapy", async () => {
+    renderAt("/kalendarz/wydarzenie/e2", { tables });
+    expect(await screen.findByRole("heading", { name: "Zebranie" })).toBeInTheDocument();
+    expect(screen.getByText(/sala Motylków/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Mapa" })[0]).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps/search/?api=1&query=sala%20Motylk%C3%B3w",
+    );
+    expect(screen.getByText("Zbiórka")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Mapa" })[1]).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=dworzec%20PKP");
   });
 
   it("pokazuje pełną historię: wiadomości, zdjęcie dokumentu i zmiany wydarzenia i rzeczy do przyniesienia", async () => {
