@@ -1,4 +1,5 @@
 import {
+  appGuide,
   buildSystemPrompt,
   CONTACT_ROLE_LABELS,
   mentionsFamily,
@@ -311,13 +312,14 @@ export async function loadViewContext(db: Db, view: AssistantView, now: Date): P
  * with the kindergarten description, the children, the family and the asking member's name.
  */
 export async function loadAssistantSystem(db: Db, userId: string, prompts: Db = db): Promise<string> {
-  const [names, profile, prompt] = await Promise.all([
+  const [names, profile, prompt, me] = await Promise.all([
     loadNames(db),
     db.query<{ content: string }>("select content from public.kindergarten_profile"),
     // The operator's template is admin-only data, read with the server connection.
     prompts.query<{ template: string }>("select template from public.llm_prompts where key = 'assistant'"),
+    db.query<{ role: string }>("select role from public.profiles where id = $1", [userId]),
   ]);
-  return buildSystemPrompt("assistant", prompt.rows[0]?.template ?? null, {
+  const system = buildSystemPrompt("assistant", prompt.rows[0]?.template ?? null, {
     // Written by the family admin (kindergarten-profile); cannot close its block.
     przedszkole: (profile.rows[0]?.content ?? "").replaceAll("</przedszkole>", "<\\/przedszkole>"),
     dzieci: names.children
@@ -329,6 +331,8 @@ export async function loadAssistantSystem(db: Db, userId: string, prompts: Db = 
     rodzina: [...new Set(names.people.values())].sort((a, b) => a.localeCompare(b, "pl")).join(", "),
     uzytkownik: names.people.get(userId) ?? "członek rodziny",
   });
+  // App help: screens and sections the assistant may link to (admin pages only for the operator).
+  return `${system}\n\n<aplikacja>\n${appGuide(me.rows[0]?.role === "admin")}\n</aplikacja>`;
 }
 
 async function viewContext(db: Db, view: AssistantView, now: Date, names: Names): Promise<ViewContext> {

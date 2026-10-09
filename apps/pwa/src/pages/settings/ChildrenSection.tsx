@@ -49,7 +49,7 @@ export function ChildrenSection() {
   }, [fromHint]);
 
   return (
-    <section ref={section} aria-label="Dzieci" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
+    <section ref={section} id="dzieci" aria-label="Dzieci" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Dzieci</h2>
       <p className="text-sm text-muted">
         Wpisz imiona tak, jak piszą je nauczycielki (np. „Zosia”), a w „Innych formach imienia” – pełne imię i zdrobnienia (np.

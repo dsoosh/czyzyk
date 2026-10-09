@@ -30,3 +30,15 @@ describe("assistantAskSchema", () => {
     expect(assistantAskSchema.safeParse({ view: { kind: "today" }, question: "x", history: [ok[1], ok[0]] }).success).toBe(false);
   });
 });
+
+describe("przewodnik po aplikacji", () => {
+  it("rodzina nie dostaje stron admina; linki asystenta tylko do znanych miejsc", async () => {
+    const { appGuide, isAppPlace } = await import("./assistant.js");
+    expect(appGuide(false)).toContain("[Ustawienia → Dzieci → Dodaj dziecko](/ustawienia?dziecko=nowe)");
+    expect(appGuide(false)).not.toContain("/admin");
+    expect(appGuide(true)).toContain("[Admin → Grupy](/admin/grupy)");
+    expect(isAppPlace("/listy/platnosci")).toBe(true);
+    expect(isAppPlace("https://example.com")).toBe(false);
+    expect(isAppPlace("/ustawienia#nieznana")).toBe(false);
+  });
+});
