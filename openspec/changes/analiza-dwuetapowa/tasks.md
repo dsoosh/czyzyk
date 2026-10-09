@@ -14,7 +14,11 @@
 - [x] 2.2 Worker: zapis adresatów, `join` z dodatkową grupą, `done` dla rodziny, przeliczenie przypisań; weryfikacja: `run.db.test.ts`.
 - [x] 2.3 Skróty i alerty według widoczności sprawy dla rodziny; weryfikacja: `cron.db.test.ts`.
 
-## 3. Sprawdzenie
+## 3. PWA
 
-- [ ] 3.1 `npm run spec:validate`, typecheck, wszystkie testy.
-- [ ] 3.2 Analiza po wdrożeniu przypisuje dzieci jak dotąd; weryfikacja: użytkownik.
+- [x] 3.1 Podpowiedź dodania dziecka na ekranie „Dziś”, gdy rodzina nie ma dzieci; weryfikacja: `TodayPage.test.tsx`, `Children.test.tsx`.
+
+## 4. Sprawdzenie
+
+- [x] 4.1 `npm run spec:validate`, typecheck, wszystkie testy.
+- [ ] 4.2 Analiza po wdrożeniu przypisuje dzieci jak dotąd; weryfikacja: użytkownik.

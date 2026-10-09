@@ -164,4 +164,14 @@ describe("Checklista rzeczy do przyniesienia", () => {
     });
     expect(await screen.findByText("spakowane: Ola, 20:15")).toBeInTheDocument();
   });
+
+  it("bez dzieci: podpowiedź z linkiem do dodania dziecka; z dzieckiem jej nie ma", async () => {
+    const { unmount } = renderAt("/", { tables: { wa_groups: f.groups } });
+    const hint = await screen.findByRole("region", { name: "Dodaj dziecko" });
+    expect(within(hint).getByRole("link", { name: "Dodaj dziecko" })).toHaveAttribute("href", "/ustawienia?dziecko=nowe");
+    unmount();
+    renderAt("/", { tables: { wa_groups: f.groups, children: [{ id: "k1", name: "Zosia", group_id: "g1", aliases: [], color: "lime" }] } });
+    await screen.findByRole("heading", { name: "Dziś i jutro" });
+    expect(screen.queryByRole("region", { name: "Dodaj dziecko" })).not.toBeInTheDocument();
+  });
 });

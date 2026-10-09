@@ -30,3 +30,10 @@ Wiadomość autora należącego do rodziny korzystającej z aplikacji SHALL mie�
 #### Scenario: Zapisujemy
 - **WHEN** mama z rodziny R1 odpisuje w grupie „Zapisujemy Zosię” na sprawę „Zapisy na basen”
 - **THEN** sprawa jest odpowiedziana w rodzinie R1, a u innych rodzin dalej czeka na odpowiedź
+
+### Requirement: Podpowiedź dodania dziecka
+Gdy rodzina zalogowanego użytkownika nie ma żadnego dziecka, ekran „Dziś” SHALL pokazywać podpowiedź z odnośnikiem otwierającym w ustawieniach formularz nowego dziecka. Podpowiedź MUST znikać po dodaniu pierwszego dziecka.
+
+#### Scenario: Pierwsze logowanie
+- **WHEN** użytkownik loguje się po raz pierwszy, a jego rodzina nie ma dzieci
+- **THEN** na ekranie „Dziś” widzi podpowiedź „Dodaj swoje dziecko”, a odnośnik otwiera formularz „Nowe dziecko”
