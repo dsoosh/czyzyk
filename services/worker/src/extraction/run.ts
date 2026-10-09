@@ -87,9 +87,10 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
       const batch = await loadBatch(client, groupId, warsawDate(now), deps.contextMessages);
       if (!batch || batch.newMessages.length === 0) return { status: "nothing_to_do" };
 
-      // A document that reached the server is always analysed: triage does not see images.
-      const hasDocument = batch.newMessages.some((m) => m.documents?.length);
-      const skippedBy = hasDocument ? null : onlyChatter(batch) ? "rules" : (await triageSaysSkip(deps, batch, groupId)) ? "model" : null;
+      // Always analysed: a document that reached the server (triage does not see images) and a
+      // message the family pasted on purpose (manual-entry), e.g. the full text of a cut notification.
+      const mustAnalyse = batch.newMessages.some((m) => m.documents?.length || m.manual);
+      const skippedBy = mustAnalyse ? null : onlyChatter(batch) ? "rules" : (await triageSaysSkip(deps, batch, groupId)) ? "model" : null;
       if (skippedBy) {
         const ids = batch.newMessages.map((m) => m.id);
         await client.query("update public.messages set processed_at = now(), triage = $2 where id = any($1::uuid[])", [ids, skippedBy]);

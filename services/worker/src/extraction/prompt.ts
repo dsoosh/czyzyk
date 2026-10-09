@@ -89,7 +89,8 @@ function renderMessage(alias: string, m: BatchMessage, roles: readonly ContactRo
     const image = d.hasImage ? " (obraz poniżej)" : "";
     return ` [dokument ${quote(d.fileName)}${image}${text}]`;
   });
-  return `${alias} | ${warsawStamp(m.sentAt)} | ${quote(m.author)}${authorTags(m, roles)}: ${quote(m.text)}${attachment}${documents.join("")}`;
+  const pasted = m.manual ? " [wklejona ręcznie]" : "";
+  return `${alias} | ${warsawStamp(m.sentAt)} | ${quote(m.author)}${authorTags(m, roles)}${pasted}: ${quote(m.text)}${attachment}${documents.join("")}`;
 }
 
 function renderItem(alias: string, item: ExistingItem, eventAliasById: Map<string, string>): string {
