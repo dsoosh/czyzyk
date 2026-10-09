@@ -83,7 +83,15 @@ export async function handleAlert(deps: AlertDeps, job: PushAlertJob, now: Date)
   const { rows } = await deps.db.query<{ user_id: string }>(
     `select s.user_id from public.push_settings s join public.profiles p on p.id = s.user_id
       where s.${SETTING[alert.kind]}
-        and public.family_sees_group(p.family_id, $1::uuid)
+        and case $3::text
+              when 'payment' then exists (
+                select 1 from public.payments t
+                 where t.id = $4 and public.family_sees_item(p.family_id, t.group_id, t.extra_group_ids, t.audience, t.child_ids, t.family_id))
+              when 'action_required' then exists (
+                select 1 from public.action_required t
+                 where t.id = $4 and public.family_sees_item(p.family_id, t.group_id, t.extra_group_ids, t.audience, t.child_ids, null))
+              else public.family_sees_group(p.family_id, $1::uuid)
+            end
         and ($2::uuid is null or p.family_id = $2::uuid)
         and not exists (
           select 1 from public.item_done d where d.item_type = $3 and d.item_id = $4 and d.family_id = p.family_id

@@ -42,7 +42,7 @@ describe("prompty LLM", () => {
   });
 
   it("członek rodziny bez admina ani nie czyta, ani nie zapisuje; anonim też nie", async () => {
-    await asAdmin("select admin_save_llm_prompt('extraction', 'Instrukcje {{dzieci}}')");
+    await asAdmin("select admin_save_llm_prompt('extraction', 'Instrukcje {{przedszkole}}')");
     const asOla = (sql: string) => as(db.client, user(familyId), async (q) => (await q(sql)).rows);
     expect(await asOla("select * from llm_prompts")).toEqual([]);
     await expect(asOla("select admin_save_llm_prompt('extraction', 'x')")).rejects.toThrow(/Brak uprawnień/);

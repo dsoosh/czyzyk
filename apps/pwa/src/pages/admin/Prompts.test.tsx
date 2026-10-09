@@ -17,7 +17,9 @@ describe("Admin → Prompty", () => {
     const extraction = await screen.findByRole("form", { name: "Analiza wiadomości" });
     expect(within(extraction).getByRole("textbox", { name: "Prompt: Analiza wiadomości" })).toHaveValue(DEFAULT_PROMPTS.extraction);
     expect(within(extraction).getByText("domyślny prompt")).toBeInTheDocument();
-    expect(within(extraction).getByRole("button", { name: "Wstaw {{dzieci}}" })).toBeInTheDocument();
+    expect(within(extraction).getByRole("button", { name: "Wstaw {{przedszkole}}" })).toBeInTheDocument();
+    // Children and families are in the request, not in the extraction prompt (families).
+    expect(within(extraction).queryByRole("button", { name: "Wstaw {{dzieci}}" })).not.toBeInTheDocument();
     expect(within(extraction).queryByRole("button", { name: "Wstaw {{uzytkownik}}" })).not.toBeInTheDocument();
     expect(within(extraction).getByText(/niezaufane dane/)).toBeInTheDocument();
     const assistant = screen.getByRole("form", { name: "Asystent „Zapytaj”" });

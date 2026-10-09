@@ -1,4 +1,4 @@
-import { CHILD_ITEM_TYPES, itemDataSchemas, type ItemData, type ItemType } from "@czyzyk/shared";
+import { CHILD_ITEM_TYPES, DONE_ITEM_TYPES, itemDataSchemas, type ItemData, type ItemType } from "@czyzyk/shared";
 import type pg from "pg";
 import { loadItem } from "./batch.js";
 import type { EventRef, Rejection, ResolvedOperation } from "./resolve.js";
@@ -147,15 +147,18 @@ class ApplyRejection extends Error {}
  * Child names as the model wrote them → ids, by name or another form of it ("Elcia");
  * unknown names are dropped, the item still counts.
  */
-async function childIds(client: pg.PoolClient, names: string[]): Promise<string[]> {
-  if (names.length === 0) return [];
-  const { rows } = await client.query<{ id: string }>(
-    `select id from public.children
-      where public.child_name_forms(name, aliases) && array(select lower(btrim(n)) from unnest($1::text[]) n)
-      order by name`,
-    [names],
-  );
-  return rows.map((r) => r.id);
+function audienceOf(names: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of names) {
+    const name = raw.trim();
+    const key = name.toLocaleLowerCase("pl-PL");
+    if (name && !seen.has(key)) {
+      seen.add(key);
+      out.push(name);
+    }
+  }
+  return out;
 }
 
 const takesChildren = (type: ItemType) => (CHILD_ITEM_TYPES as readonly ItemType[]).includes(type);
@@ -178,15 +181,17 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
     await ctx.client.query("savepoint op");
     try {
       const status = statusFor(op, ctx.threshold);
-      const outcome = op.op === "join" ? await applyJoin(ctx, op) : await applyOne(ctx, op, status, refIds);
+      const outcome =
+        op.op === "join" ? await applyJoin(ctx, op) : op.op === "done" ? await applyDone(ctx, op) : await applyOne(ctx, op, status, refIds);
       await ctx.client.query("release savepoint op");
-      // Joining adds a child to an item the family already knows about: no new alert.
-      if (outcome !== "proposed" && status === "active" && op.op !== "join") {
+      // Joining adds a child to an item families already know about, done closes it for one
+      // family: no new alert.
+      if (outcome !== "proposed" && status === "active" && op.op !== "join" && op.op !== "done") {
         summary.activeItems.push({ type: op.type, id: outcome.id });
       }
       if (outcome === "proposed" || status === "needs_review") summary.needsReview++;
       else if (op.op === "create") summary.created++;
-      else if (op.op === "update" || op.op === "join") summary.updated++;
+      else if (op.op === "update" || op.op === "join" || op.op === "done") summary.updated++;
       else summary.cancelled++;
     } catch (error) {
       await ctx.client.query("rollback to savepoint op");
@@ -197,7 +202,26 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
       summary.rejected.push({ index: op.index, reason });
     }
   }
+  // Second step, per family (families): the audience names become each family's children.
+  await ctx.client.query("select public.refresh_item_children()");
   return summary;
+}
+
+/**
+ * A member of a family using the app answered or did it (families): the item is done for that
+ * family only, the way the family would mark it in the app.
+ */
+async function applyDone(ctx: Ctx, op: Extract<ResolvedOperation, { op: "done" }>): Promise<{ id: string }> {
+  if (op.confidence < ctx.threshold) throw new ApplyRejection("done below the confidence threshold");
+  if (!(DONE_ITEM_TYPES as readonly ItemType[]).includes(op.type)) throw new ApplyRejection(`done is not available for ${op.type}`);
+  const existing = await loadItem(ctx.client, op.type, op.targetId);
+  if (!existing || existing.status !== "active") throw new ApplyRejection("target item is not active");
+  await ctx.client.query(
+    `insert into public.item_done (item_type, item_id, family_id, resolution)
+     values ($1, $2, $3, $4) on conflict (item_type, item_id, family_id) do nothing`,
+    [op.type, op.targetId, op.familyId, op.type === "action_required" ? op.resolution : null],
+  );
+  return { id: op.targetId };
 }
 
 /** Fields whose change is not part of the history (filled in separately, not user-visible facts). */
@@ -253,9 +277,10 @@ async function queueProposal(client: pg.PoolClient, table: string, op: Extract<R
 }
 
 /**
- * Shared items (shared-items): the item of another group gets this group's children
- * (the named ones, or all the family's children here) on top of the ones it concerned,
- * and the new messages as sources. Its content, group and status stay as they are.
+ * Shared items (shared-items): the item of another group gets this group as an extra group
+ * (families of its children see it) and the new messages as sources. An item for a whole group
+ * stays for whole groups; an addressed one adds the named children of this group (or all of them).
+ * Its content, group and status stay as they are.
  */
 async function applyJoin(ctx: Ctx, op: Extract<ResolvedOperation, { op: "join" }>): Promise<{ id: string }> {
   const { client, groupId } = ctx;
@@ -263,27 +288,21 @@ async function applyJoin(ctx: Ctx, op: Extract<ResolvedOperation, { op: "join" }
   const table = TABLE[op.type];
   const existing = await loadItem(client, op.type, op.targetId);
   if (!existing || existing.status !== "active") throw new ApplyRejection("target item is not active");
-  const named = await childIds(client, op.children);
-  const { rows } = await client.query<{ before: string[]; after: string[]; ids: string[] }>(
-    `with item as (select child_ids, group_id from ${table} where id = $1),
-          current as (
-            select c.id, c.name from public.children c, item
-             where case when cardinality(item.child_ids) > 0 then c.id = any(item.child_ids) else c.group_id = item.group_id end),
-          joining as (
-            select c.id, c.name from public.children c
-             where case when cardinality($2::uuid[]) > 0 then c.id = any($2::uuid[]) else c.group_id = $3 end)
-     select array(select name from current order by name) as before,
-            array(select name from (select * from current union select * from joining) u order by name) as after,
-            array(select id from (select id from current union select id from joining) u) as ids`,
-    [op.targetId, named, groupId],
-  );
-  const { before, after, ids } = rows[0]!;
+  const before = existing.children;
+  let after = before;
+  if (before.length > 0) {
+    const joining = op.children.length
+      ? op.children
+      : (await client.query<{ name: string }>("select name from public.children where group_id = $1 order by name", [groupId])).rows.map((r) => r.name);
+    after = audienceOf([...before, ...joining]);
+  }
   await client.query(
     `update ${table}
-        set child_ids = $2::uuid[],
-            source_message_ids = array(select distinct unnest(source_message_ids || $3::uuid[]))
+        set extra_group_ids = case when group_id = $2 or $2 = any(extra_group_ids) then extra_group_ids else extra_group_ids || $2::uuid end,
+            audience = $3::text[],
+            source_message_ids = array(select distinct unnest(source_message_ids || $4::uuid[]))
       where id = $1`,
-    [op.targetId, ids, op.sourceMessageIds],
+    [op.targetId, groupId, after, op.sourceMessageIds],
   );
   const changes = JSON.stringify(before) === JSON.stringify(after) ? {} : { children: { from: before, to: after } };
   await recordChange(client, op.type, op.targetId, "update", changes, op.sourceMessageIds, op.rationale);
@@ -292,7 +311,7 @@ async function applyJoin(ctx: Ctx, op: Extract<ResolvedOperation, { op: "join" }
 
 async function applyOne(
   ctx: Ctx,
-  op: Exclude<ResolvedOperation, { op: "join" }>,
+  op: Exclude<ResolvedOperation, { op: "join" | "done" }>,
   status: Status,
   refIds: Map<string, string>,
 ): Promise<{ id: string } | "proposed"> {
@@ -310,7 +329,8 @@ async function applyOne(
 
   if (op.op === "create") {
     const data = checkData(op.type, op.data);
-    const assigned: [string, string, unknown][] = takesChildren(op.type) ? [["child_ids", "$::uuid[]", await childIds(client, op.children)]] : [];
+    // The children's names (audience); refresh_item_children assigns each family's children.
+    const assigned: [string, string, unknown][] = takesChildren(op.type) ? [["audience", "$::text[]", audienceOf(op.children)]] : [];
     const cols = render([...columns(op.type, data, groupId, eventIdOf(op.eventRef)), ...assigned], 4);
     const { rows } = await client.query<{ id: string }>(
       `insert into ${table} (source_message_ids, confidence, rationale, status, ${cols.names.join(", ")})
@@ -369,9 +389,9 @@ async function applyOne(
   const eventId = op.eventRef === undefined ? currentEvent : eventIdOf(op.eventRef);
   // Only events move between "this group" and "whole kindergarten"; other items keep their group.
   const updatable = columns(op.type, data, groupId, eventId).filter(([name]) => op.type === "event" || name !== "group_id");
-  // An empty list keeps the current assignment; names that match no child do not clear it either.
-  const ids = takesChildren(op.type) ? await childIds(client, op.children) : [];
-  if (ids.length) updatable.push(["child_ids", "$::uuid[]", ids]);
+  // An empty list keeps the current audience.
+  const audience = takesChildren(op.type) ? audienceOf(op.children) : [];
+  if (audience.length) updatable.push(["audience", "$::text[]", audience]);
   const cols = render(updatable, 5);
   const assignments = cols.names.map((name, i) => `${name} = ${cols.exprs[i]}`).join(", ");
   await client.query(
@@ -383,7 +403,7 @@ async function applyOne(
   );
   const diff = diffData(existing.data as Record<string, unknown>, data as Record<string, unknown>);
   const names = (list: readonly string[]) => JSON.stringify(list.map((n) => n.toLocaleLowerCase("pl-PL")).sort());
-  if (ids.length > 0 && names(op.children) !== names(existing.children)) diff.children = { from: existing.children, to: op.children };
+  if (audience.length > 0 && names(audience) !== names(existing.children)) diff.children = { from: existing.children, to: audience };
   if (Object.keys(diff).length) await recordChange(client, op.type, op.targetId, "update", diff, op.sourceMessageIds, op.rationale);
   return { id: op.targetId };
 }

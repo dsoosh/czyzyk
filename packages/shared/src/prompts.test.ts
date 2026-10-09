@@ -13,7 +13,8 @@ describe("szablony promptów", () => {
 
   it("wykrywa placeholdery ze spacjami i nieznane nazwy", () => {
     expect(placeholdersIn("{{dzieci}} i {{ rodzina }} i znowu {{dzieci}}")).toEqual(["dzieci", "rodzina"]);
-    expect(unknownPlaceholders("extraction", "{{uzytkownik}} {{dzieci}} {{coś}}")).toEqual(["uzytkownik", "coś"]);
+    // Children and families are not in the extraction system prompt (families).
+    expect(unknownPlaceholders("extraction", "{{uzytkownik}} {{dzieci}} {{coś}}")).toEqual(["uzytkownik", "dzieci", "coś"]);
   });
 
   it("wypełnia placeholdery jednym przebiegiem, puste jako (brak), i zawsze dopisuje stałą część", () => {

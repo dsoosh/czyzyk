@@ -12,6 +12,7 @@ const aliases: Aliases = {
     ["E2", { id: "p1", type: "payment" as const }],
     ["E3", { id: "x1", type: "event" as const, foreign: true }],
   ]),
+  families: new Map([["R1", "f1"]]),
 };
 
 const event = (over: Record<string, unknown> = {}) => ({
@@ -110,5 +111,19 @@ describe("resolveOperations", () => {
   it("rejects duplicate refs", () => {
     const { rejected } = resolveOperations([event(), event()], aliases);
     expect(rejected).toEqual([{ index: 1, reason: "duplicate ref nowe1" }]);
+  });
+
+  it("done: maps the family alias; unknown family, other groups' items and wrong types are rejected", () => {
+    const done = (over: Record<string, unknown> = {}) => ({
+      op: "done", type: "payment", target: "E2", family: "R1", source_messages: ["W2"], confidence: 0.9, rationale: "Zapłacone.", ...over,
+    });
+    const { accepted, rejected } = resolveOperations(
+      [done(), done({ family: "R7" }), done({ target: "E1" }), done({ type: "event", target: "E3" })],
+      aliases,
+    );
+    expect(accepted).toEqual([
+      { op: "done", index: 0, type: "payment", targetId: "p1", familyId: "f1", resolution: null, sourceMessageIds: ["m2"], confidence: 0.9, rationale: "Zapłacone." },
+    ]);
+    expect(rejected.map((r) => r.index)).toEqual([1, 2, 3]);
   });
 });

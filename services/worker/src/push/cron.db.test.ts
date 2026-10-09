@@ -315,13 +315,17 @@ describe("Skróty i alerty dwóch rodzin", () => {
     await db.client.query("insert into bring_items (group_id, description, due_date) values ($1, 'kanapki', '2026-10-09')", [g[0].id]);
     await insertDone("payment", "insert into payments (description, amount_pln, due_date) values ('wycieczka', 30, '2026-10-09')");
     await db.client.query("insert into bring_items (description, due_date) values ('kapcie', '2026-10-09')");
+    // Addressed to children (two-step extraction): only the family of a named child gets it.
+    await db.client.query("insert into bring_items (group_id, description, due_date, audience) values ($1, 'liście', '2026-10-09', '{Hania}')", [g[0].id]);
+    await db.client.query("insert into bring_items (group_id, description, due_date, audience) values ($1, 'kasztany', '2026-10-09', '{Lenka,Lena}')", [g[0].id]);
+    await db.client.query("select public.refresh_item_children()");
 
     const { sender, sent } = fakeSender();
     await digest(sender, at("2026-10-08T19:00:00"));
     const body = (endpoint: string) => sent.find((s) => s.endpoint === endpoint)?.payload.body;
     expect(body("https://push.example/1")).toBe("Jutro: kapcie");
     expect(body("https://push.example/2")).toBe("Jutro: kapcie");
-    expect(body("https://push.example/3")).toBe("Jutro: kanapki, kapcie, wycieczka (30 zł)");
+    expect(body("https://push.example/3")).toBe("Jutro: kanapki, kapcie, kasztany, wycieczka (30 zł)");
 
     const { rows: a } = await db.client.query("insert into action_required (group_id, question) values ($1, 'Zgoda na basen') returning id", [g[0].id]);
     const alerts = fakeSender();

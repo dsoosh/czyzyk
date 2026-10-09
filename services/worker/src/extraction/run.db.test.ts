@@ -23,7 +23,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  for (const t of ["bring_items", "events", "payments", "action_required", "closures", "facts", "messages", "sync_log", "llm_calls", "item_changes", "children", "wa_groups"]) {
+  for (const t of ["item_done", "contact_roles", "bring_items", "events", "payments", "action_required", "closures", "facts", "messages", "sync_log", "llm_calls", "item_changes", "children", "wa_groups"]) {
     await db.client.query(`delete from ${t}`);
   }
   const { rows } = await db.client.query("insert into wa_groups (wa_name, display_name, tracked) values ('Motylki 2026/27', 'Motylki', true) returning id");
@@ -407,41 +407,44 @@ describe("runGroupExtraction", () => {
     expect(rows[0]).toEqual({ status: "active", proposal: "cancel" });
   });
 
-  it("przypisuje dzieci z listy (bez względu na wielkość liter), pomija nieznane, update zmienia przypisanie", async () => {
+  it("zapisuje adresatów jak w wiadomości, a baza przypisuje pasujące dzieci rodzin (imię i inne formy)", async () => {
     const { rows: kids } = await db.client.query<{ id: string; name: string }>(
-      "insert into children (name, group_id, aliases) values ('Zosia', $1, '{Zofia}'), ('Antek', null, '{}') returning id, name",
+      "insert into children (name, group_id, aliases) values ('Zosia', $1, '{Zofia}'), ('Antek', $1, '{}') returning id, name",
       [groupId],
     );
     const zosia = kids.find((c) => c.name === "Zosia")!.id;
     const antek = kids.find((c) => c.name === "Antek")!.id;
-    await addMessage("Zosia przynosi jutro kasztany", "2026-10-07T16:02:00Z");
+    await addMessage("Zosia i Kasia przynoszą jutro kasztany", "2026-10-07T16:02:00Z");
     const first = scripted((p) => [
       op({
         op: "create",
         type: "bring_item",
         ref: null,
         data: { description: "kasztany", due_date: "2026-10-08", event: null },
-        children: ["zosia", "Kasia"],
+        children: ["zosia", "Kasia", "Zosia"],
         source_messages: [lastAlias(p)],
       }),
     ]);
     await runGroupExtraction(deps(first.model), groupId);
-    expect(first.prompts[0]!.system).toContain('"Zosia" (inne formy imienia: "Zofia") – grupa "Motylki"');
+    // Families are in the request, not in the system prompt (families).
+    expect(first.prompts[0]!.user).toContain('<rodziny>\nR1: dzieci w tej grupie: "Antek", "Zosia" (inne formy imienia: "Zofia")\n</rodziny>');
+    expect(first.prompts[0]!.system).not.toContain('"Zofia"');
     // Starting kindergarten description from migration 0011.
     expect(first.prompts[0]!.system).toMatch(/<przedszkole>\n[^]*Golędzinów, Kolonia 39[^]*<\/przedszkole>/);
-    const { rows: created } = await db.client.query("select id, child_ids from bring_items");
-    expect(created).toEqual([{ id: expect.any(String), child_ids: [zosia] }]);
+    const { rows: created } = await db.client.query("select audience, child_ids from bring_items");
+    // Kasia is no family's child: the item stays addressed to her too, without a child.
+    expect(created).toEqual([{ audience: ["zosia", "Kasia"], child_ids: [zosia] }]);
 
     await addMessage("Sorry, kasztany przynosi Antek", "2026-10-07T16:30:00Z");
     const second = scripted((p) => [
       op({ op: "update", type: "bring_item", target: "E1", data: {}, children: ["Antek"], source_messages: [lastAlias(p)] }),
     ]);
     await runGroupExtraction(deps(second.model), groupId);
-    expect(second.prompts[0]!.user).toContain('| dzieci: ["Zosia"]');
-    const { rows: updated } = await db.client.query("select child_ids, description from bring_items");
-    expect(updated).toEqual([{ child_ids: [antek], description: "kasztany" }]);
+    expect(second.prompts[0]!.user).toContain('| dzieci: ["zosia","Kasia"]');
+    const { rows: updated } = await db.client.query("select audience, child_ids, description from bring_items");
+    expect(updated).toEqual([{ audience: ["Antek"], child_ids: [antek], description: "kasztany" }]);
 
-    // The model may write another form of the name; it still points at the child.
+    // Another form of the name still points at the child.
     await addMessage("Jednak Zofia też niesie kasztany", "2026-10-07T16:40:00Z");
     const third = scripted((p) => [
       op({ op: "update", type: "bring_item", target: "E1", data: {}, children: ["Antek", "Zofia"], source_messages: [lastAlias(p)] }),
@@ -451,7 +454,33 @@ describe("runGroupExtraction", () => {
     expect([...both[0].child_ids].sort()).toEqual([antek, zosia].sort());
   });
 
-  it("wspólna sprawa dwojga dzieci z różnych grup: join dopisuje dziecko zamiast tworzyć duplikat", async () => {
+  it("odpowiedź członka rodziny z aplikacji zamyka sprawę tylko dla jego rodziny (done)", async () => {
+    await allowEmail(db.client, "mama@example.com", "family");
+    const mamaId = await createAuthUser(db.client, "mama@example.com", "Mama");
+    await db.client.query("insert into contact_roles (author_key, role, label, profile_id) values ('+48535111213', 'rodzina', 'Mama', $1)", [mamaId]);
+    await db.client.query("insert into children (name, group_id) values ('Zosia', $1)", [groupId]);
+    const { rows: a } = await db.client.query(
+      "insert into action_required (group_id, question) values ($1, 'Zapisy na basen') returning id",
+      [groupId],
+    );
+    const { rows: m } = await db.client.query(
+      `insert into messages (group_id, author, sent_at, text, source, dedupe_key)
+       values ($1, '+48 535 111 213', '2026-10-07T16:02:00Z', 'Zapisujemy Zosię', 'notification', 'k-mama') returning id`,
+      [groupId],
+    );
+    const { model, prompts } = scripted((p) => [
+      { op: "done", type: "action_required", target: "E1", family: "R1", resolution: "Tak, zapisujemy", source_messages: [lastAlias(p)], confidence: 0.9, rationale: "Mama odpisała." },
+    ]);
+    expect(await runGroupExtraction(deps(model), groupId)).toMatchObject({ status: "ok", updated: 1 });
+    expect(prompts[0]!.user).toContain('"+48 535 111 213" [rodzina R1]: "Zapisujemy Zosię"');
+    const { rows } = await db.client.query("select item_id, family_id, resolution from item_done");
+    const { rows: family } = await db.client.query("select family_id from profiles where id = $1", [mamaId]);
+    expect(rows).toEqual([{ item_id: a[0].id, family_id: family[0].family_id, resolution: "Tak, zapisujemy" }]);
+    expect((await db.client.query("select status from action_required")).rows).toEqual([{ status: "active" }]);
+    expect(m[0].id).toBeDefined();
+  });
+
+  it("wspólna sprawa dwóch grup: join dopisuje grupę (i dzieci, gdy sprawa ma adresatów) zamiast tworzyć duplikat", async () => {
     const { rows: g } = await db.client.query("insert into wa_groups (wa_name, tracked) values ('Sowy', true) returning id");
     const sowy = g[0].id as string;
     const { rows: kids } = await db.client.query<{ id: string; name: string }>(
@@ -460,13 +489,13 @@ describe("runGroupExtraction", () => {
     );
     const zosia = kids.find((c) => c.name === "Zosia")!.id;
     const antek = kids.find((c) => c.name === "Antek")!.id;
-    // The trip came first in Sowy, for the whole group (no children assigned).
+    // The trip came first in Sowy, for the whole group; the payment only for Antek.
     const { rows: ev } = await db.client.query(
       "insert into events (group_id, title, starts_at, all_day) values ($1, 'Wycieczka do Zajezdni', '2026-10-14T07:30:00Z', false) returning id",
       [sowy],
     );
     const { rows: pay } = await db.client.query(
-      "insert into payments (group_id, description, amount_pln, due_date) values ($1, 'Wycieczka', 60, '2026-10-14') returning id",
+      "insert into payments (group_id, description, amount_pln, due_date, audience) values ($1, 'Wycieczka', 60, '2026-10-14', '{Antek}') returning id",
       [sowy],
     );
     await addMessage("Wycieczka do Centrum Zajezdnia 14.10, koszt 60 zł", "2026-10-07T16:00:00Z");
@@ -483,18 +512,20 @@ describe("runGroupExtraction", () => {
     expect(summary).toMatchObject({ created: 0, updated: 2, rejected: [{ index: 2, reason: expect.stringContaining("another group") }] });
     expect(prompts[0]!.user).toMatch(/<elementy_innych_grup>\n.*Wycieczka do Zajezdni.*\| grupa: "Sowy"/);
 
-    const { rows: events } = await db.client.query("select title, group_id, child_ids from events");
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ title: "Wycieczka do Zajezdni", group_id: sowy });
-    expect([...events[0].child_ids].sort()).toEqual([antek, zosia].sort());
-    const { rows: payments } = await db.client.query("select child_ids, cardinality(source_message_ids) as sources from payments where id = $1", [pay[0].id]);
+    const { rows: events } = await db.client.query("select title, group_id, extra_group_ids, audience from events");
+    expect(events).toEqual([{ title: "Wycieczka do Zajezdni", group_id: sowy, extra_group_ids: [groupId], audience: [] }]);
+    const { rows: payments } = await db.client.query(
+      "select extra_group_ids, audience, child_ids, cardinality(source_message_ids) as sources from payments where id = $1",
+      [pay[0].id],
+    );
+    expect(payments[0]).toMatchObject({ extra_group_ids: [groupId], audience: ["Antek", "Zosia"], sources: 1 });
     expect([...payments[0].child_ids].sort()).toEqual([antek, zosia].sort());
-    expect(payments[0].sources).toBe(1);
     const { rows: history } = await db.client.query(
-      "select changes from item_changes where item_type = 'event' and item_id = $1",
-      [ev[0].id],
+      "select changes from item_changes where item_type = 'payment' and item_id = $1",
+      [pay[0].id],
     );
     expect(history).toEqual([{ changes: { children: { from: ["Antek"], to: ["Antek", "Zosia"] } } }]);
+    expect(ev[0].id).toBeDefined();
   });
 
   it("bez dzieci w innych grupach model nie dostaje cudzych spraw", async () => {
@@ -507,14 +538,15 @@ describe("runGroupExtraction", () => {
     expect(prompts[0]!.user).not.toContain("elementy_innych_grup");
   });
 
-  it("używa szablonu promptu zapisanego przez admina, z imionami rodziny i stałymi zasadami", async () => {
+  it("używa szablonu promptu zapisanego przez admina, ze stałymi zasadami", async () => {
     await allowEmail(db.client, "ola.k@example.com", "family");
     await createAuthUser(db.client, "ola.k@example.com", "Ola Kowalska");
     await db.client.query("insert into llm_prompts (key, template) values ('extraction', 'Moje instrukcje dla {{rodzina}}.')");
     await addMessage("Dzień dobry, jutro zbiórka", "2026-10-07T16:02:00Z");
     const { model, prompts } = scripted(() => []);
     await runGroupExtraction(deps(model), groupId);
-    expect(prompts[0]!.system.startsWith('Moje instrukcje dla "Ola".')).toBe(true);
+    // Families are no longer in the system prompt (families): an older placeholder points to the request.
+    expect(prompts[0]!.system.startsWith("Moje instrukcje dla (zob. blok <rodziny> w treści zapytania).")).toBe(true);
     expect(prompts[0]!.system).toContain("niezaufane dane");
     await db.client.query("delete from llm_prompts");
   });
