@@ -4,12 +4,14 @@ import { ANDROID_AUTH_REDIRECT, androidBridge } from "../lib/androidApp";
 import type { Db } from "../lib/supabase";
 import type { Profile } from "../lib/types";
 
-export const NO_ACCESS_MESSAGE = "Brak dostępu – ten adres nie jest na liście rodziny.";
+export const NO_ACCESS_MESSAGE = "Brak dostępu – to konto nie ma dostępu do Czyżyka.";
 
 export type AuthState =
   | { status: "loading" }
   | { status: "signed_out" }
   | { status: "no_access"; message: string }
+  /** Signed in without a profile: the access request waits for the operator or was rejected (families-joining). */
+  | { status: "waiting"; email: string; rejected: boolean }
   | { status: "error"; message: string }
   | { status: "ready"; profile: Profile };
 
@@ -66,7 +68,12 @@ export function AuthProvider({ client, children }: { client: Db; children: React
         return;
       }
       if (!data) {
-        // Signed in, but not (or no longer) on the family list: RLS returns no profile.
+        // Signed in without a profile: a new account waits for approval; a removed member has no access.
+        const { data: request } = await client.rpc("my_access_request");
+        if (request === "pending" || request === "rejected") {
+          setState({ status: "waiting", email: session.user.email ?? "", rejected: request === "rejected" });
+          return;
+        }
         setState({ status: "no_access", message: NO_ACCESS_MESSAGE });
         await client.auth.signOut();
         return;
@@ -98,10 +105,10 @@ export function AuthProvider({ client, children }: { client: Db; children: React
     await loadProfile(data.session);
   }, [client, loadProfile]);
 
-  // A removed family member loses access on their next return to the app.
+  // A removed family member loses access, and an approved one gets it, on their next return to the app.
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible" && stateRef.current.status === "ready") {
+      if (document.visibilityState === "visible" && (stateRef.current.status === "ready" || stateRef.current.status === "waiting")) {
         void refreshProfile();
       }
     };

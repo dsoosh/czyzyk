@@ -51,8 +51,12 @@ export function AllowedEmailsPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="font-display text-4xl font-bold text-ink">Lista rodziny</h1>
-      <p className="text-sm text-slate-600">Tylko te adresy mogą zalogować się do aplikacji przez Google.</p>
+      <h1 className="font-display text-4xl font-bold text-ink">Dostęp</h1>
+      <AccessRequests onDecided={() => void load()} />
+      <h2 className="font-display text-2xl font-bold text-ink">Adresy z dostępem</h2>
+      <p className="text-sm text-slate-600">
+        Te adresy mają dostęp do aplikacji. Adres dodany tutaj trafia do Twojej rodziny; rodziny dodają swoich członków same w ustawieniach.
+      </p>
 
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
@@ -122,7 +126,7 @@ export function AllowedEmailsPage() {
                   disabled={busy || isMe}
                   aria-label={`Usuń ${row.email}`}
                   onClick={() => {
-                    if (window.confirm(`Usunąć ${row.email} z listy rodziny? Ta osoba straci dostęp.`)) {
+                    if (window.confirm(`Usunąć ${row.email} z listy dostępu? Ta osoba straci dostęp.`)) {
                       void run(() => client.rpc("admin_delete_allowed_email", { p_email: row.email }));
                     }
                   }}
@@ -135,6 +139,92 @@ export function AllowedEmailsPage() {
           })}
         </ul>
       )}
+    </section>
+  );
+}
+
+interface AccessRequest {
+  email: string;
+  display_name: string | null;
+  requested_at: string;
+}
+
+/** Pending access requests: approving creates a new family (families-joining). */
+function AccessRequests({ onDecided }: { onDecided: () => void }) {
+  const { client } = useAuth();
+  const [rows, setRows] = useState<AccessRequest[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data, error: e } = await client
+      .from("access_requests")
+      .select("email, display_name, requested_at")
+      .eq("status", "pending")
+      .order("requested_at")
+      .returns<AccessRequest[]>();
+    if (e) setError("Nie udało się wczytać próśb o dostęp.");
+    else setRows(data ?? []);
+  }, [client]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const decide = async (fn: "admin_approve_access_request" | "admin_reject_access_request", email: string) => {
+    setBusy(true);
+    setError(null);
+    const { error: e } = await client.rpc(fn, { p_email: email });
+    setBusy(false);
+    if (e) setError(e.message);
+    await load();
+    onDecided();
+  };
+
+  if (rows === null && !error) return null;
+  return (
+    <section aria-label="Prośby o dostęp" className="space-y-2">
+      <h2 className="font-display text-2xl font-bold text-ink">Prośby o dostęp</h2>
+      {error && (
+        <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          {error}
+        </p>
+      )}
+      {rows && rows.length === 0 ? (
+        <p className="text-sm text-slate-500">Nikt nie czeka na dostęp.</p>
+      ) : (
+        <ul className="divide-y divide-slate-200 rounded-2xl bg-white shadow-sm">
+          {rows?.map((r) => (
+            <li key={r.email} className="flex flex-wrap items-center gap-2 p-4">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{r.display_name ?? r.email}</span>
+                {r.display_name && <span className="block truncate text-sm text-slate-500">{r.email}</span>}
+              </span>
+              <button
+                type="button"
+                disabled={busy}
+                aria-label={`Akceptuj ${r.email}`}
+                onClick={() => void decide("admin_approve_access_request", r.email)}
+                className="rounded-lg bg-brand-700 px-3 py-1 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Akceptuj
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                aria-label={`Odrzuć ${r.email}`}
+                onClick={() => {
+                  if (window.confirm(`Odrzucić prośbę ${r.email}?`)) void decide("admin_reject_access_request", r.email);
+                }}
+                className="rounded-lg px-3 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-40"
+              >
+                Odrzuć
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-slate-500">Akceptacja tworzy nową rodzinę. Drugiego rodzica dodaje sama rodzina w ustawieniach.</p>
     </section>
   );
 }
