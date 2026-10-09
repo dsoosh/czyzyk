@@ -6,6 +6,7 @@ import {
   CLOSURE_COLUMNS,
   fetchGroupNames,
   fetchPeople,
+  ITEM_TABLES,
   PAYMENT_COLUMNS,
   run,
   type ActionRequired,
@@ -58,10 +59,10 @@ export interface ListsBase {
 export async function fetchBringList(db: Db, today: string): Promise<ListsBase & { items: BringItem[] }> {
   const [dated, undated, groups, people, children] = await Promise.all([
     run<BringItem[]>(
-      db.from("bring_items").select(BRING_COLUMNS).eq("status", "active").gte("due_date", today).order("due_date").order("description"),
+      db.from(ITEM_TABLES.bring_item).select(BRING_COLUMNS).eq("status", "active").gte("due_date", today).order("due_date").order("description"),
     ),
     run<BringItem[]>(
-      db.from("bring_items").select(BRING_COLUMNS).eq("status", "active").is("due_date", null).order("description").limit(50),
+      db.from(ITEM_TABLES.bring_item).select(BRING_COLUMNS).eq("status", "active").is("due_date", null).order("description").limit(50),
     ),
     fetchGroupNames(db),
     fetchPeople(db),
@@ -72,10 +73,10 @@ export async function fetchBringList(db: Db, today: string): Promise<ListsBase &
 
 export async function fetchPaymentList(db: Db): Promise<ListsBase & { open: Payment[]; paid: Payment[] }> {
   const [open, paid, groups, people, children] = await Promise.all([
-    run<Payment[]>(db.from("payments").select(PAYMENT_COLUMNS).eq("status", "active").is("paid_at", null).order("due_date")),
+    run<Payment[]>(db.from(ITEM_TABLES.payment).select(PAYMENT_COLUMNS).eq("status", "active").is("paid_at", null).order("due_date")),
     run<Payment[]>(
       db
-        .from("payments")
+        .from(ITEM_TABLES.payment)
         .select(PAYMENT_COLUMNS)
         .eq("status", "active")
         .not("paid_at", "is", null)
@@ -92,11 +93,11 @@ export async function fetchPaymentList(db: Db): Promise<ListsBase & { open: Paym
 export async function fetchActionList(db: Db): Promise<ListsBase & { open: ActionRequired[]; resolved: ActionRequired[] }> {
   const [open, resolved, groups, people, children] = await Promise.all([
     run<ActionRequired[]>(
-      db.from("action_required").select(ACTION_COLUMNS).eq("status", "active").is("resolved_at", null).order("due_date"),
+      db.from(ITEM_TABLES.action_required).select(ACTION_COLUMNS).eq("status", "active").is("resolved_at", null).order("due_date"),
     ),
     run<ActionRequired[]>(
       db
-        .from("action_required")
+        .from(ITEM_TABLES.action_required)
         .select(ACTION_COLUMNS)
         .eq("status", "active")
         .not("resolved_at", "is", null)

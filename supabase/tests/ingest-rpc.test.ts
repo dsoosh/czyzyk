@@ -15,7 +15,7 @@ beforeAll(async () => {
   await allowEmail(db.client, "ola@example.com", "family");
   adminId = await createAuthUser(db.client, "admin@example.com");
   familyId = await createAuthUser(db.client, "ola@example.com");
-  const { rows } = await db.client.query("insert into wa_groups (wa_name) values ('Motylki 2026/27') returning id");
+  const { rows } = await db.client.query("insert into wa_groups (wa_name, shared) values ('Motylki 2026/27', true) returning id");
   groupId = rows[0].id;
   for (let i = 0; i < 30; i++) {
     const { rows: m } = await db.client.query(

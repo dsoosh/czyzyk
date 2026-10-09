@@ -29,7 +29,7 @@ beforeAll(async () => {
   strangerId = await createAuthUser(c, "obcy@example.com", "Obcy");
 
   // Seed one row in every table (as the table owner, like a server service would).
-  const { rows: g } = await c.query("insert into wa_groups (wa_name, tracked) values ('Motylki', true) returning id");
+  const { rows: g } = await c.query("insert into wa_groups (wa_name, tracked, shared) values ('Motylki', true, true) returning id");
   const groupId = g[0].id;
   const { rows: m } = await c.query(
     `insert into messages (group_id, author, sent_at, text, source, dedupe_key)

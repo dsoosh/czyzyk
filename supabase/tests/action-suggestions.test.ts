@@ -51,7 +51,10 @@ describe("proponowane akcje", () => {
     expect(bring[0].due).toBe("2099-01-15");
     expect(result.r.due_date).toBe("2099-01-15");
     expect(bring[0].rationale).toBe("Z „Wymaga odpowiedzi”: Do przyniesienia");
-    const { rows: closed } = await db.client.query("select resolved_by, resolution from action_required where id = $1", [id]);
+    const { rows: closed } = await db.client.query(
+      "select done_by as resolved_by, resolution from item_done where item_type = 'action_required' and item_id = $1",
+      [id],
+    );
     expect(closed[0]).toEqual({ resolved_by: olaId, resolution: "Do przyniesienia" });
     await expect(asOla("select apply_action_suggestion($1, 1)", [id])).rejects.toThrow(/Nie ma takiej otwartej sprawy/);
   });
@@ -73,9 +76,9 @@ describe("proponowane akcje", () => {
   it("odpowiedź zapisuje wybraną odpowiedź; cofnięcie czyści ją", async () => {
     const id = await action([s("answer", "Tak, zapisujemy"), s("answer", "Nie")]);
     await asOla("select apply_action_suggestion($1, 1)", [id]);
-    expect((await db.client.query("select resolution from action_required where id = $1", [id])).rows[0].resolution).toBe("Nie");
+    expect((await db.client.query("select resolution from item_done where item_id = $1", [id])).rows[0].resolution).toBe("Nie");
     await asOla("select mark_resolved($1, false)", [id]);
-    expect((await db.client.query("select resolved_at, resolution from action_required where id = $1", [id])).rows[0]).toEqual({
+    expect((await asOla("select resolved_at, resolution from family_action_required where id = $1", [id]))[0]).toEqual({
       resolved_at: null,
       resolution: null,
     });

@@ -20,7 +20,7 @@ beforeAll(async () => {
   pool = new pg.Pool({ connectionString: db.url, max: 3 });
   await allowEmail(db.client, "ola@example.com", "family");
   olaId = await createAuthUser(db.client, "ola@example.com", "Ola");
-  const { rows } = await db.client.query("insert into wa_groups (wa_name, display_name) values ('Motylki 2026/27', 'Motylki') returning id");
+  const { rows } = await db.client.query("insert into wa_groups (wa_name, display_name, shared) values ('Motylki 2026/27', 'Motylki', true) returning id");
   groupId = rows[0].id;
 });
 
@@ -70,6 +70,26 @@ describe("GET /ical/{token}.ics", () => {
     expect(body).not.toContain("Tajna treść");
     expect(body).not.toContain("Pani Ania");
     expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(3);
+  });
+
+  it("tylko grupy rodziny właściciela linku: cudza grupa nie trafia do kalendarza", async () => {
+    const { rows: f } = await db.client.query("insert into families (name) values ('Rodzina Kasi') returning id");
+    await db.client.query("insert into allowed_emails (email, role, family_id) values ('kasia@example.com', 'family', $1)", [f[0].id]);
+    const kasiaId = await createAuthUser(db.client, "kasia@example.com", "Kasia");
+    const { rows: g } = await db.client.query("insert into wa_groups (wa_name, tracked) values ('Wilki', true) returning id");
+    await db.client.query("insert into children (family_id, name, group_id) values ($1, 'Lena', $2)", [f[0].id, g[0].id]);
+    await db.client.query(
+      `insert into events (group_id, title, starts_at, all_day) values
+         ($1, 'Wycieczka Wilków', now() + interval '2 days', true), ($2, 'Bal jesienny', now() + interval '2 days', true)`,
+      [g[0].id, groupId],
+    );
+    const feed = async (userId: string) => (await app().inject({ method: "GET", url: `/ical/${await newToken(userId)}.ics` })).body;
+    const ola = await feed(olaId);
+    expect(ola).toContain("SUMMARY:Bal jesienny");
+    expect(ola).not.toContain("Wycieczka Wilków");
+    const kasia = await feed(kasiaId);
+    expect(kasia).toContain("SUMMARY:Wycieczka Wilków");
+    expect(kasia).toContain("SUMMARY:Bal jesienny");
   });
 
   it("stałe zajęcia: osobny wpis na każde wystąpienie w ciągu roku, bez dni wolnych", async () => {

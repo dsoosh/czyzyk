@@ -86,7 +86,7 @@ describe("Usunięcie z listy odbiera dostęp", () => {
   it("kasuje profil i odbiera odczyt aktywnej sesji, a ponowne dodanie go przywraca", async () => {
     await allowEmail(db.client, "kasia@example.com", "family");
     const id = await createAuthUser(db.client, "kasia@example.com", "Kasia");
-    await db.client.query("insert into wa_groups (wa_name) values ('Biedronki')");
+    await db.client.query("insert into wa_groups (wa_name, shared) values ('Biedronki', true)");
     const read = () =>
       as(db.client, user(id), async (q) => (await q("select count(*)::int as n from public.wa_groups")).rows[0].n);
 

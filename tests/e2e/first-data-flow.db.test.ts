@@ -55,7 +55,7 @@ beforeAll(async () => {
   pool = new pg.Pool({ connectionString: db.url, max: 3 });
   await allowEmail(db.client, "ola@example.com", "family");
   familyId = await createAuthUser(db.client, "ola@example.com");
-  await db.client.query("insert into wa_groups (wa_name, display_name, tracked) values ('Motylki 2026/27', 'Motylki', true)");
+  await db.client.query("insert into wa_groups (wa_name, display_name, tracked, shared) values ('Motylki 2026/27', 'Motylki', true, true)");
   await db.client.query("insert into devices (name, token_hash) values ('Telefon', $1)", [
     createHash("sha256").update(token).digest("hex"),
   ]);

@@ -67,7 +67,14 @@ describe("Admin → Grupy", () => {
     const { rpc } = renderAt("/admin/grupy", { admin: true, tables });
     const row = (await screen.findByText("Motylki 2026/27")).closest("li")!;
     await userEvent.click(within(row).getByRole("checkbox", { name: "Śledź" }));
-    expect(rpc).toHaveBeenCalledWith("admin_update_group", { p_id: "g1", p_tracked: true, p_display_name: "" });
+    expect(rpc).toHaveBeenCalledWith("admin_update_group", { p_id: "g1", p_tracked: true, p_display_name: "", p_shared: false });
+  });
+
+  it("oznacza grupę jako wspólną dla wszystkich rodzin", async () => {
+    const { rpc } = renderAt("/admin/grupy", { admin: true, tables });
+    const row = (await screen.findByText("Motylki 2026/27")).closest("li")!;
+    await userEvent.click(within(row).getByRole("checkbox", { name: "Wspólna" }));
+    expect(rpc).toHaveBeenCalledWith("admin_update_group", { p_id: "g1", p_tracked: false, p_display_name: "", p_shared: true });
   });
 
   it("zapisuje nazwę wyświetlaną", async () => {
@@ -77,7 +84,7 @@ describe("Admin → Grupy", () => {
     expect(save).toBeDisabled();
     await userEvent.type(within(row).getByLabelText("Nazwa wyświetlana Motylki 2026/27"), "Motylki");
     await userEvent.click(save);
-    expect(rpc).toHaveBeenCalledWith("admin_update_group", { p_id: "g1", p_tracked: false, p_display_name: "Motylki" });
+    expect(rpc).toHaveBeenCalledWith("admin_update_group", { p_id: "g1", p_tracked: false, p_display_name: "Motylki", p_shared: false });
   });
 
   it("dodaje grupę z palca, zanim przyjdzie z niej wiadomość", async () => {

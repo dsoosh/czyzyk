@@ -2,6 +2,7 @@ import cors from "@fastify/cors";
 import { assistantAskSchema, type AssistantAnswer } from "@czyzyk/shared";
 import type { FastifyInstance } from "fastify";
 import type pg from "pg";
+import { asUser } from "../asUser.js";
 import type { SessionVerifier } from "../push/session.js";
 import type { DailyLimiter, RateLimiter } from "../rateLimit.js";
 import { loadAssistantSystem, loadViewContext, warsawDate } from "./context.js";
@@ -55,7 +56,10 @@ export async function assistantRoutes(
     if (!opts.perUser.hit(`assistant:${userId}`)) return reply.code(429).send({ error: "rate_limited" });
     if (!opts.daily.hit(userId, warsawDate(at))) return reply.code(429).send({ error: "daily_limit" });
 
-    const [context, system] = await Promise.all([loadViewContext(db, view, at), loadAssistantSystem(db, userId)]);
+    // Read as the user (families): only the groups and "done" marks of their family.
+    const [context, system] = await asUser(db, userId, (udb) =>
+      Promise.all([loadViewContext(udb, view, at), loadAssistantSystem(udb, userId, db)]),
+    );
     const result = await opts.model.answer({ system, messages: buildAssistantMessages(context, question, history, at) });
 
     request.log.info(

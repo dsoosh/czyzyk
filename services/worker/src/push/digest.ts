@@ -11,32 +11,38 @@ export interface DigestDeps {
 }
 
 /**
- * Tomorrow's digest text ("Jutro: strój sportowy, 10 zł na teatrzyk"), or null when
- * there is nothing for tomorrow. Only active items; packed and paid ones are left out.
+ * Tomorrow's digest text for one family ("Jutro: strój sportowy, 10 zł na teatrzyk"), or null
+ * when there is nothing for tomorrow. Only active items of groups the family sees (families);
+ * what the family packed or paid is left out.
  */
-export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string): Promise<string | null> {
+export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string, familyId: string): Promise<string | null> {
   const [closures, events, bring, payments] = await Promise.all([
     db.query<{ reason: string | null }>(
       `select reason from public.closures
-        where status = 'active' and $1::date between date_from and date_to order by date_from limit 1`,
-      [tomorrow],
+        where status = 'active' and $1::date between date_from and date_to and public.family_sees_group($2, group_id)
+        order by date_from limit 1`,
+      [tomorrow, familyId],
     ),
     db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null }>(
       `select e.title, e.all_day, e.location, e.meeting_point, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
-        where e.status = 'active'
+        where e.status = 'active' and public.family_sees_group($2, e.group_id) and (e.family_id is null or e.family_id = $2)
         order by o.starts_at, e.title`,
-      [tomorrow],
+      [tomorrow, familyId],
     ),
     db.query<{ description: string }>(
       `select description from public.bring_items
-        where status = 'active' and due_date = $1::date and packed_at is null order by description`,
-      [tomorrow],
+        where status = 'active' and due_date = $1::date and public.family_sees_group($2, group_id) and (family_id is null or family_id = $2)
+          and not exists (select 1 from public.item_done d where d.item_type = 'bring_item' and d.item_id = id and d.family_id = $2)
+        order by description`,
+      [tomorrow, familyId],
     ),
     db.query<{ description: string; amount_pln: string | null }>(
       `select description, amount_pln from public.payments
-        where status = 'active' and due_date = $1::date and paid_at is null order by description`,
-      [tomorrow],
+        where status = 'active' and due_date = $1::date and public.family_sees_group($2, group_id) and (family_id is null or family_id = $2)
+          and not exists (select 1 from public.item_done d where d.item_type = 'payment' and d.item_id = id and d.family_id = $2)
+        order by description`,
+      [tomorrow, familyId],
     ),
   ]);
 
@@ -55,7 +61,7 @@ export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string):
  * digest per day even if runs overlap; empty days are claimed but not sent.
  */
 export async function runDigest(deps: DigestDeps, now: Date): Promise<DeliverySummary & { claimed: number; empty: boolean }> {
-  const { rows: claimed } = await deps.db.query<{ user_id: string; today: string; tomorrow: string }>(
+  const { rows: claimed } = await deps.db.query<{ user_id: string; today: string; tomorrow: string; family_id: string | null }>(
     `with local as (select ($1::timestamptz at time zone 'Europe/Warsaw') as ts)
      update public.push_settings s
         set digest_sent_on = (select ts::date from local)
@@ -64,50 +70,65 @@ export async function runDigest(deps: DigestDeps, now: Date): Promise<DeliverySu
         and (select ts::time from local) - s.digest_time between interval '0' and make_interval(mins => $2)
         and exists (select 1 from public.push_subscriptions p where p.user_id = s.user_id)
      returning s.user_id, to_char((select ts::date from local), 'YYYY-MM-DD') as today,
-               to_char((select ts::date from local) + 1, 'YYYY-MM-DD') as tomorrow`,
+               to_char((select ts::date from local) + 1, 'YYYY-MM-DD') as tomorrow,
+               (select p.family_id from public.profiles p where p.id = s.user_id) as family_id`,
     [now, deps.windowMinutes],
   );
   const empty = { users: 0, sent: 0, removed: 0, failed: 0 };
   if (claimed.length === 0) return { ...empty, claimed: 0, empty: false };
 
   const tomorrow = claimed[0]!.tomorrow;
-  const body = await buildDigest(deps.db, tomorrow);
-  if (!body) {
-    deps.logger.info({ claimed: claimed.length }, "digest skipped: nothing for tomorrow");
-    return { ...empty, claimed: claimed.length, empty: true };
+  let summary: DeliverySummary = empty;
+  let sentAny = false;
+  for (const [familyId, userIds] of byFamily(claimed)) {
+    const body = await buildDigest(deps.db, tomorrow, familyId);
+    if (!body) continue;
+    sentAny = true;
+    summary = add(summary, await sendToUsers(deps.db, deps.sender, userIds, { title: "Czyżyk", body, url: "/", tag: `digest-${tomorrow}` }, deps.logger));
   }
-  const summary = await sendToUsers(
-    deps.db,
-    deps.sender,
-    claimed.map((c) => c.user_id),
-    { title: "Czyżyk", body, url: "/", tag: `digest-${tomorrow}` },
-    deps.logger,
-  );
-  return { ...summary, claimed: claimed.length, empty: false };
+  if (!sentAny) deps.logger.info({ claimed: claimed.length }, "digest skipped: nothing for tomorrow");
+  return { ...summary, claimed: claimed.length, empty: !sentAny };
+}
+
+/** Claimed users grouped by family: each family gets its own text (families). */
+function byFamily(rows: { user_id: string; family_id: string | null }[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const r of rows) {
+    if (!r.family_id) continue;
+    map.set(r.family_id, [...(map.get(r.family_id) ?? []), r.user_id]);
+  }
+  return map;
+}
+
+function add(a: DeliverySummary, b: DeliverySummary): DeliverySummary {
+  return { users: a.users + b.users, sent: a.sent + b.sent, removed: a.removed + b.removed, failed: a.failed + b.failed };
 }
 
 /**
- * Today's plan for the morning ("Dziś: basen 9:00, spakować: strój, kapcie"), or null when
- * there is nothing. Packed things are left out.
+ * Today's plan for one family's morning ("Dziś: basen 9:00, spakować: strój, kapcie"), or null
+ * when there is nothing. What the family packed is left out.
  */
-export async function buildMorning(db: Pick<pg.Pool, "query">, today: string): Promise<string | null> {
+export async function buildMorning(db: Pick<pg.Pool, "query">, today: string, familyId: string): Promise<string | null> {
   const [closures, events, bring] = await Promise.all([
     db.query<{ reason: string | null }>(
       `select reason from public.closures
-        where status = 'active' and $1::date between date_from and date_to order by date_from limit 1`,
-      [today],
+        where status = 'active' and $1::date between date_from and date_to and public.family_sees_group($2, group_id)
+        order by date_from limit 1`,
+      [today, familyId],
     ),
     db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null }>(
       `select e.title, e.all_day, e.location, e.meeting_point, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
-        where e.status = 'active'
+        where e.status = 'active' and public.family_sees_group($2, e.group_id) and (e.family_id is null or e.family_id = $2)
         order by o.starts_at, e.title`,
-      [today],
+      [today, familyId],
     ),
     db.query<{ description: string }>(
       `select description from public.bring_items
-        where status = 'active' and due_date = $1::date and packed_at is null order by description`,
-      [today],
+        where status = 'active' and due_date = $1::date and public.family_sees_group($2, group_id) and (family_id is null or family_id = $2)
+          and not exists (select 1 from public.item_done d where d.item_type = 'bring_item' and d.item_id = id and d.family_id = $2)
+        order by description`,
+      [today, familyId],
     ),
   ]);
   const parts: string[] = [];
@@ -119,24 +140,26 @@ export async function buildMorning(db: Pick<pg.Pool, "query">, today: string): P
 }
 
 /**
- * Deadlines of open payments and answers, today and tomorrow ("Termin dziś: zgoda na
- * wycieczkę. Jutro: składka (20 zł)"), or null. Paid and resolved items are left out.
+ * One family's deadlines of open payments and answers, today and tomorrow ("Termin dziś: zgoda
+ * na wycieczkę. Jutro: składka (20 zł)"), or null. What the family paid or resolved is left out.
  */
-export async function buildReminders(db: Pick<pg.Pool, "query">, today: string): Promise<string | null> {
+export async function buildReminders(db: Pick<pg.Pool, "query">, today: string, familyId: string): Promise<string | null> {
   const [payments, actions] = await Promise.all([
     db.query<{ description: string; amount_pln: string | null; due: string }>(
       `select description, amount_pln, case when due_date = $1::date then 'today' else 'tomorrow' end as due
          from public.payments
-        where status = 'active' and paid_at is null and due_date between $1::date and $1::date + 1
+        where status = 'active' and due_date between $1::date and $1::date + 1
+          and public.family_sees_group($2, group_id) and (family_id is null or family_id = $2) and not exists (select 1 from public.item_done d where d.item_type = 'payment' and d.item_id = id and d.family_id = $2)
         order by due_date, description`,
-      [today],
+      [today, familyId],
     ),
     db.query<{ question: string; due: string }>(
       `select question, case when due_date = $1::date then 'today' else 'tomorrow' end as due
          from public.action_required
-        where status = 'active' and resolved_at is null and due_date between $1::date and $1::date + 1
+        where status = 'active' and due_date between $1::date and $1::date + 1
+          and public.family_sees_group($2, group_id) and not exists (select 1 from public.item_done d where d.item_type = 'action_required' and d.item_id = id and d.family_id = $2)
         order by due_date, question`,
-      [today],
+      [today, familyId],
     ),
   ]);
   const labels = (due: string) => [
@@ -156,7 +179,7 @@ export async function buildReminders(db: Pick<pg.Pool, "query">, today: string):
  */
 export async function runMorning(deps: DigestDeps, now: Date): Promise<{ plan: DeliverySummary; reminders: DeliverySummary }> {
   const claim = (enabled: string, sentOn: string) =>
-    deps.db.query<{ user_id: string; today: string }>(
+    deps.db.query<{ user_id: string; today: string; family_id: string | null }>(
       `with local as (select ($1::timestamptz at time zone 'Europe/Warsaw') as ts)
        update public.push_settings s
           set ${sentOn} = (select ts::date from local)
@@ -164,18 +187,27 @@ export async function runMorning(deps: DigestDeps, now: Date): Promise<{ plan: D
           and s.${sentOn} is distinct from (select ts::date from local)
           and (select ts::time from local) - s.morning_time between interval '0' and make_interval(mins => $2)
           and exists (select 1 from public.push_subscriptions p where p.user_id = s.user_id)
-       returning s.user_id, to_char((select ts::date from local), 'YYYY-MM-DD') as today`,
+       returning s.user_id, to_char((select ts::date from local), 'YYYY-MM-DD') as today,
+                 (select p.family_id from public.profiles p where p.id = s.user_id) as family_id`,
       [now, deps.windowMinutes],
     );
   const empty: DeliverySummary = { users: 0, sent: 0, removed: 0, failed: 0 };
-  const send = async (rows: { user_id: string; today: string }[], build: (today: string) => Promise<string | null>, tag: string) => {
+  const send = async (
+    rows: { user_id: string; today: string; family_id: string | null }[],
+    build: (today: string, familyId: string) => Promise<string | null>,
+    tag: string,
+  ) => {
     if (rows.length === 0) return empty;
     const today = rows[0]!.today;
-    const body = await build(today);
-    if (!body) return empty;
-    return sendToUsers(deps.db, deps.sender, rows.map((r) => r.user_id), { title: "Czyżyk", body, url: "/", tag: `${tag}-${today}` }, deps.logger);
+    let summary = empty;
+    for (const [familyId, userIds] of byFamily(rows)) {
+      const body = await build(today, familyId);
+      if (!body) continue;
+      summary = add(summary, await sendToUsers(deps.db, deps.sender, userIds, { title: "Czyżyk", body, url: "/", tag: `${tag}-${today}` }, deps.logger));
+    }
+    return summary;
   };
-  const plan = await send((await claim("morning_enabled", "morning_sent_on")).rows, (d) => buildMorning(deps.db, d), "morning");
-  const reminders = await send((await claim("reminders_enabled", "reminders_sent_on")).rows, (d) => buildReminders(deps.db, d), "deadlines");
+  const plan = await send((await claim("morning_enabled", "morning_sent_on")).rows, (d, f) => buildMorning(deps.db, d, f), "morning");
+  const reminders = await send((await claim("reminders_enabled", "reminders_sent_on")).rows, (d, f) => buildReminders(deps.db, d, f), "deadlines");
   return { plan, reminders };
 }

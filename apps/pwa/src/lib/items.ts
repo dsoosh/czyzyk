@@ -9,9 +9,10 @@ export type ItemKind = "event" | "bring_item" | "payment" | "action_required" | 
 
 export const ITEM_TABLES: Record<ItemKind, string> = {
   event: "events",
-  bring_item: "bring_items",
-  payment: "payments",
-  action_required: "action_required",
+  // Views with the caller's family "done" marks (families).
+  bring_item: "family_bring_items",
+  payment: "family_payments",
+  action_required: "family_action_required",
   closure: "closures",
   fact: "facts",
 };
@@ -75,6 +76,8 @@ export interface Group {
   wa_name: string;
   display_name: string | null;
   tracked: boolean;
+  /** Visible to every family, not only to families whose children attend it (families). */
+  shared?: boolean;
 }
 
 const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, status";
@@ -127,7 +130,7 @@ export async function fetchToday(db: Db, today: string): Promise<TodayData> {
   const [bring, oneOff, recurring, payments, actions, closures, groups, people, children] = await Promise.all([
     run<BringItem[]>(
       db
-        .from("bring_items")
+        .from(ITEM_TABLES.bring_item)
         .select(BRING_COLUMNS)
         .eq("status", "active")
         .gte("due_date", today)
@@ -148,7 +151,7 @@ export async function fetchToday(db: Db, today: string): Promise<TodayData> {
     fetchRecurring(db, addDays(today, 7)),
     run<Payment[]>(
       db
-        .from("payments")
+        .from(ITEM_TABLES.payment)
         .select(PAYMENT_COLUMNS)
         .eq("status", "active")
         .is("paid_at", null)
@@ -157,7 +160,7 @@ export async function fetchToday(db: Db, today: string): Promise<TodayData> {
         .order("due_date"),
     ),
     run<ActionRequired[]>(
-      db.from("action_required").select(ACTION_COLUMNS).eq("status", "active").is("resolved_at", null).order("due_date"),
+      db.from(ITEM_TABLES.action_required).select(ACTION_COLUMNS).eq("status", "active").is("resolved_at", null).order("due_date"),
     ),
     run<Closure[]>(
       db
@@ -247,7 +250,7 @@ export async function deleteEvent(db: Db, id: string): Promise<void> {
 export async function fetchEvent(db: Db, id: string) {
   const [event, bring, groups] = await Promise.all([
     run<EventItem | null>(db.from("events").select(EVENT_COLUMNS).eq("id", id).maybeSingle()),
-    run<BringItem[]>(db.from("bring_items").select(BRING_COLUMNS).eq("event_id", id).eq("status", "active").order("due_date")),
+    run<BringItem[]>(db.from(ITEM_TABLES.bring_item).select(BRING_COLUMNS).eq("event_id", id).eq("status", "active").order("due_date")),
     fetchGroupNames(db),
   ]);
   return { event, bring, groups };
@@ -341,7 +344,7 @@ export async function fetchEventHistory(db: Db, eventId: string): Promise<EventH
   const [event, bring] = await Promise.all([
     run<{ source_message_ids: string[] } | null>(db.from("events").select("source_message_ids").eq("id", eventId).maybeSingle()),
     run<{ id: string; description: string; source_message_ids: string[] }[]>(
-      db.from("bring_items").select("id, description, source_message_ids").eq("event_id", eventId),
+      db.from(ITEM_TABLES.bring_item).select("id, description, source_message_ids").eq("event_id", eventId),
     ),
   ]);
   const bringIds = bring.map((b) => b.id);
