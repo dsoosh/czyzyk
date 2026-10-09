@@ -1,4 +1,4 @@
-import type { ContactRoleRow } from "@czyzyk/shared";
+import { roleOf, type ContactRoleRow } from "@czyzyk/shared";
 import { CHILD_ITEM_TYPES, type ItemData, type ItemType } from "@czyzyk/shared";
 import type pg from "pg";
 
@@ -38,7 +38,7 @@ export interface ExistingItem<T extends ItemType = ItemType> {
   type: T;
   status: "active" | "needs_review" | "cancelled";
   data: ItemData[T];
-  /** Names of the children the item is assigned to (empty: the whole group). */
+  /** Names of the children the item is about, as the analysis wrote them (empty: the whole group). */
   children: string[];
   /** Set for an item of another group (shared-items): the model may only join it. */
   groupName?: string;
@@ -48,8 +48,16 @@ export interface FamilyChild {
   name: string;
   /** Other forms of the name: nicknames, full form ("Eleonora", "Elcia"). */
   aliases: string[];
-  /** Display name of the child's group, or null when not set. */
-  group: string | null;
+}
+
+/**
+ * A family using the app, as the analysis sees it (families): its children in this group, so
+ * names in messages are written the way the family wrote them, and its members' authorship.
+ */
+export interface BatchFamily {
+  id: string;
+  /** Children attending this group (may be empty for a family that only wrote here). */
+  children: FamilyChild[];
 }
 
 export interface ExtractionBatch {
@@ -66,16 +74,17 @@ export interface ExtractionBatch {
   /** Current and future items of this group and of the whole kindergarten. */
   items: ExistingItem[];
   /**
-   * Active items of the family's other children's groups (shared-items): the same trip or
-   * payment announced in two groups is joined instead of created twice.
+   * Active items of other groups attended by children of the same families (shared-items): the
+   * same trip or payment announced in two groups is joined instead of created twice.
    */
   otherItems?: ExistingItem[];
-  /** Children of the family, so the model can tell which child a message is about. */
-  children: FamilyChild[];
-  /** Description of the kindergarten written by the family admin (empty when not set). */
+  /**
+   * Families with children in this group or members writing here, oldest first; they appear in
+   * the request, not in the system prompt (families).
+   */
+  families: BatchFamily[];
+  /** Description of the kindergarten written by the operator (empty when not set). */
   kindergarten: string;
-  /** First names of the family members. */
-  family: string[];
   /** The admin's extraction prompt template, or null for the default (llm-prompts). */
   promptTemplate: string | null;
   /** Roles of message authors set by the family (contact-roles). */
@@ -106,28 +115,28 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
       'whole_kindergarten', t.group_id is null,
       'repeat', case when t.repeat_weekdays is null then null
                      else jsonb_build_object('weekdays', to_jsonb(t.repeat_weekdays), 'until', to_char(t.repeat_until, 'YYYY-MM-DD')) end) as data,
-      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children,
+      t.audience as children,
       t.group_id
     from public.events t`,
   bring_item: `select t.id, t.status, jsonb_build_object(
       'description', t.description,
       'due_date', to_char(t.due_date, 'YYYY-MM-DD'),
       'event', t.event_id) as data,
-      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children,
+      t.audience as children,
       t.group_id
     from public.bring_items t`,
   payment: `select t.id, t.status, jsonb_build_object(
       'description', t.description,
       'amount_pln', t.amount_pln::float8,
       'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data,
-      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children,
+      t.audience as children,
       t.group_id
     from public.payments t`,
   action_required: `select t.id, t.status, jsonb_build_object(
       'question', t.question,
       'due_date', to_char(t.due_date, 'YYYY-MM-DD'),
       'suggestions', t.suggested_actions) as data,
-      coalesce(array(select c.name from public.children c where c.id = any(t.child_ids) order by c.name), '{}') as children,
+      t.audience as children,
       t.group_id
     from public.action_required t`,
   closure: `select t.id, t.status, jsonb_build_object(
@@ -166,15 +175,17 @@ const MAX_OTHER_ITEMS = 25;
 
 /**
  * Active items with children (events, things to bring, payments, actions) of the other groups
- * the family's children attend; only when a child of the family attends this group too.
+ * attended by children of a family that also has a child in this group.
  */
 async function loadOtherItems(db: Queryable, groupId: string, today: string): Promise<ExistingItem[]> {
   const { rows: groups } = await db.query<{ id: string; name: string }>(
     `select g.id, coalesce(g.display_name, g.wa_name) as name
        from public.wa_groups g
       where g.tracked and g.id <> $1
-        and exists (select 1 from public.children c where c.group_id = g.id)
-        and exists (select 1 from public.children c where c.group_id = $1)`,
+        and exists (
+          select 1 from public.children c1 join public.children c2 on c2.family_id = c1.family_id
+           where c1.group_id = g.id and c2.group_id = $1
+        )`,
     [groupId],
   );
   if (groups.length === 0) return [];
@@ -226,9 +237,8 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
       contextMessages: [],
       laterMessages: [],
       items: [],
-      children: [],
+      families: [],
       kindergarten: "",
-      family: [],
       promptTemplate: null,
       contactRoles: [],
     };
@@ -265,19 +275,16 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
 
   const otherItems = await loadOtherItems(db, groupId, today);
 
-  const { rows: children } = await db.query<FamilyChild>(
-    `select c.name, c.aliases, coalesce(g.display_name, g.wa_name) as "group"
-       from public.children c left join public.wa_groups g on g.id = c.group_id
-      order by c.name`,
-  );
-
   const { rows: profile } = await db.query<{ content: string }>("select content from public.kindergarten_profile");
-  const { rows: family } = await db.query<{ name: string }>(
-    `select coalesce(nullif(split_part(btrim(display_name), ' ', 1), ''), split_part(email, '@', 1)) as name
-       from public.profiles order by 1`,
-  );
   const { rows: prompt } = await db.query<{ template: string }>("select template from public.llm_prompts where key = 'extraction'");
-  const { rows: contactRoles } = await db.query<ContactRoleRow>("select author_key, role, label from public.contact_roles");
+  const { rows: contactRoles } = await db.query<ContactRoleRow>(
+    `select r.author_key, r.role, r.label, p.family_id
+       from public.contact_roles r left join public.profiles p on p.id = r.profile_id`,
+  );
+  const { rows: kids } = await db.query<{ family_id: string; name: string; aliases: string[] }>(
+    "select family_id, name, aliases from public.children where group_id = $1 order by name",
+    [groupId],
+  );
 
   const contextMessages = earlier.map(toMessage);
   const laterMessages = later.map(toMessage);
@@ -305,6 +312,22 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     }
   }
 
+  // Families with children here, then families whose members wrote in this batch (families).
+  const writers = new Set(
+    all.flatMap((m) => {
+      const role = roleOf(contactRoles, m.author);
+      return role?.role === "rodzina" && role.family_id ? [role.family_id] : [];
+    }),
+  );
+  const familyIds = [...new Set([...kids.map((k) => k.family_id), ...writers])];
+  const { rows: order } = await db.query<{ id: string }>("select id from public.families where id = any($1::uuid[]) order by created_at, id", [
+    familyIds,
+  ]);
+  const families: BatchFamily[] = order.map((f) => ({
+    id: f.id,
+    children: kids.filter((k) => k.family_id === f.id).map((k) => ({ name: k.name, aliases: k.aliases })),
+  }));
+
   return {
     group,
     newMessages,
@@ -313,9 +336,8 @@ export async function loadBatch(db: Queryable, groupId: string, today: string, c
     images: images.map((i) => ({ messageId: i.message_id, fileName: i.file_name, data: i.data })),
     items,
     otherItems,
-    children,
+    families,
     kindergarten: profile[0]?.content ?? "",
-    family: family.map((f) => f.name),
     promptTemplate: prompt[0]?.template ?? null,
     contactRoles,
   };

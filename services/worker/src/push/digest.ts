@@ -26,20 +26,20 @@ export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string, 
     db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null }>(
       `select e.title, e.all_day, e.location, e.meeting_point, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
-        where e.status = 'active' and public.family_sees_group($2, e.group_id) and (e.family_id is null or e.family_id = $2)
+        where e.status = 'active' and public.family_sees_item($2, e.group_id, e.extra_group_ids, e.audience, e.child_ids, e.family_id)
         order by o.starts_at, e.title`,
       [tomorrow, familyId],
     ),
     db.query<{ description: string }>(
       `select description from public.bring_items
-        where status = 'active' and due_date = $1::date and public.family_sees_group($2, group_id) and (family_id is null or family_id = $2)
+        where status = 'active' and due_date = $1::date and public.family_sees_item($2, group_id, extra_group_ids, audience, child_ids, family_id)
           and not exists (select 1 from public.item_done d where d.item_type = 'bring_item' and d.item_id = id and d.family_id = $2)
         order by description`,
       [tomorrow, familyId],
     ),
     db.query<{ description: string; amount_pln: string | null }>(
       `select description, amount_pln from public.payments
-        where status = 'active' and due_date = $1::date and public.family_sees_group($2, group_id) and (family_id is null or family_id = $2)
+        where status = 'active' and due_date = $1::date and public.family_sees_item($2, group_id, extra_group_ids, audience, child_ids, family_id)
           and not exists (select 1 from public.item_done d where d.item_type = 'payment' and d.item_id = id and d.family_id = $2)
         order by description`,
       [tomorrow, familyId],
@@ -119,13 +119,13 @@ export async function buildMorning(db: Pick<pg.Pool, "query">, today: string, fa
     db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null }>(
       `select e.title, e.all_day, e.location, e.meeting_point, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
-        where e.status = 'active' and public.family_sees_group($2, e.group_id) and (e.family_id is null or e.family_id = $2)
+        where e.status = 'active' and public.family_sees_item($2, e.group_id, e.extra_group_ids, e.audience, e.child_ids, e.family_id)
         order by o.starts_at, e.title`,
       [today, familyId],
     ),
     db.query<{ description: string }>(
       `select description from public.bring_items
-        where status = 'active' and due_date = $1::date and public.family_sees_group($2, group_id) and (family_id is null or family_id = $2)
+        where status = 'active' and due_date = $1::date and public.family_sees_item($2, group_id, extra_group_ids, audience, child_ids, family_id)
           and not exists (select 1 from public.item_done d where d.item_type = 'bring_item' and d.item_id = id and d.family_id = $2)
         order by description`,
       [today, familyId],
@@ -149,7 +149,7 @@ export async function buildReminders(db: Pick<pg.Pool, "query">, today: string, 
       `select description, amount_pln, case when due_date = $1::date then 'today' else 'tomorrow' end as due
          from public.payments
         where status = 'active' and due_date between $1::date and $1::date + 1
-          and public.family_sees_group($2, group_id) and (family_id is null or family_id = $2) and not exists (select 1 from public.item_done d where d.item_type = 'payment' and d.item_id = id and d.family_id = $2)
+          and public.family_sees_item($2, group_id, extra_group_ids, audience, child_ids, family_id) and not exists (select 1 from public.item_done d where d.item_type = 'payment' and d.item_id = id and d.family_id = $2)
         order by due_date, description`,
       [today, familyId],
     ),
@@ -157,7 +157,7 @@ export async function buildReminders(db: Pick<pg.Pool, "query">, today: string, 
       `select question, case when due_date = $1::date then 'today' else 'tomorrow' end as due
          from public.action_required
         where status = 'active' and due_date between $1::date and $1::date + 1
-          and public.family_sees_group($2, group_id) and not exists (select 1 from public.item_done d where d.item_type = 'action_required' and d.item_id = id and d.family_id = $2)
+          and public.family_sees_item($2, group_id, extra_group_ids, audience, child_ids, null) and not exists (select 1 from public.item_done d where d.item_type = 'action_required' and d.item_id = id and d.family_id = $2)
         order by due_date, question`,
       [today, familyId],
     ),

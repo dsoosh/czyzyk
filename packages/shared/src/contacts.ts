@@ -18,6 +18,8 @@ export interface ContactRoleRow {
   author_key: string;
   role: ContactRole;
   label: string | null;
+  /** For "rodzina": the family of the member who marked the number as theirs (families). */
+  family_id?: string | null;
 }
 
 const FORMAT_CHARS = /[­؜᠎​-‏‪-‮⁠-⁩﻿]/gu;
@@ -50,11 +52,11 @@ export function roleOf(roles: readonly ContactRoleRow[], author: string): Contac
 }
 
 /**
- * Whether the text mentions our family: "@48535111213" / "@+48 535 111 213" for a family
- * number, or "@Name" for a family author name or label.
+ * Whether the text mentions a family: "@48535111213" / "@+48 535 111 213" for a family
+ * number, or "@Name" for a family author name or label. Without `familyId`, any family.
  */
-export function mentionsFamily(roles: readonly ContactRoleRow[], text: string): boolean {
-  const family = roles.filter((r) => r.role === "rodzina");
+export function mentionsFamily(roles: readonly ContactRoleRow[], text: string, familyId?: string): boolean {
+  const family = roles.filter((r) => r.role === "rodzina" && (familyId === undefined || r.family_id === familyId));
   if (family.length === 0 || !text.includes("@")) return false;
   const phones = new Set(family.filter((r) => r.author_key.startsWith("+")).map((r) => r.author_key));
   for (const m of text.matchAll(/@\+?(\d[\d ]{7,}\d)/g)) {

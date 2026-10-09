@@ -65,7 +65,15 @@ describe("parseOperation", () => {
     expect(withChild.ok && withChild.value.op === "create" && withChild.value.children).toEqual(["Zosia"]);
     const onlyChildren = parseOperation({ ...create, op: "update", target: "E2", data: {}, children: ["Antek"] });
     expect(onlyChildren).toMatchObject({ ok: true, value: { op: "update", children: ["Antek"] } });
-    expect(parseOperation({ ...create, children: Array(11).fill("x") })).toMatchObject({ ok: false });
+    expect(parseOperation({ ...create, children: Array(31).fill("x") })).toMatchObject({ ok: false });
+  });
+
+  it("done: rodzina R… zamyka sprawę dla siebie; tylko rzeczy, płatności i sprawy", () => {
+    const done = { op: "done", type: "action_required", target: "E3", family: "R1", resolution: "Tak, zapisujemy", source_messages: ["W2"], confidence: 0.9, rationale: "Mama odpisała." };
+    expect(parseOperation(done)).toMatchObject({ ok: true, value: { op: "done", target: "E3", family: "R1", resolution: "Tak, zapisujemy" } });
+    expect(parseOperation({ ...done, resolution: undefined })).toMatchObject({ ok: true, value: { resolution: null } });
+    expect(parseOperation({ ...done, type: "event" })).toMatchObject({ ok: false });
+    expect(parseOperation({ ...done, family: "rodzina" })).toMatchObject({ ok: false });
   });
 
   it("rejects malformed aliases and confidence", () => {

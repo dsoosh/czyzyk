@@ -24,6 +24,12 @@ const saveChild = (args: Record<string, unknown>, tables: Record<string, Record<
 };
 
 describe("Ustawienia → Dzieci", () => {
+  it("z podpowiedzi na ekranie głównym od razu otwiera formularz nowego dziecka", async () => {
+    renderAt("/ustawienia?dziecko=nowe", { tables: { wa_groups: groups, children: [] } });
+    const section = await screen.findByRole("region", { name: "Dzieci" });
+    expect(await within(section).findByRole("form", { name: "Nowe dziecko" })).toBeInTheDocument();
+  });
+
   it("„Dodaj dziecko” dodaje dziecko z imieniem i grupą (tylko śledzone grupy do wyboru)", async () => {
     const { rpc } = renderAt("/ustawienia", { tables: { wa_groups: groups, children: [] }, rpc: { save_child: saveChild } });
     const section = await screen.findByRole("region", { name: "Dzieci" });

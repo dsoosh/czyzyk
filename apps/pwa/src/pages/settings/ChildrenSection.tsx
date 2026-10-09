@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router";
 import { useAuth } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
 import {
@@ -38,10 +39,17 @@ async function load(db: ReturnType<typeof useAuth>["client"]) {
 export function ChildrenSection() {
   const { client } = useAuth();
   const { data, error, reload } = useLoader(() => load(client), [client]);
-  const [adding, setAdding] = useState(false);
+  // "?dziecko=nowe" (from the hint on the home screen): open the form for the first child.
+  const [params] = useSearchParams();
+  const fromHint = params.get("dziecko") === "nowe";
+  const [adding, setAdding] = useState(fromHint);
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (fromHint) section.current?.scrollIntoView?.({ block: "start" });
+  }, [fromHint]);
 
   return (
-    <section aria-label="Dzieci" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
+    <section ref={section} aria-label="Dzieci" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Dzieci</h2>
       <p className="text-sm text-muted">
         Wpisz imiona tak, jak piszą je nauczycielki (np. „Zosia”), a w „Innych formach imienia” – pełne imię i zdrobnienia (np.

@@ -30,6 +30,17 @@ export type ResolvedOperation = { index: number } & (
   | { op: "cancel"; type: ItemType; targetId: string; sourceMessageIds: string[]; confidence: number; rationale: string }
   /** Adds this group's children to an item of another group (shared-items). */
   | { op: "join"; type: ItemType; targetId: string; children: string[]; sourceMessageIds: string[]; confidence: number; rationale: string }
+  /** A family's member answered or did it: done for that family only (families). */
+  | {
+      op: "done";
+      type: ItemType;
+      targetId: string;
+      familyId: string;
+      resolution: string | null;
+      sourceMessageIds: string[];
+      confidence: number;
+      rationale: string;
+    }
 );
 
 export interface Rejection {
@@ -118,6 +129,12 @@ export function resolveOperations(raw: unknown[], aliases: Aliases): { accepted:
     }
     if (target.foreign) {
       reject(`item ${op.target} belongs to another group`);
+      continue;
+    }
+    if (op.op === "done") {
+      const familyId = aliases.families.get(op.family);
+      if (!familyId) reject(`unknown family alias ${op.family}`);
+      else accepted.push({ op: "done", targetId: target.id, familyId, resolution: op.resolution, ...common });
       continue;
     }
     accepted.push(

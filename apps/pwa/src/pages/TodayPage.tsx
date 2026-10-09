@@ -81,6 +81,8 @@ export function TodayPage() {
         <h1 className="font-display text-[52px] leading-none font-bold text-ink">Dziś i jutro</h1>
       </div>
 
+      {data.children.length === 0 && <AddChildHint />}
+
       {data.closures.map((c) => (
         <div key={c.id} role="status" className="rounded-[28px] bg-sun/35 px-5 py-4 font-semibold text-ink">
           {closureBanner(c, today)}
@@ -193,5 +195,24 @@ export function TodayPage() {
         </Section>
       </div>
     </div>
+  );
+}
+
+/**
+ * Until the family adds a child (families), it sees only shared groups: a hint on the home
+ * screen leads to the form for the first child.
+ */
+function AddChildHint() {
+  return (
+    <section aria-label="Dodaj dziecko" className="space-y-2 rounded-[28px] bg-sun/35 px-5 py-4 text-ink">
+      <h2 className="font-display text-2xl font-bold">Dodaj swoje dziecko</h2>
+      <p className="text-sm">
+        Czyżyk pokazuje sprawy z grup, do których chodzą Twoje dzieci. Dodaj dziecko i wybierz jego grupę, a zobaczysz wydarzenia,
+        rzeczy do przyniesienia i płatności.
+      </p>
+      <Link to="/ustawienia?dziecko=nowe" className="inline-block rounded-full bg-ink px-5 py-2 font-semibold text-cream">
+        Dodaj dziecko
+      </Link>
+    </section>
   );
 }
