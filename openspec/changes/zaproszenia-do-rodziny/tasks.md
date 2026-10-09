@@ -15,5 +15,5 @@
 
 ## 4. Sprawdzenie
 
-- [ ] 4.1 `npm run spec:validate`, typecheck, wszystkie testy.
+- [x] 4.1 `npm run spec:validate`, typecheck, wszystkie testy.
 - [ ] 4.2 Drugi rodzic z osobnym kontem przyjmuje zaproszenie; weryfikacja: użytkownik.
