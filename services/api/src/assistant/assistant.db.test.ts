@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
 import { buildApp, type AppDeps } from "../app.js";
 import { createSessionVerifier } from "../push/session.js";
-import { FIXED_PROMPT_PARTS } from "@czyzyk/shared";
+import { appGuide, FIXED_PROMPT_PARTS } from "@czyzyk/shared";
 import { loadAssistantSystem, loadViewContext } from "./context.js";
 import type { AssistantModel } from "./model.js";
 import { NO_ANSWER } from "./routes.js";
@@ -317,7 +317,11 @@ describe("loadViewContext", () => {
     expect(system).toContain("<przedszkole>\nPlacówka: Leśne Przedszkole i Leśna Klasa „Cztery Żywioły”");
     expect(system).toContain("„Baza” – główna siedziba przedszkola i leśnej klasy: Golędzinów");
     expect(system).toContain("Pytanie zadaje: Ola.");
-    expect(system.endsWith(FIXED_PROMPT_PARTS.assistant)).toBe(true);
+    expect(system).toContain(FIXED_PROMPT_PARTS.assistant);
+    // App help after the fixed rules: family places only for a family member.
+    expect(system.endsWith("</aplikacja>")).toBe(true);
+    expect(system).toContain("- [Ustawienia → Moja rodzina](/ustawienia#rodzina): ");
+    expect(system).not.toContain("/admin");
     const { data } = await loadViewContext(pool, { kind: "list", list: "bring" }, NOW);
     expect(data).not.toContain("Golędzinów");
   });
@@ -325,7 +329,9 @@ describe("loadViewContext", () => {
   it("prompt systemowy z szablonu admina, stałe zasady zawsze na końcu", async () => {
     await db.client.query("insert into llm_prompts (key, template) values ('assistant', 'Mów do {{uzytkownik}} po imieniu.')");
     try {
-      expect(await loadAssistantSystem(pool, olaId)).toBe(`Mów do Ola po imieniu.\n\n${FIXED_PROMPT_PARTS.assistant}`);
+      expect(await loadAssistantSystem(pool, olaId)).toBe(
+        `Mów do Ola po imieniu.\n\n${FIXED_PROMPT_PARTS.assistant}\n\n<aplikacja>\n${appGuide(false)}\n</aplikacja>`,
+      );
     } finally {
       await db.client.query("delete from llm_prompts");
     }

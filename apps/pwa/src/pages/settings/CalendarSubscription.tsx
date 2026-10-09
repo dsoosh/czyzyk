@@ -56,7 +56,7 @@ export function CalendarSubscription() {
   const since = active.data[0]?.created_at;
 
   return (
-    <section aria-label="Mój kalendarz" className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+    <section id="kalendarz" aria-label="Mój kalendarz" className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Mój kalendarz</h2>
       <p className="text-sm text-slate-600">
         Wydarzenia i dni wolne przedszkola w Twoim kalendarzu Google, Apple lub Outlook. Link jest prywatny – nie udostępniaj go.

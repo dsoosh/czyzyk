@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router";
 import { androidBridge } from "../../lib/androidApp";
 import { CalendarSubscription } from "./CalendarSubscription";
 import { ChildrenSection } from "./ChildrenSection";
@@ -6,6 +8,12 @@ import { MyPhoneSection } from "./MyPhoneSection";
 import { PushSettingsSection } from "./PushSettingsSection";
 
 export function SettingsPage() {
+  // "#rodzina", "#powiadomienia"… (links from the assistant): scroll to that section.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView?.({ block: "start" });
+  }, [hash]);
+
   return (
     <div className="space-y-4">
       <h1 className="font-display text-4xl font-bold text-ink">Ustawienia</h1>

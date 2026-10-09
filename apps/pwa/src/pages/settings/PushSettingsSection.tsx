@@ -119,7 +119,7 @@ export function PushSettingsSection() {
     setSettings((s) => ({ ...s, [name]: e.target.checked }));
 
   return (
-    <section aria-label="Powiadomienia" className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+    <section id="powiadomienia" aria-label="Powiadomienia" className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Powiadomienia</h2>
       <p className="text-sm text-slate-600">
         Wieczorny skrót na jutro i natychmiastowe alerty: dzień wolny, nowa sprawa do załatwienia, płatność na jutro.

@@ -4,6 +4,7 @@ import { useLocation } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { ASSISTANT_ERRORS, AssistantError, askAssistant, viewForLocation, viewLabel } from "../lib/assistant";
 import { readPublicEnv } from "../lib/env";
+import { AnswerText } from "./AnswerText";
 
 /** Exchanges sent back as context (the API accepts up to 10). */
 const HISTORY_EXCHANGES = 10;
@@ -89,7 +90,7 @@ export function AssistantPanel() {
       <div className="flex-1 space-y-2 overflow-y-auto px-5 py-3">
         {turns.length === 0 && (
           <p className="text-sm text-muted">
-            Np. „Co trzeba przygotować na jutro?”, „Kiedy jest pasowanie?”, „Co pisali o wycieczce?”
+            Np. „Co trzeba przygotować na jutro?”, „Kiedy jest pasowanie?”, „Co pisali o wycieczce?”, „Jak włączyć powiadomienia?”
           </p>
         )}
         <ol aria-label="Rozmowa" className="space-y-2">
@@ -101,7 +102,7 @@ export function AssistantPanel() {
               }`}
             >
               <span className="sr-only">{t.role === "user" ? "Ty: " : "Asystent: "}</span>
-              {t.content}
+              {t.role === "assistant" ? <AnswerText text={t.content} onNavigate={() => setOpen(false)} /> : t.content}
             </li>
           ))}
         </ol>

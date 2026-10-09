@@ -44,7 +44,7 @@ export function FamilySection() {
   };
 
   return (
-    <section aria-label="Moja rodzina" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
+    <section id="rodzina" aria-label="Moja rodzina" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Moja rodzina</h2>
       <p className="text-sm text-muted">
         Dodaj adres Google drugiego rodzica albo opiekuna. Po zalogowaniu zobaczy dzieci, sprawy i znaczniki Waszej rodziny. Jeśli ma już konto w Czyżyku, dostanie zaproszenie do Waszej rodziny.

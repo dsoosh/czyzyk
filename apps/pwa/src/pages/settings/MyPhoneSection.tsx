@@ -15,7 +15,7 @@ export function MyPhoneSection() {
   );
 
   return (
-    <section aria-label="Mój numer WhatsApp" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
+    <section id="numer" aria-label="Mój numer WhatsApp" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Mój numer WhatsApp</h2>
       <p className="text-sm text-muted">
         Twoje wiadomości w grupach będą oznaczone jako „nasza rodzina”, a wiadomości z wzmianką o Tobie (@numer) – jako skierowane do rodziny.

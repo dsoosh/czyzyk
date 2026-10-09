@@ -82,6 +82,21 @@ describe("Zapytaj", () => {
     }
   });
 
+  it("link do miejsca w aplikacji prowadzi tam i zamyka panel; nieznane linki zostają tekstem", async () => {
+    fetchMock.mockResolvedValue(
+      answer("Wejdź w [Ustawienia → Moja rodzina](/ustawienia#rodzina) i dodaj adres. [Strona](https://zly.example) [Admin](/admin/prompty)"),
+    );
+    renderAt("/", { tables: {} });
+    await userEvent.click(await screen.findByRole("button", { name: "Zapytaj" }));
+    await askQuestion("jak dodać męża?");
+    const link = await screen.findByRole("link", { name: "Ustawienia → Moja rodzina" });
+    expect(screen.queryByRole("link", { name: "Strona" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Strona/)).toBeInTheDocument();
+    await userEvent.click(link);
+    expect(await screen.findByRole("heading", { name: "Ustawienia" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Zapytaj asystenta" })).not.toBeInTheDocument();
+  });
+
   it("pokazuje komunikat o dziennym limicie", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: "daily_limit" }), { status: 429 }));
     renderAt("/", { tables: {} });
