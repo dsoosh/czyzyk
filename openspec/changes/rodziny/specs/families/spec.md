@@ -37,3 +37,14 @@ Panel grup operatora SHALL mieć przy każdej grupie znacznik „Wspólna” obo
 #### Scenario: Zaznaczenie
 - **WHEN** operator zaznacza „Wspólna” przy grupie
 - **THEN** grupa jest od razu widoczna dla wszystkich rodzin
+
+### Requirement: Dodanie i usunięcie dziecka
+Dodanie dziecka do grupy SHALL od razu pokazać rodzinie istniejące wiadomości i sprawy tej grupy. Usunięcie dziecka albo przeniesienie go do innej grupy SHALL:
+- usunąć je z przypisań przy sprawach;
+- gdy rodzina przestaje widzieć grupę, usunąć jej stan „zrobione” i sprawy utworzone z jej wyborów w tej grupie.
+
+Stan innych rodzin MUST pozostać bez zmian.
+
+#### Scenario: Usunięcie jedynego dziecka z grupy
+- **WHEN** rodzina usuwa dziecko z grupy Wilki, a innego dziecka tam nie ma
+- **THEN** sprawy Wilków znikają z jej widoku, a jej znaczniki „zapłacone” w Wilkach są usunięte; znaczniki innej rodziny zostają

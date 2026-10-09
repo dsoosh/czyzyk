@@ -418,6 +418,29 @@ drop index public.children_color_key;
 create unique index children_name_key on public.children (family_id, lower(btrim(name)));
 create unique index children_color_key on public.children (family_id, color) where color is not null;
 
+-- When a family no longer sees a group (its last child there left or moved): what the family kept
+-- for that group goes away – its own items created from its choices and its "done" marks.
+create function public.family_forget_group(p_family uuid, p_group uuid) returns void
+language plpgsql security definer
+set search_path = ''
+as $$
+begin
+  if p_group is null or public.family_sees_group(p_family, p_group) then
+    return;
+  end if;
+  delete from public.item_done d
+   where d.family_id = p_family
+     and (
+       (d.item_type = 'bring_item' and exists (select 1 from public.bring_items t where t.id = d.item_id and t.group_id = p_group))
+       or (d.item_type = 'payment' and exists (select 1 from public.payments t where t.id = d.item_id and t.group_id = p_group))
+       or (d.item_type = 'action_required' and exists (select 1 from public.action_required t where t.id = d.item_id and t.group_id = p_group))
+     );
+  delete from public.bring_items where family_id = p_family and group_id = p_group;
+  delete from public.payments where family_id = p_family and group_id = p_group;
+  delete from public.events where family_id = p_family and group_id = p_group;
+end;
+$$;
+
 create or replace function public.save_child(
   p_id uuid, p_name text, p_group_id uuid, p_aliases text[] default '{}', p_color text default null
 )
@@ -428,6 +451,7 @@ as $$
 declare
   v_family uuid := public.my_family();
   v_row public.children;
+  v_old_group uuid;
   v_aliases text[];
   v_clash text;
   v_color text := nullif(btrim(coalesce(p_color, '')), '');
@@ -478,12 +502,17 @@ begin
     insert into public.children (family_id, name, group_id, aliases, color)
       values (v_family, btrim(p_name), p_group_id, v_aliases, v_color) returning * into v_row;
   else
+    select group_id into v_old_group from public.children where id = p_id and family_id = v_family;
     -- No colour given: the current one stays.
     update public.children
        set name = btrim(p_name), group_id = p_group_id, aliases = v_aliases, color = coalesce(v_color, color)
      where id = p_id and family_id = v_family returning * into v_row;
     if v_row.id is null then
       raise exception 'Nie ma takiego dziecka.' using errcode = 'P0002';
+    end if;
+    -- Moved to another group: the family may no longer see the old one.
+    if v_old_group is distinct from p_group_id then
+      perform public.family_forget_group(v_family, v_old_group);
     end if;
   end if;
   return v_row;
@@ -495,11 +524,24 @@ returns void
 language plpgsql security definer
 set search_path = ''
 as $$
+declare
+  v_family uuid := public.my_family();
+  v_group uuid;
+  v_found boolean := false;
 begin
   if not public.is_family() then
     raise exception 'Brak uprawnień.' using errcode = '42501';
   end if;
-  delete from public.children where id = p_id and family_id = public.my_family();
+  delete from public.children where id = p_id and family_id = v_family returning group_id, true into v_group, v_found;
+  if not v_found then
+    return;
+  end if;
+  -- Items no longer point at the child, and the family's leftovers of a group it stops seeing go.
+  update public.events set child_ids = array_remove(child_ids, p_id) where p_id = any(child_ids);
+  update public.bring_items set child_ids = array_remove(child_ids, p_id) where p_id = any(child_ids);
+  update public.payments set child_ids = array_remove(child_ids, p_id) where p_id = any(child_ids);
+  update public.action_required set child_ids = array_remove(child_ids, p_id) where p_id = any(child_ids);
+  perform public.family_forget_group(v_family, v_group);
 end;
 $$;
 
@@ -573,6 +615,7 @@ $$;
 -- ---------------------------------------------------------------------------
 
 revoke execute on function public.default_family() from public, anon, authenticated;
+revoke execute on function public.family_forget_group(uuid, uuid) from public, anon, authenticated;
 revoke execute on function public.allowed_email_family() from public, anon, authenticated;
 revoke execute on function public.my_family() from public, anon;
 revoke execute on function public.family_sees_group(uuid, uuid) from public, anon, authenticated;

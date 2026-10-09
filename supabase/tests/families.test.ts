@@ -177,3 +177,46 @@ describe("rodzina nowego adresu", () => {
     expect(rows[0].family_id).toBe(familyA);
   });
 });
+
+describe("dodanie i usunięcie dziecka", () => {
+  it("nowe dziecko od razu pokazuje istniejące sprawy jego grupy; usunięcie chowa je i sprząta stan rodziny", async () => {
+    const familyC = (await db.client.query("insert into families (name) values ('Rodzina Ewy') returning id")).rows[0].id;
+    await db.client.query("insert into allowed_emails (email, role, family_id) values ('ewa@example.com', 'family', $1)", [familyC]);
+    const ewaId = await createAuthUser(db.client, "ewa@example.com", "Ewa");
+    const commit = (sql: string, params: unknown[] = []) =>
+      as(db.client, user(ewaId), async (q) => (await q(sql, params)).rows, { commit: true });
+    const wilki = async () => (await titles(ewaId)).filter((t) => t.includes("wilki"));
+
+    expect(await wilki()).toEqual([]);
+    const [hania] = await commit("select * from save_child(null, 'Hania', $1)", [ids.wilki]);
+    expect(await wilki()).toEqual(["wydarzenie wilki"]);
+    expect(await read(ewaId, "select id from messages where id = $1", [ids.msg_wilki])).toHaveLength(1);
+
+    await commit("select mark_paid($1, true)", [ids.payment_wilki]);
+    await as(db.client, user(kasiaId), (q) => q("select mark_paid($1, true)", [ids.payment_wilki]), { commit: true });
+    await db.client.query("insert into bring_items (group_id, family_id, description) values ($1, $2, 'spray Ewy')", [ids.wilki, familyC]);
+    await db.client.query("update events set child_ids = array[$1::uuid] where id = $2", [hania.id, ids.event_wilki]);
+
+    await commit("select delete_child($1)", [hania.id]);
+    expect(await wilki()).toEqual([]);
+    expect((await db.client.query("select family_id from item_done where item_id = $1", [ids.payment_wilki])).rows).toEqual([
+      { family_id: familyB },
+    ]);
+    expect((await db.client.query("select count(*)::int as n from bring_items where description = 'spray Ewy'")).rows[0].n).toBe(0);
+    expect((await db.client.query("select child_ids from events where id = $1", [ids.event_wilki])).rows[0].child_ids).toEqual([]);
+  });
+
+  it("przeniesienie dziecka do innej grupy chowa starą grupę, jeśli nie chodzi do niej inne dziecko rodziny", async () => {
+    const familyD = (await db.client.query("insert into families (name) values ('Rodzina Jana') returning id")).rows[0].id;
+    await db.client.query("insert into allowed_emails (email, role, family_id) values ('jan@example.com', 'family', $1)", [familyD]);
+    const janId = await createAuthUser(db.client, "jan@example.com", "Jan");
+    const commit = (sql: string, params: unknown[] = []) =>
+      as(db.client, user(janId), async (q) => (await q(sql, params)).rows, { commit: true });
+    const [kuba] = await commit("select * from save_child(null, 'Kuba', $1)", [ids.wilki]);
+    await commit("select mark_paid($1, true)", [ids.payment_wilki]);
+    await commit("select save_child($1, 'Kuba', $2)", [kuba.id, ids.motylki]);
+    expect(await titles(janId)).toContain("wydarzenie motylki");
+    expect(await titles(janId)).not.toContain("wydarzenie wilki");
+    expect((await db.client.query("select count(*)::int as n from item_done where family_id = $1", [familyD])).rows[0].n).toBe(0);
+  });
+});

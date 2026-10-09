@@ -40,6 +40,7 @@ Zmiana na prośbę użytkownika. **Gotowe, gdy:** dane mają właściciela-rodzi
 
 **Poza zakresem:**
 - analiza dwuetapowa i przypisanie dzieci innych rodzin (zmiana 2);
+- przeliczenie przypisań istniejących spraw do imion po dodaniu dziecka (zmiana 2; tu dodanie dziecka od razu pokazuje sprawy jego grupy, a usunięcie sprząta stan rodziny).
 - samodzielne dołączanie i panel rodziny (zmiana 3).
 
 ## Capabilities
