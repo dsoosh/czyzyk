@@ -113,6 +113,25 @@ describe("Szczegóły wydarzenia", () => {
     expect(screen.getAllByRole("link", { name: "skąd to wiem" }).map((a) => a.getAttribute("href"))).toContain("/zrodlo/event/e1");
   });
 
+  it("admin usuwa wydarzenie po potwierdzeniu i wraca do kalendarza", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const { rpc } = renderAt("/kalendarz/wydarzenie/e1", { admin: true, tables, rpc: { admin_delete_event: () => null } });
+    const button = await screen.findByRole("button", { name: "Usuń wydarzenie" });
+    await userEvent.click(button);
+    expect(rpc).not.toHaveBeenCalledWith("admin_delete_event", expect.anything());
+    await userEvent.click(button);
+    expect(confirm).toHaveBeenLastCalledWith("Usunąć wydarzenie „Bal”? Tego nie da się cofnąć.");
+    expect(rpc).toHaveBeenCalledWith("admin_delete_event", { p_id: "e1" });
+    expect(await screen.findByRole("heading", { name: "Kalendarz" })).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it("członek rodziny nie widzi przycisku usuwania", async () => {
+    renderAt("/kalendarz/wydarzenie/e1", { tables });
+    await screen.findByRole("heading", { name: "Bal" });
+    expect(screen.queryByRole("button", { name: "Usuń wydarzenie" })).not.toBeInTheDocument();
+  });
+
   it("miejsce wydarzenia z linkiem do mapy", async () => {
     renderAt("/kalendarz/wydarzenie/e2", { tables });
     expect(await screen.findByRole("heading", { name: "Zebranie" })).toBeInTheDocument();
