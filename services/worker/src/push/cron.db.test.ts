@@ -46,7 +46,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.client.query(
-    "delete from bring_items; delete from payments; delete from events; delete from closures; delete from action_required; delete from push_alerts_sent; delete from push_subscriptions; delete from push_settings",
+    "delete from item_done; delete from bring_items; delete from payments; delete from events; delete from closures; delete from action_required; delete from push_alerts_sent; delete from push_subscriptions; delete from push_settings",
   );
   for (const [uid, n] of [
     [olaId, 1],
@@ -59,6 +59,15 @@ beforeEach(async () => {
     ]);
   }
 });
+
+/** An item the family already marked as done ("done" marks are per family, families). */
+async function insertDone(type: "bring_item" | "payment" | "action_required", sql: string) {
+  const { rows } = await db.client.query(`${sql} returning id`);
+  await db.client.query(
+    "insert into item_done (item_type, item_id, family_id) select $1, $2, family_id from profiles where id = $3",
+    [type, rows[0].id, olaId],
+  );
+}
 
 const digest = (sender: PushSender, now: Date) => runDigest({ db: pool, sender, logger, windowMinutes: 120 }, now);
 
@@ -73,11 +82,11 @@ describe("Poranny skrót i przypomnienia o terminach", () => {
   it("o 6:45 plan na dziś, a osobno terminy na dziś i jutro", async () => {
     await db.client.query("insert into events (title, starts_at, all_day) values ('Basen', '2026-10-08 09:00+02', false)");
     await db.client.query("insert into bring_items (description, due_date) values ('strój kąpielowy', '2026-10-08'), ('kapcie', '2026-10-08')");
-    await db.client.query("insert into bring_items (description, due_date, packed_at) values ('spakowane', '2026-10-08', now())");
+    await insertDone("bring_item", "insert into bring_items (description, due_date) values ('spakowane', '2026-10-08')");
     await db.client.query("insert into payments (description, amount_pln, due_date) values ('składka', 20, '2026-10-08'), ('teatrzyk', 10, '2026-10-09')");
-    await db.client.query("insert into payments (description, due_date, paid_at) values ('zapłacone', '2026-10-08', now())");
+    await insertDone("payment", "insert into payments (description, due_date) values ('zapłacone', '2026-10-08')");
     await db.client.query("insert into action_required (question, due_date) values ('Zgoda na wycieczkę', '2026-10-09')");
-    await db.client.query("insert into action_required (question, due_date, resolved_at) values ('Załatwione', '2026-10-08', now())");
+    await insertDone("action_required", "insert into action_required (question, due_date) values ('Załatwione', '2026-10-08')");
     const { sender, sent } = fakeSender();
     const result = await morning(sender, at("2026-10-08T06:45:00"));
     expect(result).toMatchObject({ plan: { sent: 2 }, reminders: { sent: 2 } });
@@ -162,8 +171,8 @@ describe("Wieczorny skrót", () => {
 
   it("pusty dzień: skrót nie jest wysyłany", async () => {
     await db.client.query("insert into bring_items (description, due_date, status) values ('niepewne', '2026-10-09', 'needs_review')");
-    await db.client.query("insert into bring_items (description, due_date, packed_at) values ('spakowane', '2026-10-09', now())");
-    await db.client.query("insert into payments (description, due_date, paid_at) values ('zapłacone', '2026-10-09', now())");
+    await insertDone("bring_item", "insert into bring_items (description, due_date) values ('spakowane', '2026-10-09')");
+    await insertDone("payment", "insert into payments (description, due_date) values ('zapłacone', '2026-10-09')");
     const { sender, sent } = fakeSender();
     expect(await digest(sender, at("2026-10-08T19:00:00"))).toMatchObject({ claimed: 2, empty: true, sent: 0 });
     expect(sent).toHaveLength(0);
@@ -291,5 +300,32 @@ describe("registerPushJobs", () => {
     } finally {
       await boss.stop({ graceful: true, timeout: 10_000 });
     }
+  });
+});
+
+describe("Skróty i alerty dwóch rodzin", () => {
+  it("każda rodzina dostaje swój skrót: grupy swoich dzieci i własny stan „zapłacone”", async () => {
+    const { rows: f } = await db.client.query("insert into families (name) values ('Rodzina Kasi') returning id");
+    await db.client.query("insert into allowed_emails (email, role, family_id) values ('kasia@example.com', 'family', $1)", [f[0].id]);
+    const kasiaId = await createAuthUser(db.client, "kasia@example.com", "Kasia");
+    const { rows: g } = await db.client.query("insert into wa_groups (wa_name, tracked) values ('Wilki', true) returning id");
+    await db.client.query("insert into children (family_id, name, group_id) values ($1, 'Lena', $2)", [f[0].id, g[0].id]);
+    await db.client.query("insert into push_settings (user_id) values ($1)", [kasiaId]);
+    await db.client.query("insert into push_subscriptions (user_id, endpoint, p256dh, auth) values ($1, 'https://push.example/3', 'p', 'a')", [kasiaId]);
+    await db.client.query("insert into bring_items (group_id, description, due_date) values ($1, 'kanapki', '2026-10-09')", [g[0].id]);
+    await insertDone("payment", "insert into payments (description, amount_pln, due_date) values ('wycieczka', 30, '2026-10-09')");
+    await db.client.query("insert into bring_items (description, due_date) values ('kapcie', '2026-10-09')");
+
+    const { sender, sent } = fakeSender();
+    await digest(sender, at("2026-10-08T19:00:00"));
+    const body = (endpoint: string) => sent.find((s) => s.endpoint === endpoint)?.payload.body;
+    expect(body("https://push.example/1")).toBe("Jutro: kapcie");
+    expect(body("https://push.example/2")).toBe("Jutro: kapcie");
+    expect(body("https://push.example/3")).toBe("Jutro: kanapki, kapcie, wycieczka (30 zł)");
+
+    const { rows: a } = await db.client.query("insert into action_required (group_id, question) values ($1, 'Zgoda na basen') returning id", [g[0].id]);
+    const alerts = fakeSender();
+    await handleAlert({ db: pool, sender: alerts.sender, logger }, { type: "action_required", id: a[0].id }, at("2026-10-07T18:00:00"));
+    expect(alerts.sent.map((s) => s.endpoint)).toEqual(["https://push.example/3"]);
   });
 });

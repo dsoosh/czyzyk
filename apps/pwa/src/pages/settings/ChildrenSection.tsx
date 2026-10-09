@@ -28,9 +28,10 @@ interface Draft {
 async function load(db: ReturnType<typeof useAuth>["client"]) {
   const [children, groups] = await Promise.all([
     fetchChildren(db),
-    run<Group[]>(db.from("wa_groups").select("id, wa_name, display_name, tracked").eq("tracked", true)),
+    // Every tracked group: a family does not see a group's content until a child attends it (families).
+    run<{ id: string; name: string }[]>(db.rpc("trackable_groups")),
   ]);
-  return { children, groups };
+  return { children, groups: groups.map((g): Group => ({ id: g.id, wa_name: g.name, display_name: null, tracked: true })) };
 }
 
 /** The family's children: names the assistant matches in messages, and their kindergarten groups. */

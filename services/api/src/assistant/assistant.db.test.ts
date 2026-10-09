@@ -94,7 +94,7 @@ beforeAll(async () => {
   verify = createSessionVerifier({ supabaseUrl: SUPABASE_URL, keys: createLocalJWKSet({ keys: [publicJwk] }) });
 
   const g = await db.client.query<{ id: string }>(
-    "insert into wa_groups (wa_name, display_name, tracked) values ('Motylki 2026/27', 'Motylki', true), ('Sąsiedzi', null, false) returning id",
+    "insert into wa_groups (wa_name, display_name, tracked, shared) values ('Motylki 2026/27', 'Motylki', true, true), ('Sąsiedzi', null, false, false) returning id",
   );
   [motylki, sasiedzi] = g.rows.map((r) => r.id) as [string, string];
 

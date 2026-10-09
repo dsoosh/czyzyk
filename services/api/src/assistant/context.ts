@@ -144,7 +144,7 @@ interface BringRow {
 
 const BRING_SELECT = `
   select b.group_id, b.child_ids, b.description, to_char(b.due_date, 'YYYY-MM-DD') as due_date, b.packed_by, b.packed_at, e.title as event_title
-    from public.bring_items b
+    from public.family_bring_items b
     left join public.events e on e.id = b.event_id and e.status = 'active'`;
 
 function bringLine(b: BringRow, names: Names): string {
@@ -165,7 +165,7 @@ interface PaymentRow {
 
 const PAYMENT_SELECT = `
   select group_id, child_ids, description, amount_pln::text, to_char(due_date, 'YYYY-MM-DD') as due_date, paid_by, paid_at
-    from public.payments`;
+    from public.family_payments`;
 
 function paymentLine(p: PaymentRow, names: Names): string {
   const amount = p.amount_pln ? `${p.amount_pln.replace(".", ",")} zł` : "kwota nieznana";
@@ -185,7 +185,7 @@ interface ActionRow {
 
 const ACTION_SELECT = `
   select group_id, child_ids, question, to_char(due_date, 'YYYY-MM-DD') as due_date, resolved_by, resolved_at
-    from public.action_required`;
+    from public.family_action_required`;
 
 function actionLine(a: ActionRow, names: Names): string {
   const due = a.due_date ? `do ${dayWithWeekday(a.due_date)}` : "bez terminu";
@@ -310,11 +310,12 @@ export async function loadViewContext(db: Db, view: AssistantView, now: Date): P
  * The assistant's system prompt (llm-prompts): the admin's template or the default, filled
  * with the kindergarten description, the children, the family and the asking member's name.
  */
-export async function loadAssistantSystem(db: Db, userId: string): Promise<string> {
+export async function loadAssistantSystem(db: Db, userId: string, prompts: Db = db): Promise<string> {
   const [names, profile, prompt] = await Promise.all([
     loadNames(db),
     db.query<{ content: string }>("select content from public.kindergarten_profile"),
-    db.query<{ template: string }>("select template from public.llm_prompts where key = 'assistant'"),
+    // The operator's template is admin-only data, read with the server connection.
+    prompts.query<{ template: string }>("select template from public.llm_prompts where key = 'assistant'"),
   ]);
   return buildSystemPrompt("assistant", prompt.rows[0]?.template ?? null, {
     // Written by the family admin (kindergarten-profile); cannot close its block.

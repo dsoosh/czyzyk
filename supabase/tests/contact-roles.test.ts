@@ -12,7 +12,7 @@ beforeAll(async () => {
   adminId = await createAuthUser(db.client, "darek@example.com", "Darek Nowak");
   olaId = await createAuthUser(db.client, "ola@example.com", "Ola");
   const { rows } = await db.client.query<{ id: string }>(
-    "insert into wa_groups (wa_name, tracked) values ('Motylki', true), ('Sąsiedzi', false) returning id",
+    "insert into wa_groups (wa_name, tracked, shared) values ('Motylki', true, true), ('Sąsiedzi', false, true) returning id",
   );
   await db.client.query(
     `insert into messages (group_id, author, sent_at, text, source, dedupe_key) values

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type pg from "pg";
 import type { RateLimiter } from "../rateLimit.js";
+import { asUser } from "../asUser.js";
 import { renderCalendar, type FeedEvent } from "./ics.js";
 
 const TOKEN_FILE = /^([0-9a-f]{64})\.ics$/;
@@ -65,14 +66,15 @@ export async function icalRoutes(app: FastifyInstance, opts: { db: pg.Pool; perI
     if (!match) return reply.code(404).send({ error: "not_found" });
     const hash = createHash("sha256").update(match[1]!).digest("hex");
     const { rows } = await db.query(
-      `select t.id from public.ical_tokens t
+      `select t.user_id from public.ical_tokens t
          join public.profiles p on p.id = t.user_id
         where t.token_hash = $1 and t.revoked_at is null`,
       [hash],
     );
     if (rows.length === 0) return reply.code(404).send({ error: "not_found" });
 
-    const body = renderCalendar(await loadFeed(db), "Czyżyk – przedszkole");
+    // Read as the token's owner (families): only the groups their family sees.
+    const body = renderCalendar(await asUser(db, rows[0].user_id, (udb) => loadFeed(udb)), "Czyżyk – przedszkole");
     return reply
       .header("content-type", "text/calendar; charset=utf-8")
       .header("cache-control", "private, max-age=900")

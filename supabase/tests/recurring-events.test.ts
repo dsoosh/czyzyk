@@ -10,7 +10,7 @@ beforeAll(async () => {
   db = await createTestDb();
   await allowEmail(db.client, "ola@example.com", "family");
   familyId = await createAuthUser(db.client, "ola@example.com", "Ola");
-  const { rows } = await db.client.query("insert into wa_groups (wa_name) values ('Motylki'), ('Sokoły') returning id");
+  const { rows } = await db.client.query("insert into wa_groups (wa_name, shared) values ('Motylki', true), ('Sokoły', true) returning id");
   groupId = rows[0].id;
   otherGroupId = rows[1].id;
 });

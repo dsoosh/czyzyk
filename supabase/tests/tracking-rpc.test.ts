@@ -45,29 +45,35 @@ const cases = [
   },
 ] as const;
 
+const read = (actor: string, view: string, id: string) =>
+  as(db.client, user(actor), async (q) => (await q(`select * from public.${view} where id = $1`, [id])).rows[0]);
+
 describe.each(cases)("$fn", ({ fn, table, by, at, insert }) => {
-  it("zapisuje wykonawcę i czas, bez zmiany innych pól", async () => {
+  const view = `family_${table}`;
+
+  it("zapisuje wykonawcę i czas dla rodziny, bez zmiany elementu", async () => {
     const { rows } = await db.client.query(insert);
     const before = rows[0];
-    const [after] = await rpc(olaId, `select * from public.${fn}($1, true)`, [before.id]);
+    await rpc(olaId, `select public.${fn}($1, true)`, [before.id]);
+    const after = await read(olaId, view, before.id);
     expect(after[by]).toBe(olaId);
     expect(after[at]).toBeInstanceOf(Date);
-    const { [by]: _b, [at]: _a, updated_at: _u, ...restAfter } = after;
-    const { [by]: _b2, [at]: _a2, updated_at: _u2, ...restBefore } = before;
-    expect(restAfter).toEqual(restBefore);
+    const { rows: item } = await db.client.query(`select * from ${table} where id = $1`, [before.id]);
+    expect(item[0]).toEqual(before);
   });
 
   it("wykonawcą jest zawsze wywołujący", async () => {
     const { rows } = await db.client.query(insert);
     await rpc(olaId, `select public.${fn}($1, true)`, [rows[0].id]);
-    const [row] = await rpc(darekId, `select * from public.${fn}($1, true)`, [rows[0].id]);
-    expect(row[by]).toBe(darekId);
+    await rpc(darekId, `select public.${fn}($1, true)`, [rows[0].id]);
+    expect((await read(olaId, view, rows[0].id))[by]).toBe(darekId);
   });
 
   it("cofnięcie czyści wykonawcę i czas", async () => {
     const { rows } = await db.client.query(insert);
     await rpc(olaId, `select public.${fn}($1, true)`, [rows[0].id]);
-    const [row] = await rpc(darekId, `select * from public.${fn}($1, false)`, [rows[0].id]);
+    await rpc(darekId, `select public.${fn}($1, false)`, [rows[0].id]);
+    const row = await read(olaId, view, rows[0].id);
     expect(row[by]).toBeNull();
     expect(row[at]).toBeNull();
   });
@@ -80,8 +86,8 @@ describe.each(cases)("$fn", ({ fn, table, by, at, insert }) => {
     await expect(
       as(db.client, anon, (q) => q(`select public.${fn}($1, true)`, [rows[0].id])),
     ).rejects.toMatchObject({ code: "42501" });
-    const { rows: after } = await db.client.query(`select ${by} from ${table} where id = $1`, [rows[0].id]);
-    expect(after[0][by]).toBeNull();
+    const { rows: done } = await db.client.query("select * from item_done where item_id = $1", [rows[0].id]);
+    expect(done).toEqual([]);
   });
 
   it("nie oznacza anulowanych ani nieistniejących", async () => {
@@ -93,10 +99,10 @@ describe.each(cases)("$fn", ({ fn, table, by, at, insert }) => {
     ).rejects.toMatchObject({ code: "P0002" });
   });
 
-  it("członek rodziny nadal nie może pisać do tabeli bezpośrednio", async () => {
+  it("członek rodziny nadal nie może pisać stanu bezpośrednio", async () => {
     const { rows } = await db.client.query(insert);
     await expect(
-      rpc(olaId, `update ${table} set ${by} = $2 where id = $1`, [rows[0].id, olaId]),
+      rpc(olaId, "insert into item_done (item_type, item_id, family_id) values ('payment', $1, public.my_family())", [rows[0].id]),
     ).rejects.toMatchObject({ code: "42501" });
   });
 });

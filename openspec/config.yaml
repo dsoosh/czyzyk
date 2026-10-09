@@ -5,7 +5,7 @@ context: |
   All artifacts must be written in pl.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
 
-  Projekt: „Czyżyk” – prywatny asystent przedszkolny dla jednej rodziny (PWA).
+  Projekt: „Czyżyk” – prywatny asystent przedszkolny dla rodzin (PWA).
   Automatycznie wyciąga z grup WhatsApp przedszkola wydarzenia, rzeczy do
   przyniesienia, płatności, sprawy „wymaga odpowiedzi”, dni wolne, fakty do
   ściągawki (także ze zdjęć dokumentów: plany, jadłospisy, plakaty) oraz
@@ -13,14 +13,16 @@ context: |
   Pełna specyfikacja źródłowa: docs/specyfikacja.md.
 
   Użytkownicy i źródło danych:
-  - Tylko rodzina; logowanie Google, wyłącznie adresy z listy dozwolonych
-    (role: admin, family).
+  - Rodziny: logowanie Google, wyłącznie adresy z listy dozwolonych
+    (role: admin = operator, family). Każdy użytkownik należy do jednej
+    rodziny; rodzina widzi grupy swoich dzieci i grupy wspólne.
   - Jedyne źródło danych: telefon właściciela z Androidem (powiadomienia na
     bieżąco + eksport czatu na klik; obrazy filtrowane na telefonie).
   - Bez ingerencji w protokół WhatsApp: żadnego Cloud API, Baileys,
     whatsapp-web.js. Aplikacja nigdy nic nie wysyła na WhatsApp.
-  - Poza zakresem: inni rodzice jako użytkownicy, iOS jako źródło, wiele
-    telefonów-źródeł. Interfejs i treści po polsku.
+  - Telefon-źródło i panel admina tylko u operatora.
+  - Poza zakresem: iOS jako źródło, wiele telefonów-źródeł.
+    Interfejs i treści po polsku.
 
   Architektura i stos:
   - Monorepo: apps/android (Kotlin, APK spoza Sklepu Play), apps/pwa
@@ -40,7 +42,7 @@ context: |
 
   Niezmienniki bezpieczeństwa i prywatności (obowiązują w każdej zmianie):
   - Dostęp egzekwowany w bazie (RLS na każdej tabeli), bo klucz anon jest
-    publiczny. Odczyt tylko dla członków rodziny; zapis wyłącznie przez
+    publiczny. Odczyt tylko dla członków rodziny w zakresie jej grup; zapis wyłącznie przez
     usługi serwerowe poza wąskimi funkcjami RPC.
   - Klucze service_role, Anthropic, Voyage tylko w zmiennych środowiskowych.
   - Tokeny (urządzenia, iCal) długie, losowe, przechowywane jako hash,

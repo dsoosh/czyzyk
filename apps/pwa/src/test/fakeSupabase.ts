@@ -66,7 +66,9 @@ export function fakeSupabase(options: FakeOptions = {}) {
     }),
   };
 
-  const from = vi.fn((table: string) => {
+  const from = vi.fn((name: string) => {
+    // The family views (families) read the same rows as their tables in tests.
+    const table = name.replace(/^family_/, "");
     const filters: ((r: Row) => boolean)[] = [];
     const orders: { col: string; asc: boolean }[] = [];
     let limit = Infinity;
@@ -127,6 +129,10 @@ export function fakeSupabase(options: FakeOptions = {}) {
       row[mark.by] = args.p_done ? options.userId : null;
       row[mark.at] = args.p_done ? new Date().toISOString() : null;
       return { data: row, error: null };
+    }
+    if (name === "trackable_groups") {
+      const groups = (tables.wa_groups ?? []).filter((g) => g.tracked);
+      return { data: groups.map((g) => ({ id: g.id, name: g.display_name ?? g.wa_name, shared: g.shared ?? false })), error: null };
     }
     if (name === "admin_upsert_allowed_email") {
       const list = tables.allowed_emails!;

@@ -147,8 +147,10 @@ const ITEM_FILTERS: Record<ItemType, string> = {
   event: `(coalesce(t.ends_at, t.starts_at) >= ($2::date)::timestamp at time zone 'Europe/Warsaw'
            or (t.repeat_weekdays is not null and (t.repeat_until is null or t.repeat_until >= $2::date)))`,
   bring_item: "(t.due_date is null or t.due_date >= $2::date)",
-  payment: "(t.paid_at is null or t.due_date >= $2::date)",
-  action_required: "(t.resolved_at is null or t.due_date >= $2::date)",
+  // "Done" marks are per family (families), so the shared context keeps items by date: a past
+  // due date for 30 days, an undated item for 60 days after it appeared.
+  payment: "(case when t.due_date is null then t.created_at >= $2::date - 60 else t.due_date >= $2::date - 30 end)",
+  action_required: "(case when t.due_date is null then t.created_at >= $2::date - 60 else t.due_date >= $2::date - 30 end)",
   closure: "t.date_to >= $2::date",
   fact: "$2::date is not null", // facts never expire; references $2 so both queries bind the same parameters
 };
