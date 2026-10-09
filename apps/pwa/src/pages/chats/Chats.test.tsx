@@ -46,20 +46,20 @@ describe("Czaty", () => {
     expect(screen.queryByText("Sąsiedzi")).not.toBeInTheDocument();
   });
 
-  it("historia: 50 najnowszych, potem 100, najstarsze u góry", async () => {
+  it("historia: 20 najnowszych, potem 40, najstarsze u góry", async () => {
     renderAt("/czaty/g1", { tables: { wa_groups: groups, messages } });
     expect(await screen.findByRole("heading", { name: "Motylki" })).toBeInTheDocument();
     const list = screen.getByRole("list", { name: "Wiadomości" });
     let items = within(list).getAllByText(/^wiadomość \d+$/);
-    expect(items).toHaveLength(50);
-    expect(items[0]).toHaveTextContent("wiadomość 70");
+    expect(items).toHaveLength(20);
+    expect(items[0]).toHaveTextContent("wiadomość 100");
     expect(items.at(-1)).toHaveTextContent("wiadomość 119");
     expect(within(list).getByRole("separator")).toHaveTextContent("dziś");
 
     await userEvent.click(screen.getByRole("button", { name: "Wcześniejsze wiadomości" }));
-    await screen.findByText("wiadomość 20");
-    items = within(screen.getByRole("list", { name: "Wiadomości" })).getAllByText(/^wiadomość \d+$|Wycieczka/);
-    expect(items).toHaveLength(100);
+    await screen.findByText("wiadomość 80");
+    items = within(screen.getByRole("list", { name: "Wiadomości" })).getAllByText(/^wiadomość \d+$/);
+    expect(items).toHaveLength(40);
   });
 
   it("wyszukuje w treści bez rozróżniania wielkości liter, tylko w tej grupie", async () => {
