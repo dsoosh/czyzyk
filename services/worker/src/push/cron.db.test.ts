@@ -4,7 +4,7 @@ import { PgBoss } from "pg-boss";
 import { pino } from "pino";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
-import { runAccessRequests } from "./access.js";
+import { runAccessRequests, runFamilyInvites } from "./access.js";
 import { handleAlert } from "./alerts.js";
 import { registerPushJobs } from "./cron.js";
 import { runDigest, runMorning } from "./digest.js";
@@ -345,6 +345,24 @@ describe("Prośby o dostęp", () => {
       {
         endpoint: "https://push.example/2",
         payload: { title: "Prośba o dostęp", body: "Nowa Mama (nowa@example.com) chce dołączyć do Czyżyka.", url: "/admin", tag: "access-nowa@example.com" },
+      },
+    ]);
+  });
+});
+
+describe("Zaproszenia do rodziny", () => {
+  it("zaproszony dostaje jedno powiadomienie", async () => {
+    const { rows } = await db.client.query(
+      "insert into family_invites (email, family_id, invited_by) select 'ola@example.com', family_id, id from profiles where id = $1 returning id",
+      [darekId],
+    );
+    const { sender, sent } = fakeSender();
+    expect(await runFamilyInvites({ db: pool, sender, logger })).toMatchObject({ invites: 1, sent: 1 });
+    expect(await runFamilyInvites({ db: pool, sender, logger })).toMatchObject({ invites: 0, sent: 0 });
+    expect(sent).toEqual([
+      {
+        endpoint: "https://push.example/1",
+        payload: { title: "Zaproszenie do rodziny", body: "Darek zaprasza Cię do swojej rodziny w Czyżyku.", url: "/", tag: `invite-${rows[0].id}` },
       },
     ]);
   });

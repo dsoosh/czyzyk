@@ -174,4 +174,22 @@ describe("Checklista rzeczy do przyniesienia", () => {
     await screen.findByRole("heading", { name: "Dziś i jutro" });
     expect(screen.queryByRole("region", { name: "Dodaj dziecko" })).not.toBeInTheDocument();
   });
+
+  it("zaproszenie do rodziny: „Dołącz” przyjmuje je i odświeża ekran", async () => {
+    const invites = [{ id: "inv1", family_name: "Rodzina Oli", invited_by_name: "Ola", created_at: "" }];
+    const { rpc } = renderAt("/", {
+      tables: { wa_groups: f.groups },
+      rpc: {
+        my_family_invites: () => invites,
+        accept_family_invite: () => {
+          invites.length = 0;
+        },
+      },
+    });
+    const banner = await screen.findByRole("region", { name: "Zaproszenie do rodziny" });
+    expect(banner).toHaveTextContent("Ola zaprasza Cię do rodziny „Rodzina Oli”");
+    fireEvent.click(within(banner).getByRole("button", { name: "Dołącz" }));
+    await vi.waitFor(() => expect(screen.queryByRole("region", { name: "Zaproszenie do rodziny" })).not.toBeInTheDocument());
+    expect(rpc).toHaveBeenCalledWith("accept_family_invite", { p_id: "inv1" });
+  });
 });

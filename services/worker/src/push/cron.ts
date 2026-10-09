@@ -3,7 +3,7 @@ import type pg from "pg";
 import type { PgBoss } from "pg-boss";
 import type { Logger } from "pino";
 import { BACKGROUND_POLL_SECONDS } from "../polling.js";
-import { runAccessRequests } from "./access.js";
+import { runAccessRequests, runFamilyInvites } from "./access.js";
 import { handleAlert } from "./alerts.js";
 import { runDigest, runMorning } from "./digest.js";
 import type { PushSender } from "./send.js";
@@ -15,12 +15,12 @@ export interface PushJobs {
   digestNow(): Promise<Awaited<ReturnType<typeof runDigest>>>;
   /** Runs the morning plan and deadline reminders check now (same schedule). */
   morningNow(): Promise<Awaited<ReturnType<typeof runMorning>>>;
-  /** Announces new access requests to the admins now (same schedule). */
+  /** Announces new family invites and access requests now (same schedule). */
   accessNow(): Promise<Awaited<ReturnType<typeof runAccessRequests>>>;
 }
 
 /**
- * Web Push jobs on the worker's pg-boss instance: access requests for the admins, the morning
+ * Web Push jobs on the worker's pg-boss instance: family invites, access requests for the admins, the morning
  * plan, deadline reminders and the evening digest (checked every 5 minutes) and push-alert jobs enqueued after extractions.
  */
 export async function registerPushJobs(
@@ -38,7 +38,10 @@ export async function registerPushJobs(
   const digestDeps = { db: pool, sender: deps.sender, logger, windowMinutes: deps.digestWindowMinutes };
   const digestNow = () => runDigest(digestDeps, now());
   const morningNow = () => runMorning(digestDeps, now());
-  const accessNow = () => runAccessRequests(digestDeps);
+  const accessNow = async () => {
+    await runFamilyInvites(digestDeps);
+    return runAccessRequests(digestDeps);
+  };
   await boss.work(DIGEST_QUEUE, { pollingIntervalSeconds: BACKGROUND_POLL_SECONDS }, async () => {
     await accessNow();
     await morningNow();
