@@ -10,7 +10,7 @@ export function NoAccessPage({ message }: { message: string }) {
       <p role="alert" className="text-slate-700">
         {message}
       </p>
-      <p className="text-sm text-slate-500">Jeśli należysz do rodziny, poproś administratora o dodanie Twojego adresu.</p>
+      <p className="text-sm text-slate-500">Poproś administratora albo kogoś z Twojej rodziny w Czyżyku o dodanie Twojego adresu.</p>
       <button
         type="button"
         onClick={() => void signInWithGoogle({ selectAccount: true })}

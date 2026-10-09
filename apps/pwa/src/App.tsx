@@ -25,6 +25,7 @@ import { NoAccessPage } from "./pages/NoAccessPage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import { SourcePage } from "./pages/SourcePage";
 import { TodayPage } from "./pages/TodayPage";
+import { WaitingPage } from "./pages/WaitingPage";
 
 export function App() {
   const { state, refreshProfile } = useAuth();
@@ -36,6 +37,8 @@ export function App() {
       return <LoginPage />;
     case "no_access":
       return <NoAccessPage message={state.message} />;
+    case "waiting":
+      return <WaitingPage email={state.email} rejected={state.rejected} />;
     case "error":
       return (
         <div className="p-8 text-center">

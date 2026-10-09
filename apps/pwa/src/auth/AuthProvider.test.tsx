@@ -31,7 +31,22 @@ describe("bramka dostępu", () => {
     expect(await screen.findByRole("heading", { name: "Dziś i jutro" })).toBeInTheDocument();
   });
 
-  it("sesja bez profilu rodziny kończy się ekranem „Brak dostępu” i wylogowaniem", async () => {
+  it("nowe konto z prośbą o dostęp widzi ekran oczekiwania i nie jest wylogowane", async () => {
+    const fake = fakeSupabase({ userId: "u-nowa", profile: null, rpc: { my_access_request: () => "pending" } });
+    renderApp(fake);
+    expect(await screen.findByRole("heading", { name: "Czekasz na akceptację" })).toBeInTheDocument();
+    expect(fake.auth.signOut).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Sprawdź ponownie" }));
+    expect(fake.rpc.mock.calls.filter(([name]) => name === "my_access_request")).toHaveLength(2);
+  });
+
+  it("odrzucona prośba pokazuje ekran odrzucenia", async () => {
+    renderApp(fakeSupabase({ userId: "u-obcy", profile: null, rpc: { my_access_request: () => "rejected" } }));
+    expect(await screen.findByRole("heading", { name: "Prośba odrzucona" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zaloguj innym kontem Google" })).toBeInTheDocument();
+  });
+
+  it("sesja bez profilu i bez prośby (usunięty członek) kończy się ekranem „Brak dostępu” i wylogowaniem", async () => {
     const fake = fakeSupabase({ userId: "u-obcy", profile: null });
     renderApp(fake);
     expect(await screen.findByRole("heading", { name: "Brak dostępu" })).toBeInTheDocument();
@@ -43,7 +58,7 @@ describe("bramka dostępu", () => {
     window.history.replaceState(
       null,
       "",
-      "/?error=access_denied&error_description=" + encodeURIComponent("Brak dostępu – ten adres nie jest na liście rodziny."),
+      "/?error=access_denied&error_description=" + encodeURIComponent("Brak dostępu – konto Google bez adresu e-mail."),
     );
     const fake = fakeSupabase({ userId: null });
     renderApp(fake);

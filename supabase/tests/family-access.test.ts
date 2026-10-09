@@ -19,15 +19,13 @@ async function runHook(event: object) {
   return as(db.client, authAdmin, async (q) => (await q("select public.hook_before_user_created($1) as r", [event])).rows[0].r);
 }
 
-describe("Lista dozwolonych e-maili blokuje zakładanie kont", () => {
+describe("Hook zakładania kont", () => {
   beforeAll(async () => {
     await allowEmail(db.client, "anna@example.com", "family");
   });
 
-  it("odrzuca e-mail spoza listy z kodem 403", async () => {
-    const r = await runHook(hookEvent("obcy@example.com"));
-    expect(r.error.http_code).toBe(403);
-    expect(r.error.message).toContain("Brak dostępu");
+  it("przyjmuje konto Google spoza listy (dostęp zależy od profilu, families-joining)", async () => {
+    expect(await runHook(hookEvent("obcy@example.com"))).toEqual({});
   });
 
   it("przyjmuje e-mail z listy niezależnie od wielkości liter", async () => {

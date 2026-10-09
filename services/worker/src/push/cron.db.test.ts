@@ -4,6 +4,7 @@ import { PgBoss } from "pg-boss";
 import { pino } from "pino";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { allowEmail, createAuthUser, createTestDb, type TestDb } from "../../../../supabase/tests/db.js";
+import { runAccessRequests } from "./access.js";
 import { handleAlert } from "./alerts.js";
 import { registerPushJobs } from "./cron.js";
 import { runDigest, runMorning } from "./digest.js";
@@ -331,5 +332,20 @@ describe("Skróty i alerty dwóch rodzin", () => {
     const alerts = fakeSender();
     await handleAlert({ db: pool, sender: alerts.sender, logger }, { type: "action_required", id: a[0].id }, at("2026-10-07T18:00:00"));
     expect(alerts.sent.map((s) => s.endpoint)).toEqual(["https://push.example/3"]);
+  });
+});
+
+describe("Prośby o dostęp", () => {
+  it("admin dostaje jedno powiadomienie o nowej prośbie", async () => {
+    await createAuthUser(db.client, "nowa@example.com", "Nowa Mama");
+    const { sender, sent } = fakeSender();
+    expect(await runAccessRequests({ db: pool, sender, logger })).toMatchObject({ requests: 1, sent: 1 });
+    expect(await runAccessRequests({ db: pool, sender, logger })).toMatchObject({ requests: 0, sent: 0 });
+    expect(sent).toEqual([
+      {
+        endpoint: "https://push.example/2",
+        payload: { title: "Prośba o dostęp", body: "Nowa Mama (nowa@example.com) chce dołączyć do Czyżyka.", url: "/admin", tag: "access-nowa@example.com" },
+      },
+    ]);
   });
 });

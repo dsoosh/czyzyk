@@ -8,7 +8,7 @@ export function LoginPage() {
         <h1>
           <img src="/logo.svg" alt="Czyżyk" className="mx-auto h-auto w-64" />
         </h1>
-        <p className="mt-2 text-slate-600">Asystent przedszkolny rodziny</p>
+        <p className="mt-2 text-slate-600">Asystent przedszkolny</p>
       </div>
       <button
         type="button"
@@ -17,7 +17,7 @@ export function LoginPage() {
       >
         Zaloguj przez Google
       </button>
-      <p className="text-sm text-slate-500">Dostęp mają tylko osoby z listy rodziny.</p>
+      <p className="text-sm text-slate-500">Nowe konto dostaje dostęp po akceptacji administratora.</p>
     </main>
   );
 }
