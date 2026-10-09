@@ -21,7 +21,19 @@ export const eventDataSchema = z
     start: localDateTime.describe("Początek w czasie Europe/Warsaw: YYYY-MM-DD (cały dzień) lub YYYY-MM-DDTHH:mm"),
     end: localDateTime.nullable().describe("Koniec albo null"),
     all_day: z.boolean(),
-    location: z.string().trim().max(200).nullable(),
+    location: z
+      .string()
+      .trim()
+      .max(200)
+      .nullable()
+      .describe("Gdzie odbywa się wydarzenie (cel wyjazdu: nazwa, adres), np. „Teatr Lalka, ul. Kopernika 3”; null, gdy w przedszkolu albo nie podano"),
+    meeting_point: z
+      .string()
+      .trim()
+      .max(200)
+      .nullable()
+      .optional()
+      .describe("Miejsce zbiórki lub odbioru dzieci, gdy inne niż przedszkole, np. „dworzec PKP”, „Baza”; inaczej null"),
     whole_kindergarten: z.boolean().describe("true, gdy dotyczy całego przedszkola, a nie tylko tej grupy"),
     repeat: z
       .object({

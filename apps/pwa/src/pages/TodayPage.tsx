@@ -124,6 +124,8 @@ export function TodayPage() {
                   <span className="font-semibold text-ink">{dayLabel(day, today)}</span>
                   <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
                   {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
+                  {e.location && <span>📍 {e.location}</span>}
+                  {e.meeting_point && <span>zbiórka: {e.meeting_point}</span>}
                   <ChildTag kids={childrenOf(data.children, e)} all={data.children} />
                   <span>{g(e.group_id)}</span>
                   <SourceLink kind="event" id={e.id} />

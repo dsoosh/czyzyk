@@ -1,6 +1,6 @@
 import type pg from "pg";
 import type { Logger } from "pino";
-import { paymentLabel, truncate } from "./format.js";
+import { eventLabel, paymentLabel, truncate } from "./format.js";
 import { sendToUsers, type DeliverySummary, type PushSender } from "./send.js";
 
 export interface DigestDeps {
@@ -21,8 +21,8 @@ export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string):
         where status = 'active' and $1::date between date_from and date_to order by date_from limit 1`,
       [tomorrow],
     ),
-    db.query<{ title: string; all_day: boolean; time: string }>(
-      `select e.title, e.all_day, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
+    db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null }>(
+      `select e.title, e.all_day, e.location, e.meeting_point, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
         where e.status = 'active'
         order by o.starts_at, e.title`,
@@ -43,7 +43,7 @@ export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string):
   const parts: string[] = [];
   const closure = closures.rows[0];
   if (closure) parts.push(closure.reason ? `przedszkole nieczynne (${closure.reason})` : "przedszkole nieczynne");
-  for (const e of events.rows) parts.push(e.all_day ? e.title : `${e.title} ${e.time}`);
+  for (const e of events.rows) parts.push(eventLabel(e));
   for (const b of bring.rows) parts.push(b.description);
   for (const p of payments.rows) parts.push(paymentLabel(p.description, p.amount_pln));
   return parts.length ? truncate(`Jutro: ${parts.join(", ")}`) : null;
@@ -97,8 +97,8 @@ export async function buildMorning(db: Pick<pg.Pool, "query">, today: string): P
         where status = 'active' and $1::date between date_from and date_to order by date_from limit 1`,
       [today],
     ),
-    db.query<{ title: string; all_day: boolean; time: string }>(
-      `select e.title, e.all_day, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
+    db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null }>(
+      `select e.title, e.all_day, e.location, e.meeting_point, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
         where e.status = 'active'
         order by o.starts_at, e.title`,
@@ -113,7 +113,7 @@ export async function buildMorning(db: Pick<pg.Pool, "query">, today: string): P
   const parts: string[] = [];
   const closure = closures.rows[0];
   if (closure) parts.push(closure.reason ? `przedszkole nieczynne (${closure.reason})` : "przedszkole nieczynne");
-  for (const e of events.rows) parts.push(e.all_day ? e.title : `${e.title} ${e.time}`);
+  for (const e of events.rows) parts.push(eventLabel(e));
   if (bring.rows.length) parts.push(`spakować: ${bring.rows.map((b) => b.description).join(", ")}`);
   return parts.length ? truncate(`Dziś: ${parts.join(", ")}`) : null;
 }

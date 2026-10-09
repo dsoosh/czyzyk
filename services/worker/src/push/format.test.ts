@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { loadWorkerConfig } from "../config.js";
 import { pushConfig } from "./config.js";
-import { dateRange, formatAmount, paymentLabel, truncate } from "./format.js";
+import { dateRange, eventLabel, formatAmount, paymentLabel, truncate } from "./format.js";
 
 describe("format", () => {
   it("daty i kwoty po polsku", () => {
@@ -15,6 +15,14 @@ describe("format", () => {
     expect(paymentLabel("basen", 12)).toBe("basen (12 zł)");
     expect(paymentLabel("10 zł na teatrzyk", 10)).toBe("10 zł na teatrzyk");
     expect(paymentLabel("wyprawka", null)).toBe("wyprawka");
+  });
+
+  it("wydarzenie z godziną i miejscem, gdy są", () => {
+    expect(eventLabel({ title: "Teatrzyk", all_day: false, time: "09:00", location: "Teatr Lalka" })).toBe("Teatrzyk 09:00 (Teatr Lalka)");
+    expect(eventLabel({ title: "Bal", all_day: true, time: "00:00", location: null })).toBe("Bal");
+    expect(eventLabel({ title: "Wycieczka", all_day: false, time: "08:00", location: "ZOO", meeting_point: "dworzec PKP" })).toBe(
+      "Wycieczka 08:00 (ZOO; zbiórka: dworzec PKP)",
+    );
   });
 
   it("skraca długie treści", () => {

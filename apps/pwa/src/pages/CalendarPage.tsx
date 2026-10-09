@@ -82,7 +82,8 @@ function DayItems({ entries, groups, ranges = true }: { entries: DayEntries; gro
               {range && <span>{range}</span>}
               {e.all_day ? s.from === s.to && <span>cały dzień</span> : <span>{warsawTime(e.starts_at)}</span>}
               {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
-              {e.location && <span>{e.location}</span>}
+              {e.location && <span>📍 {e.location}</span>}
+              {e.meeting_point && <span>zbiórka: {e.meeting_point}</span>}
               <span>{groupLabel(groups, e.group_id)}</span>
               <SourceLink kind="event" id={e.id} />
             </Meta>

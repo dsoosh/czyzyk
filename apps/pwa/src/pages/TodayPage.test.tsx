@@ -13,7 +13,7 @@ const section = (name: string) => screen.getByRole("region", { name });
 
 describe("Dziś i jutro", () => {
   it("jutro bal: rzecz w „W najbliższych dniach” z etykietą „jutro”, wydarzenie z etykietą „jutro”", async () => {
-    renderAt("/", { tables: { wa_groups: f.groups, events: [f.event()], bring_items: [f.bring()] } });
+    renderAt("/", { tables: { wa_groups: f.groups, events: [f.event({ location: "Teatr Lalka" })], bring_items: [f.bring()] } });
     await screen.findByRole("heading", { name: "Dziś i jutro" });
     const week = section("W najbliższych dniach");
     expect(within(week).getByText("przebranie")).toBeInTheDocument();
@@ -23,6 +23,7 @@ describe("Dziś i jutro", () => {
     expect(within(events).getByText("Bal")).toBeInTheDocument();
     expect(within(events).getByText("jutro")).toBeInTheDocument();
     expect(within(events).getByText("Motylki")).toBeInTheDocument();
+    expect(within(events).getByText("📍 Teatr Lalka")).toBeInTheDocument();
     expect(within(events).getByRole("link", { name: "skąd to wiem" })).toHaveAttribute("href", "/zrodlo/event/e1");
   });
 

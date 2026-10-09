@@ -102,6 +102,7 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
                   else to_char(t.ends_at at time zone 'Europe/Warsaw', 'YYYY-MM-DD"T"HH24:MI') end,
       'all_day', t.all_day,
       'location', t.location,
+      'meeting_point', t.meeting_point,
       'whole_kindergarten', t.group_id is null,
       'repeat', case when t.repeat_weekdays is null then null
                      else jsonb_build_object('weekdays', to_jsonb(t.repeat_weekdays), 'until', to_char(t.repeat_until, 'YYYY-MM-DD')) end) as data,

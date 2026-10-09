@@ -33,6 +33,8 @@ export interface EventItem extends Provenance {
   ends_at: string | null;
   all_day: boolean;
   location: string | null;
+  /** Where children are brought or picked up, when not the kindergarten (event-location). */
+  meeting_point?: string | null;
   /** Recurring events (recurring-events): ISO weekdays, 1 = Monday; null for one-off events. */
   repeat_weekdays?: number[] | null;
   repeat_until?: string | null;
@@ -76,7 +78,7 @@ export interface Group {
 }
 
 const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, status";
-export const EVENT_COLUMNS = `${PROVENANCE}, child_ids, title, starts_at, ends_at, all_day, location, repeat_weekdays, repeat_until`;
+export const EVENT_COLUMNS = `${PROVENANCE}, child_ids, title, starts_at, ends_at, all_day, location, meeting_point, repeat_weekdays, repeat_until`;
 export const BRING_COLUMNS = `${PROVENANCE}, child_ids, event_id, description, due_date, packed_by, packed_at`;
 export const PAYMENT_COLUMNS = `${PROVENANCE}, child_ids, description, amount_pln, due_date, paid_by, paid_at`;
 export const ACTION_COLUMNS = `${PROVENANCE}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution`;

@@ -7,6 +7,11 @@ import { fetchEvent, groupLabel } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
 import { repeatLabel } from "../lib/recurrence";
 
+/** Map search for an event's place (event location). */
+export function mapUrl(location: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+}
+
 export function EventPage() {
   const { id = "" } = useParams();
   const { client } = useAuth();
@@ -34,7 +39,23 @@ export function EventPage() {
         {event.location && (
           <>
             <dt className="text-slate-500">Miejsce</dt>
-            <dd>{event.location}</dd>
+            <dd>
+              {event.location}{" "}
+              <a href={mapUrl(event.location)} target="_blank" rel="noreferrer" className="text-sm text-brand-700 underline">
+                Mapa
+              </a>
+            </dd>
+          </>
+        )}
+        {event.meeting_point && (
+          <>
+            <dt className="text-slate-500">Zbiórka</dt>
+            <dd>
+              {event.meeting_point}{" "}
+              <a href={mapUrl(event.meeting_point)} target="_blank" rel="noreferrer" className="text-sm text-brand-700 underline">
+                Mapa
+              </a>
+            </dd>
           </>
         )}
         <dt className="text-slate-500">Grupa</dt>
