@@ -1,9 +1,10 @@
-import { Link, useParams } from "react-router";
-import { useAuth } from "../auth/AuthProvider";
+import { useState } from "react";
+import { Link, useNavigate, useParams } from "react-router";
+import { useAuth, useProfile } from "../auth/AuthProvider";
 import { EventHistory } from "../components/EventHistory";
 import { LoadError, Loading, SourceLink } from "../components/ui";
 import { longDayLabel, warsawDay, warsawTime } from "../lib/dates";
-import { fetchEvent, groupLabel } from "../lib/items";
+import { deleteEvent, fetchEvent, groupLabel } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
 import { repeatLabel } from "../lib/recurrence";
 
@@ -15,6 +16,7 @@ export function mapUrl(location: string): string {
 export function EventPage() {
   const { id = "" } = useParams();
   const { client } = useAuth();
+  const isAdmin = useProfile().role === "admin";
   const { data, error, loading, reload } = useLoader(() => fetchEvent(client, id), [client, id]);
   if (error) return <LoadError message={error} onRetry={reload} />;
   if (!data) return loading ? <Loading /> : null;
@@ -78,6 +80,44 @@ export function EventPage() {
       </section>
       <EventHistory eventId={event.id} />
       <SourceLink kind="event" id={event.id} />
+      {isAdmin && <DeleteEvent id={event.id} title={event.title} />}
     </article>
+  );
+}
+
+/** Admin only (event-deletion): removes a wrong or duplicate event after a confirmation. */
+function DeleteEvent({ id, title }: { id: string; title: string }) {
+  const { client } = useAuth();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const remove = async () => {
+    if (!window.confirm(`Usunąć wydarzenie „${title}”? Tego nie da się cofnąć.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteEvent(client, id);
+      navigate("/kalendarz", { replace: true });
+    } catch {
+      setError("Nie udało się usunąć wydarzenia.");
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-2 border-t border-slate-200 pt-4">
+      <button
+        type="button"
+        onClick={remove}
+        disabled={busy}
+        className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+      >
+        {busy ? "Usuwanie…" : "Usuń wydarzenie"}
+      </button>
+      {error && (
+        <p role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

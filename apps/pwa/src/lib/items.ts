@@ -238,6 +238,12 @@ function fetchRecurring(db: Db, toDay: string): Promise<EventItem[]> {
   );
 }
 
+/** Removes an event for good (event-deletion); admins only, enforced by the database. */
+export async function deleteEvent(db: Db, id: string): Promise<void> {
+  const { error } = await db.rpc("admin_delete_event", { p_id: id });
+  if (error) throw new Error(error.message);
+}
+
 export async function fetchEvent(db: Db, id: string) {
   const [event, bring, groups] = await Promise.all([
     run<EventItem | null>(db.from("events").select(EVENT_COLUMNS).eq("id", id).maybeSingle()),
