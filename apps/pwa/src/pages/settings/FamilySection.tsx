@@ -10,6 +10,8 @@ interface Member {
   role: "admin" | "family";
   signed_in: boolean;
   is_me: boolean;
+  /** An invite sent to someone from another family, not accepted yet. */
+  invited: boolean;
 }
 
 /** Members of the family: a family adds the second parent itself, without the operator (families-joining). */
@@ -19,16 +21,19 @@ export function FamilySection() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const act = async (fn: "family_add_member" | "family_remove_member", value: string) => {
     setBusy(true);
     setMessage(null);
-    const { error: e } = await client.rpc(fn, { p_email: value });
+    setNotice(null);
+    const { data: result, error: e } = await client.rpc(fn, { p_email: value });
     setBusy(false);
     if (e) {
       setMessage(e.message);
       return false;
     }
+    if (result === "invited") setNotice(`${value.trim()} ma już konto w innej rodzinie – wysłaliśmy zaproszenie do Waszej.`);
     reload();
     return true;
   };
@@ -42,7 +47,7 @@ export function FamilySection() {
     <section aria-label="Moja rodzina" className="space-y-3 rounded-[28px] bg-card p-5 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Moja rodzina</h2>
       <p className="text-sm text-muted">
-        Dodaj adres Google drugiego rodzica albo opiekuna. Po zalogowaniu zobaczy dzieci, sprawy i znaczniki Waszej rodziny.
+        Dodaj adres Google drugiego rodzica albo opiekuna. Po zalogowaniu zobaczy dzieci, sprawy i znaczniki Waszej rodziny. Jeśli ma już konto w Czyżyku, dostanie zaproszenie do Waszej rodziny.
       </p>
       {error ? (
         <LoadError message={error} onRetry={reload} />
@@ -51,7 +56,7 @@ export function FamilySection() {
       ) : (
         <ul className="divide-y divide-slate-200">
           {data.map((m) => (
-            <li key={m.email} className="flex items-center gap-2 py-2">
+            <li key={`${m.email}:${m.invited}`} className="flex items-center gap-2 py-2">
               <span className="min-w-0 flex-1">
                 <span className="block truncate">
                   {m.display_name ?? m.email}
@@ -59,20 +64,21 @@ export function FamilySection() {
                 </span>
                 <span className="block truncate text-sm text-muted">
                   {m.display_name ? `${m.email} · ` : ""}
-                  {m.signed_in ? "ma dostęp" : "jeszcze się nie zalogował(a)"}
+                  {m.invited ? "zaproszenie wysłane" : m.signed_in ? "ma dostęp" : "jeszcze się nie zalogował(a)"}
                 </span>
               </span>
               {!m.is_me && m.role !== "admin" && (
                 <button
                   type="button"
                   disabled={busy}
-                  aria-label={`Usuń ${m.email}`}
+                  aria-label={m.invited ? `Anuluj zaproszenie ${m.email}` : `Usuń ${m.email}`}
                   onClick={() => {
-                    if (window.confirm(`Usunąć ${m.email} z rodziny? Ta osoba straci dostęp.`)) void act("family_remove_member", m.email);
+                    const question = m.invited ? `Anulować zaproszenie dla ${m.email}?` : `Usunąć ${m.email} z rodziny? Ta osoba straci dostęp.`;
+                    if (window.confirm(question)) void act("family_remove_member", m.email);
                   }}
                   className="rounded-lg px-2 py-1 text-sm text-red-700 hover:bg-red-50 disabled:opacity-40"
                 >
-                  Usuń
+                  {m.invited ? "Anuluj" : "Usuń"}
                 </button>
               )}
             </li>
@@ -93,6 +99,11 @@ export function FamilySection() {
           Dodaj
         </button>
       </form>
+      {notice && (
+        <p role="status" className="text-sm text-ink">
+          {notice}
+        </p>
+      )}
       {message && (
         <p role="alert" className="text-sm text-red-700">
           {message}

@@ -6,14 +6,16 @@ import { renderAt } from "../../test/render";
 type Tables = Record<string, Record<string, unknown>[]>;
 
 const members = [
-  { email: "ola@example.com", display_name: "Ola", role: "family", signed_in: true, is_me: true },
-  { email: "marek@example.com", display_name: null, role: "family", signed_in: false, is_me: false },
+  { email: "ola@example.com", display_name: "Ola", role: "family", signed_in: true, is_me: true, invited: false },
+  { email: "marek@example.com", display_name: null, role: "family", signed_in: false, is_me: false, invited: false },
 ];
 
 const rpc = {
   family_members: (_: Record<string, unknown>, tables: Tables) => tables.members,
   family_add_member: (args: Record<string, unknown>, tables: Tables) => {
-    tables.members!.push({ email: args.p_email, display_name: null, role: "family", signed_in: false, is_me: false });
+    const invited = args.p_email === "tata@example.com";
+    tables.members!.push({ email: args.p_email, display_name: null, role: "family", signed_in: false, is_me: false, invited });
+    return invited ? "invited" : "added";
   },
   family_remove_member: (args: Record<string, unknown>, tables: Tables) => {
     tables.members = tables.members!.filter((m) => m.email !== args.p_email);
@@ -38,4 +40,17 @@ describe("Ustawienia → Moja rodzina", () => {
     await waitFor(() => expect(within(section).queryByText("marek@example.com")).not.toBeInTheDocument());
   });
 
+
+  it("adres z innej rodziny dostaje zaproszenie, które można anulować", async () => {
+    const { rpc: calls } = renderAt("/ustawienia", { tables: { members: [...members] }, rpc });
+    const section = await screen.findByRole("region", { name: "Moja rodzina" });
+    await within(section).findByText("Ola");
+    await userEvent.type(within(section).getByRole("textbox", { name: "Adres e-mail członka rodziny" }), "tata@example.com");
+    await userEvent.click(within(section).getByRole("button", { name: "Dodaj" }));
+    expect(await within(section).findByRole("status")).toHaveTextContent("wysłaliśmy zaproszenie");
+    expect(await within(section).findByText("zaproszenie wysłane")).toBeInTheDocument();
+    window.confirm = () => true;
+    await userEvent.click(within(section).getByRole("button", { name: "Anuluj zaproszenie tata@example.com" }));
+    expect(calls).toHaveBeenCalledWith("family_remove_member", { p_email: "tata@example.com" });
+  });
 });

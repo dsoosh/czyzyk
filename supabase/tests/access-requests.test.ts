@@ -72,8 +72,9 @@ describe("członkowie rodziny", () => {
     ]);
   });
 
-  it("adres innej rodziny jest odrzucany, a admin nie widzi się w cudzej rodzinie", async () => {
-    await expect(commit(olaId, "select public.family_add_member('darek@example.com')")).rejects.toMatchObject({ code: "23505" });
+  it("adres innej rodziny dostaje zaproszenie (family-invites), a admin nie widzi się w cudzej rodzinie", async () => {
+    expect(await commit(olaId, "select public.family_add_member('darek@example.com') as r")).toEqual([{ r: "invited" }]);
+    await commit(olaId, "select public.family_remove_member('darek@example.com')");
     await expect(commit(olaId, "select public.family_add_member('bez-malpy')")).rejects.toMatchObject({ code: "22023" });
     expect((await rows(adminId, "select email from public.family_members()")).map((r) => r.email)).toEqual(["darek@example.com"]);
   });

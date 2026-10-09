@@ -35,3 +35,41 @@ export async function runAccessRequests(deps: { db: pg.Pool; sender: PushSender;
   }
   return { ...summary, requests: requests.length };
 }
+
+/** Announces family invites to the invited person (families-joining), each invite once. */
+export async function runFamilyInvites(deps: { db: pg.Pool; sender: PushSender; logger: Logger }): Promise<DeliverySummary & { invites: number }> {
+  const { rows: invites } = await deps.db.query<{ id: string; user_id: string | null; inviter: string | null }>(
+    `with claimed as (
+       update public.family_invites set notified_at = now() where notified_at is null
+       returning id, email, invited_by
+     )
+     select c.id, p.id as user_id,
+            coalesce(nullif(btrim(i.display_name), ''), split_part(i.email, '@', 1)) as inviter
+       from claimed c
+       left join public.profiles p on p.email = c.email
+       left join public.profiles i on i.id = c.invited_by`,
+  );
+  let summary: DeliverySummary = { users: 0, sent: 0, removed: 0, failed: 0 };
+  for (const inv of invites) {
+    if (!inv.user_id) continue;
+    const result = await sendToUsers(
+      deps.db,
+      deps.sender,
+      [inv.user_id],
+      {
+        title: "Zaproszenie do rodziny",
+        body: `${inv.inviter ?? "Ktoś"} zaprasza Cię do swojej rodziny w Czyżyku.`,
+        url: "/",
+        tag: `invite-${inv.id}`,
+      },
+      deps.logger,
+    );
+    summary = {
+      users: summary.users + result.users,
+      sent: summary.sent + result.sent,
+      removed: summary.removed + result.removed,
+      failed: summary.failed + result.failed,
+    };
+  }
+  return { ...summary, invites: invites.length };
+}

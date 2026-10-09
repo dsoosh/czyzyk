@@ -8,6 +8,7 @@ import { eventKey, repeatLabel } from "../lib/recurrence";
 import { fetchToday, formatAmount, groupLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
 import { doneLabel } from "../lib/tracking";
 import { useLoader, useOnForeground } from "../lib/useLoader";
+import { FamilyInvites } from "./FamilyInvites";
 import { useMarkDone } from "../lib/useMarkDone";
 import { useState } from "react";
 
@@ -81,6 +82,7 @@ export function TodayPage() {
         <h1 className="font-display text-[52px] leading-none font-bold text-ink">Dziś i jutro</h1>
       </div>
 
+      <FamilyInvites onJoined={reload} />
       {data.children.length === 0 && <AddChildHint />}
 
       {data.closures.map((c) => (
