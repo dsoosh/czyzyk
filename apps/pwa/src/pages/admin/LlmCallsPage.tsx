@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useAuth } from "../../auth/AuthProvider";
 import { LoadError, Loading } from "../../components/ui";
@@ -16,6 +17,8 @@ interface LlmCall {
   response: { operations?: unknown[]; containsPeople?: boolean; relevant?: boolean; rationale?: string | null } | null;
   error: string | null;
   usage: { input_tokens?: number; output_tokens?: number } | null;
+  /** What the worker applied from the answer (extraction only). */
+  outcome: { created?: number; updated?: number; cancelled?: number; needsReview?: number; rejected?: { index: number; reason: string }[] } | null;
   duration_ms: number | null;
   created_at: string;
 }
@@ -27,7 +30,7 @@ export function LlmCallsPage() {
   const [params] = useSearchParams();
   const only = params.get("wywolanie");
   const { data, error, reload } = useLoader(async () => {
-    const columns = "id, kind, group_id, model, request, response, error, usage, duration_ms, created_at";
+    const columns = "id, kind, group_id, model, request, response, error, usage, outcome, duration_ms, created_at";
     const [calls, groups] = await Promise.all([
       run<LlmCall[]>(
         only
@@ -78,11 +81,13 @@ export function LlmCallsPage() {
                   {c.kind === "triage" && c.response?.rationale && <span className="w-full text-xs text-slate-600">{c.response.rationale}</span>}
                 </summary>
                 <div className="mt-3 space-y-3 text-sm">
+                  <CopyButton text={callText(c, groupLabel(data.groups, c.group_id))} />
                   {c.model && <p className="text-xs text-slate-500">Model: {c.model}</p>}
                   {c.error && <p className="text-red-800">Błąd: {c.error}</p>}
                   {c.request.user ? <Block title="Zapytanie (wiadomości)" text={c.request.user} open /> : null}
                   {c.request.images?.length ? <p className="text-xs text-slate-600">Dołączone obrazy: {c.request.images.join(" · ")}</p> : null}
                   {c.response && <Block title="Odpowiedź modelu" text={JSON.stringify(c.response.operations ?? c.response, null, 2)} open />}
+                  {c.outcome && <Block title="Zapisano" text={outcomeText(c.outcome)} open />}
                   <Block title="Prompt systemowy" text={c.request.system ?? ""} />
                 </div>
               </details>
@@ -123,4 +128,48 @@ function usageLabel(c: LlmCall): string {
   if (c.usage?.input_tokens != null) parts.push(`${c.usage.input_tokens} → ${c.usage.output_tokens ?? 0} tokenów`);
   if (c.duration_ms != null) parts.push(`${(c.duration_ms / 1000).toFixed(1)} s`);
   return parts.join(" · ");
+}
+
+function outcomeText(o: NonNullable<LlmCall["outcome"]>): string {
+  const lines = [
+    `utworzone: ${o.created ?? 0}, zmienione: ${o.updated ?? 0}, odwołane: ${o.cancelled ?? 0}, do przejrzenia: ${o.needsReview ?? 0}`,
+  ];
+  for (const r of o.rejected ?? []) lines.push(`odrzucona operacja ${r.index + 1}: ${r.reason}`);
+  return lines.join("\n");
+}
+
+/** The whole call as plain text, to paste into a bug report. */
+export function callText(c: LlmCall, group: string): string {
+  const parts = [
+    `Wywołanie LLM ${c.id}`,
+    `Czas: ${c.created_at}`,
+    `Rodzaj: ${KIND_LABELS[c.kind]}`,
+    `Grupa: ${group}`,
+    `Model: ${c.model ?? "?"}`,
+    `Użycie: ${usageLabel(c) || "?"}`,
+  ];
+  if (c.error) parts.push(`Błąd: ${c.error}`);
+  if (c.request.images?.length) parts.push(`Dołączone obrazy: ${c.request.images.join(" · ")}`);
+  parts.push("", "=== Zapytanie (wiadomości) ===", c.request.user ?? "");
+  if (c.response) parts.push("", "=== Odpowiedź modelu ===", JSON.stringify(c.response.operations ?? c.response, null, 2));
+  if (c.outcome) parts.push("", "=== Zapisano ===", outcomeText(c.outcome));
+  parts.push("", "=== Prompt systemowy ===", c.request.system ?? "");
+  return parts.join("\n");
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+    } catch {
+      setState("failed");
+    }
+  };
+  return (
+    <button type="button" onClick={() => void copy()} className="rounded-full bg-ink px-4 py-1.5 text-xs font-semibold text-cream">
+      {state === "copied" ? "Skopiowano" : state === "failed" ? "Nie udało się skopiować" : "Kopiuj całość"}
+    </button>
+  );
 }

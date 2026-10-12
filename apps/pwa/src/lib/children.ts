@@ -69,17 +69,20 @@ export async function deleteChild(db: Db, id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+type ItemGroups = { group_id: string | null; child_ids?: string[] | null; extra_group_ids?: string[] | null };
+
 /**
- * Names shown on an item: the children it is assigned to, otherwise the children
- * attending the item's group (none for whole-kindergarten items).
+ * Names shown on an item: the children it is assigned to, otherwise the children attending
+ * the item's group or a group that joined it (none for whole-kindergarten items).
  */
-export function childrenOf(children: Child[], item: { group_id: string | null; child_ids?: string[] | null }): Child[] {
+export function childrenOf(children: Child[], item: ItemGroups): Child[] {
   const assigned = item.child_ids ?? [];
   if (assigned.length) return children.filter((c) => assigned.includes(c.id));
   if (!item.group_id) return [];
-  return children.filter((c) => c.group_id === item.group_id);
+  const groups = [item.group_id, ...(item.extra_group_ids ?? [])];
+  return children.filter((c) => c.group_id != null && groups.includes(c.group_id));
 }
 
-export function childNames(children: Child[], item: { group_id: string | null; child_ids?: string[] | null }): string[] {
+export function childNames(children: Child[], item: ItemGroups): string[] {
   return childrenOf(children, item).map((c) => c.name);
 }

@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
-import { ActionSuggestions } from "../components/ActionSuggestions";
+import { ResolveButton } from "../components/ResolveButton";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
 import { childrenOf } from "../lib/children";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
@@ -62,7 +62,7 @@ export function TodayPage() {
   const { data, error, loading, reload } = useLoader(() => fetchToday(client, today), [client, today]);
   const mark = useMarkDone("bring_item", reload);
   const pay = useMarkDone("payment", reload);
-  const [applied, setApplied] = useState<string | null>(null);
+  const resolve = useMarkDone("action_required", reload);
 
   // Returning to the app (e.g. after midnight) recomputes "today" and refreshes the data.
   useOnForeground(() => {
@@ -94,9 +94,9 @@ export function TodayPage() {
         </div>
       ))}
 
-      {applied && (
-        <p role="status" className="text-sm text-ink">
-          {applied}
+      {resolve.error && (
+        <p role="alert" className="text-red-700">
+          {resolve.error}
         </p>
       )}
 
@@ -185,13 +185,7 @@ export function TodayPage() {
                 <span>{g(a.group_id)}</span>
                 <SourceLink kind="action_required" id={a.id} />
               </Meta>
-              <ActionSuggestions
-                item={a}
-                onApplied={(message) => {
-                  setApplied(message);
-                  reload();
-                }}
-              />
+              <ResolveButton question={a.question} disabled={resolve.pending === a.id} onResolve={() => void resolve.toggle(a.id, true)} />
             </Row>
           ))}
         </Section>

@@ -134,8 +134,7 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
     from public.payments t`,
   action_required: `select t.id, t.status, jsonb_build_object(
       'question', t.question,
-      'due_date', to_char(t.due_date, 'YYYY-MM-DD'),
-      'suggestions', t.suggested_actions) as data,
+      'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data,
       t.audience as children,
       t.group_id
     from public.action_required t`,
