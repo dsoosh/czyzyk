@@ -3,7 +3,7 @@ import { useAuth, useProfile } from "../../auth/AuthProvider";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
 import { childrenOf } from "../../lib/children";
 import { dayLabel, warsawDay } from "../../lib/dates";
-import { groupLabel, type BringItem } from "../../lib/items";
+import { itemGroupsLabel, type BringItem } from "../../lib/items";
 import { doneLabel, fetchBringList } from "../../lib/tracking";
 import { useLoader, useOnForeground } from "../../lib/useLoader";
 import { useMarkDone } from "../../lib/useMarkDone";
@@ -46,7 +46,7 @@ export function BringListPage() {
                   <Meta>
                     {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
                     <ChildTag kids={childrenOf(data.children, b)} all={data.children} />
-            <span>{groupLabel(data.groups, b.group_id)}</span>
+            <span>{itemGroupsLabel(data.groups, b)}</span>
                     <SourceLink kind="bring_item" id={b.id} />
                   </Meta>
                 </div>
