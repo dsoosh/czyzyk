@@ -82,11 +82,13 @@ export interface Group {
   shared?: boolean;
 }
 
-const PROVENANCE = "id, group_id, extra_group_ids, source_message_ids, confidence, rationale, status";
-export const EVENT_COLUMNS = `${PROVENANCE}, child_ids, title, starts_at, ends_at, all_day, location, meeting_point, repeat_weekdays, repeat_until`;
-export const BRING_COLUMNS = `${PROVENANCE}, child_ids, event_id, description, due_date, packed_by, packed_at`;
-export const PAYMENT_COLUMNS = `${PROVENANCE}, child_ids, description, amount_pln, due_date, paid_by, paid_at`;
-export const ACTION_COLUMNS = `${PROVENANCE}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution`;
+const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, status";
+/** Items a group can join (events, bring items, payments, actions); closures have no extra groups. */
+const SHARED = `${PROVENANCE}, extra_group_ids`;
+export const EVENT_COLUMNS = `${SHARED}, child_ids, title, starts_at, ends_at, all_day, location, meeting_point, repeat_weekdays, repeat_until`;
+export const BRING_COLUMNS = `${SHARED}, child_ids, event_id, description, due_date, packed_by, packed_at`;
+export const PAYMENT_COLUMNS = `${SHARED}, child_ids, description, amount_pln, due_date, paid_by, paid_at`;
+export const ACTION_COLUMNS = `${SHARED}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution`;
 export const CLOSURE_COLUMNS = `${PROVENANCE}, date_from, date_to, reason`;
 
 export async function run<T>(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
