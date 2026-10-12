@@ -300,6 +300,7 @@ async function applyJoin(ctx: Ctx, op: Extract<ResolvedOperation, { op: "join" }
     `update ${table}
         set extra_group_ids = case when group_id = $2 or $2 = any(extra_group_ids) then extra_group_ids else extra_group_ids || $2::uuid end,
             audience = $3::text[],
+            legacy_audience = false,
             source_message_ids = array(select distinct unnest(source_message_ids || $4::uuid[]))
       where id = $1`,
     [op.targetId, groupId, after, op.sourceMessageIds],
@@ -391,7 +392,8 @@ async function applyOne(
   const updatable = columns(op.type, data, groupId, eventId).filter(([name]) => op.type === "event" || name !== "group_id");
   // An empty list keeps the current audience.
   const audience = takesChildren(op.type) ? audienceOf(op.children) : [];
-  if (audience.length) updatable.push(["audience", "$::text[]", audience]);
+  // The model's audience replaces one computed from old message texts (legacy_audience).
+  if (audience.length) updatable.push(["audience", "$::text[]", audience], ["legacy_audience", "$::boolean", false]);
   const cols = render(updatable, 5);
   const assignments = cols.names.map((name, i) => `${name} = ${cols.exprs[i]}`).join(", ");
   await client.query(

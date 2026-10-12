@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderAt } from "../../test/render";
 
 const calls = [
@@ -35,6 +35,7 @@ const calls = [
     model: "model-z-konfiguracji",
     request: { system: "Jesteś asystentem rodziców", user: "W1 | 07.10 | \"Pani Ania\": \"W piątek bal\"" },
     response: { operations: [{ op: "create", type: "event" }] },
+    outcome: { created: 0, updated: 0, cancelled: 0, needsReview: 0, rejected: [{ index: 0, reason: "target item is not active" }] },
     error: null,
     usage: { input_tokens: 1200, output_tokens: 80 },
     duration_ms: 2400,
@@ -88,5 +89,19 @@ describe("Admin → LLM", () => {
     renderAt("/admin/llm", { admin: true, tables: { llm_calls: [], wa_groups: [] } });
     expect(await screen.findByText("Brak wywołań w ostatnich 14 dniach.")).toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Panel admina" })).getByRole("link", { name: "LLM" })).toHaveAttribute("href", "/admin/llm");
+  });
+
+  it("„Kopiuj całość” kopiuje zapytanie, odpowiedź, wynik zapisu i prompt", async () => {
+    const writeText = vi.fn(async (_text: string) => {});
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderAt("/admin/llm?wywolanie=c1", { admin: true, tables: { llm_calls: calls, wa_groups: [] } });
+    expect(await screen.findByText(/odrzucona operacja 1: target item is not active/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Kopiuj całość" }));
+    expect(await screen.findByRole("button", { name: "Skopiowano" })).toBeInTheDocument();
+    const text = writeText.mock.calls[0]![0] as string;
+    expect(text).toContain("W piątek bal");
+    expect(text).toContain('"type": "event"');
+    expect(text).toContain("odrzucona operacja 1: target item is not active");
+    expect(text).toContain("=== Prompt systemowy ===\nJesteś asystentem rodziców");
   });
 });

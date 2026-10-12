@@ -3,7 +3,7 @@ import type { Logger } from "pino";
 import { applyOperations, type ApplySummary } from "./apply.js";
 import { loadBatch, type ExtractionBatch } from "./batch.js";
 import { checkPendingDocuments, type DocumentChecker } from "./documents.js";
-import { errorLabel, logLlmCall } from "./llmLog.js";
+import { errorLabel, logLlmCall, logLlmOutcome } from "./llmLog.js";
 import { buildTriagePrompt, onlyChatter, type TriageModel } from "./triage.js";
 import type { ExtractionModel } from "./model.js";
 import { buildExtractionPrompt } from "./prompt.js";
@@ -128,7 +128,7 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
         throw error;
       }
 
-      await log({ response: { operations: result.operations }, usage: result.usage });
+      const callId = await log({ response: { operations: result.operations }, usage: result.usage });
 
       const { accepted, rejected } = resolveOperations(result.operations, prompt.aliases);
       await client.query("begin");
@@ -149,6 +149,13 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
           usage: result.usage,
         });
         await client.query("commit");
+        await logLlmOutcome(deps.db, deps.logger, callId, {
+          created: summary.created,
+          updated: summary.updated,
+          cancelled: summary.cancelled,
+          needsReview: summary.needsReview,
+          rejected: summary.rejected,
+        });
         deps.logger.info(
           {
             groupId,

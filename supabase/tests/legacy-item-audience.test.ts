@@ -69,4 +69,20 @@ describe("adresaci starych spraw", () => {
     expect(await titles(olaId)).not.toContain("Lenka");
     expect(await titles(kasiaId)).toContain("Lenka");
   });
+
+  it("sprawa całej grupy nie trzyma starego przypisania, a adresaci z analizy (join) nie są nadpisywani", async () => {
+    const { rows: whole } = await db.client.query("select child_ids from events where title = 'wycieczka'");
+    expect(whole).toEqual([{ child_ids: [] }]);
+    // The worker's join/update writes the model's audience and turns the text-based one off.
+    await db.client.query("update events set audience = '{Zosia,Antek}', legacy_audience = false where title = 'kapcie Zosi'");
+    await db.client.query("select public.refresh_item_children()");
+    const { rows } = await db.client.query("select audience, cardinality(child_ids) as n from events where title = 'kapcie Zosi'");
+    expect(rows).toEqual([{ audience: ["Zosia", "Antek"], n: 2 }]);
+  });
+
+  it("widoki rodziny mają dodatkowe grupy sprawy", async () => {
+    await db.client.query("insert into bring_items (group_id, description) values ($1, 'kapcie')", [wilki]);
+    const rows = await as(db.client, user(kasiaId), async (q) => (await q("select extra_group_ids, audience from family_bring_items")).rows);
+    expect(rows).toEqual([{ extra_group_ids: [], audience: [] }]);
+  });
 });

@@ -301,20 +301,21 @@ describe("runGroupExtraction", () => {
     const model: ExtractionModel = {
       name: "model-z-konfiguracji",
       async extract() {
-        return { operations: [], usage: { input_tokens: 120, output_tokens: 8 } };
+        // One operation with an unknown alias: rejected, and the log says why.
+        return { operations: [{ op: "cancel", type: "event", target: "E99", rationale: "r", confidence: 0.9, source_messages: ["W1"] }], usage: { input_tokens: 120, output_tokens: 8 } };
       },
     };
     await runGroupExtraction(deps(model), groupId);
-    const { rows } = await db.client.query("select kind, group_id, model, request, response, error, usage, duration_ms, message_ids from llm_calls");
+    const { rows } = await db.client.query("select kind, group_id, model, request, response, error, usage, duration_ms, message_ids, outcome from llm_calls");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       kind: "extraction",
       group_id: groupId,
       message_ids: [messageId],
       model: "model-z-konfiguracji",
-      response: { operations: [] },
       error: null,
       usage: { input_tokens: 120, output_tokens: 8 },
+      outcome: { created: 0, updated: 0, cancelled: 0, needsReview: 0, rejected: [{ index: 0, reason: expect.any(String) }] },
     });
     expect(rows[0].request.user).toContain("W piątek bal");
     expect(rows[0].request.system).toContain("wiadomości z grupy WhatsApp");
@@ -495,7 +496,8 @@ describe("runGroupExtraction", () => {
       [sowy],
     );
     const { rows: pay } = await db.client.query(
-      "insert into payments (group_id, description, amount_pln, due_date, audience) values ($1, 'Wycieczka', 60, '2026-10-14', '{Antek}') returning id",
+      // An old item (legacy_audience): the join's children must survive the text-based recompute.
+      "insert into payments (group_id, description, amount_pln, due_date, audience, legacy_audience) values ($1, 'Wycieczka', 60, '2026-10-14', '{Antek}', true) returning id",
       [sowy],
     );
     await addMessage("Wycieczka do Centrum Zajezdnia 14.10, koszt 60 zł", "2026-10-07T16:00:00Z");
@@ -584,7 +586,7 @@ describe("runGroupExtraction", () => {
       op({ op: "update", type: "action_required", target: "E1", data: { suggestions }, source_messages: [lastAlias(p)], confidence: 0.5 }),
     ]);
     await runGroupExtraction(deps(model), groupId);
-    expect(prompts[0]!.user).toContain('"suggestions":[]');
+    expect(prompts[0]!.user).not.toContain('"suggestions"');
     const { rows: after } = await db.client.query(
       "select suggested_actions, status, confidence, pending_patch from action_required where id = $1",
       [rows[0]!.id],
