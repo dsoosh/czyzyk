@@ -115,6 +115,12 @@ export function groupLabel(names: Map<string, string>, groupId: string | null): 
   return groupId ? (names.get(groupId) ?? "grupa") : "całe przedszkole";
 }
 
+/** The item's group and the groups that joined it (a shared trip of two groups: "Wilki, Sowy"). */
+export function itemGroupsLabel(names: Map<string, string>, item: { group_id: string | null; extra_group_ids?: string[] | null }): string {
+  if (!item.group_id) return groupLabel(names, null);
+  return [item.group_id, ...(item.extra_group_ids ?? [])].map((id) => groupLabel(names, id)).join(", ");
+}
+
 export interface TodayData {
   /** Due today: packed in the morning. */
   bringToday: BringItem[];

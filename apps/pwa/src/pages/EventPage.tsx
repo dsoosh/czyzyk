@@ -4,7 +4,7 @@ import { useAuth, useProfile } from "../auth/AuthProvider";
 import { EventHistory } from "../components/EventHistory";
 import { LoadError, Loading, SourceLink } from "../components/ui";
 import { longDayLabel, warsawDay, warsawTime } from "../lib/dates";
-import { deleteEvent, fetchEvent, groupLabel } from "../lib/items";
+import { deleteEvent, fetchEvent, itemGroupsLabel } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
 import { repeatLabel } from "../lib/recurrence";
 
@@ -61,7 +61,7 @@ export function EventPage() {
           </>
         )}
         <dt className="text-slate-500">Grupa</dt>
-        <dd>{groupLabel(groups, event.group_id)}</dd>
+        <dd>{itemGroupsLabel(groups, event)}</dd>
       </dl>
       <section aria-label="Do przyniesienia" className="space-y-2">
         <h2 className="font-display text-2xl font-bold text-ink">Do przyniesienia</h2>

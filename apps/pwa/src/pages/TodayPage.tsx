@@ -5,7 +5,7 @@ import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLin
 import { childrenOf } from "../lib/children";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
 import { eventKey, repeatLabel } from "../lib/recurrence";
-import { fetchToday, formatAmount, groupLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
+import { fetchToday, formatAmount, itemGroupsLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
 import { doneLabel } from "../lib/tracking";
 import { useLoader, useOnForeground } from "../lib/useLoader";
 import { FamilyInvites } from "./FamilyInvites";
@@ -46,7 +46,7 @@ function bringRows(
             {withDay && b.due_date && <span className="font-semibold text-ink">{dayLabel(b.due_date, today)}</span>}
             {b.packed_at && <span>{doneLabel("spakowane", b.packed_by, b.packed_at, me, data.people, today)}</span>}
             <ChildTag kids={childrenOf(data.children, b)} all={data.children} />
-            <span>{groupLabel(data.groups, b.group_id)}</span>
+            <span>{itemGroupsLabel(data.groups, b)}</span>
             <SourceLink kind="bring_item" id={b.id} />
           </Meta>
         </div>
@@ -73,7 +73,6 @@ export function TodayPage() {
 
   if (error) return <LoadError message={error} onRetry={reload} />;
   if (!data) return loading ? <Loading /> : null;
-  const g = (id: string | null) => groupLabel(data.groups, id);
 
   return (
     <div className="space-y-6">
@@ -131,7 +130,7 @@ export function TodayPage() {
                   {e.location && <span>📍 {e.location}</span>}
                   {e.meeting_point && <span>zbiórka: {e.meeting_point}</span>}
                   <ChildTag kids={childrenOf(data.children, e)} all={data.children} />
-                  <span>{g(e.group_id)}</span>
+                  <span>{itemGroupsLabel(data.groups, e)}</span>
                   <SourceLink kind="event" id={e.id} />
                 </Meta>
               </Row>
@@ -160,7 +159,7 @@ export function TodayPage() {
                         {dayLabel(p.due_date!, today)}
                       </span>
                       <ChildTag kids={childrenOf(data.children, p)} all={data.children} />
-                      <span>{g(p.group_id)}</span>
+                      <span>{itemGroupsLabel(data.groups, p)}</span>
                       <SourceLink kind="payment" id={p.id} />
                     </Meta>
                   </div>
@@ -182,7 +181,7 @@ export function TodayPage() {
                   </span>
                 )}
                 <ChildTag kids={childrenOf(data.children, a)} all={data.children} />
-                <span>{g(a.group_id)}</span>
+                <span>{itemGroupsLabel(data.groups, a)}</span>
                 <SourceLink kind="action_required" id={a.id} />
               </Meta>
               <ResolveButton question={a.question} disabled={resolve.pending === a.id} onResolve={() => void resolve.toggle(a.id, true)} />

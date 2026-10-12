@@ -36,6 +36,15 @@ describe("Kalendarz – lista", () => {
   });
 });
 
+describe("Kalendarz – wspólne wydarzenia", () => {
+  it("wydarzenie dołączone przez drugą grupę pokazuje obie grupy", async () => {
+    const groups = [...f.groups, { id: "g2", wa_name: "Sowy", display_name: null, tracked: true }];
+    renderAt("/kalendarz", { tables: { wa_groups: groups, events: [f.event({ extra_group_ids: ["g2"] })] } });
+    const friday = await screen.findByRole("region", { name: "Piątek 9.10" });
+    expect(within(friday).getByText("Motylki, Sowy")).toBeInTheDocument();
+  });
+});
+
 describe("Kalendarz – wpisy kilkudniowe", () => {
   const spanTables = {
     ...tables,

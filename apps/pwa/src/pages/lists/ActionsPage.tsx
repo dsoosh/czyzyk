@@ -4,7 +4,7 @@ import { ResolveButton } from "../../components/ResolveButton";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
 import { childrenOf } from "../../lib/children";
 import { addDays, dayLabel, warsawDay } from "../../lib/dates";
-import { groupLabel, type ActionRequired } from "../../lib/items";
+import { itemGroupsLabel, type ActionRequired } from "../../lib/items";
 import { doneLabel, fetchActionList } from "../../lib/tracking";
 import { useLoader, useOnForeground } from "../../lib/useLoader";
 import { useMarkDone } from "../../lib/useMarkDone";
@@ -40,7 +40,7 @@ export function ActionsPage() {
             {a.resolution && <span className="font-semibold text-ink">„{a.resolution}”</span>}
             {a.resolved_at && <span>{doneLabel("załatwione", a.resolved_by, a.resolved_at, me, data.people, today)}</span>}
             <ChildTag kids={childrenOf(data.children, a)} all={data.children} />
-            <span>{groupLabel(data.groups, a.group_id)}</span>
+            <span>{itemGroupsLabel(data.groups, a)}</span>
             <SourceLink kind="action_required" id={a.id} />
           </Meta>
           {!a.resolved_at && (
