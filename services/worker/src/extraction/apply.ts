@@ -11,6 +11,8 @@ export interface ApplySummary {
   cancelled: number;
   needsReview: number;
   rejected: Rejection[];
+  /** Creates turned into a join of the same event in another group (shared-items). */
+  joined: Rejection[];
   /** Items created or updated as active (ids only); the worker turns some into push alerts. */
   activeItems: { type: ItemType; id: string }[];
 }
@@ -72,6 +74,7 @@ function columns(type: ItemType, data: ItemData[ItemType], groupId: string, even
         ["description", "$", d.description],
         ["amount_pln", "$::numeric", d.amount_pln],
         ["due_date", "$::date", d.due_date],
+        ["event_id", "$::uuid", eventId],
       ];
     }
     case "action_required": {
@@ -127,9 +130,15 @@ function statusFor(op: ResolvedOperation, threshold: number): Status {
 
 function checkData(type: ItemType, data: unknown): ItemData[ItemType] {
   // The event link is resolved separately (alias/ref → id), so it is not part of the stored data check.
-  const schema = type === "bring_item" ? itemDataSchemas.bring_item.omit({ event: true }) : itemDataSchemas[type];
+  const linked = type === "bring_item" || type === "payment";
+  const schema =
+    type === "bring_item"
+      ? itemDataSchemas.bring_item.omit({ event: true })
+      : type === "payment"
+        ? itemDataSchemas.payment.omit({ event: true })
+        : itemDataSchemas[type];
   let input = data;
-  if (type === "bring_item" && data && typeof data === "object") {
+  if (linked && data && typeof data === "object") {
     const { event: _event, ...rest } = data as Record<string, unknown>;
     input = rest;
   }
@@ -172,7 +181,7 @@ const takesChildren = (type: ItemType) => (CHILD_ITEM_TYPES as readonly ItemType
  * savepoint, so one bad operation is rejected without losing the others.
  */
 export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[]): Promise<ApplySummary> {
-  const summary: ApplySummary = { created: 0, updated: 0, cancelled: 0, needsReview: 0, rejected: [], activeItems: [] };
+  const summary: ApplySummary = { created: 0, updated: 0, cancelled: 0, needsReview: 0, rejected: [], joined: [], activeItems: [] };
   const refIds = new Map<string, string>();
 
   // Events first, so bring items created in the same answer can point at them.
@@ -185,6 +194,17 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
     await ctx.client.query("savepoint op");
     try {
       const status = statusFor(op, ctx.threshold);
+      // The same trip already announced in another group: join it instead of a duplicate.
+      const shared = op.op === "create" && op.type === "event" && status === "active" ? await findSharedEvent(ctx, op) : null;
+      if (shared && op.op === "create") {
+        await applyJoin(ctx, { op: "join", type: "event", targetId: shared, children: op.children, sourceMessageIds: op.sourceMessageIds, confidence: op.confidence, rationale: op.rationale, index: op.index });
+        await fillMissingPlan(ctx, shared, op.data as ItemData["event"]);
+        if (op.ref) refIds.set(op.ref, shared);
+        await ctx.client.query("release savepoint op");
+        summary.updated++;
+        summary.joined.push({ index: op.index, reason: "to samo wydarzenie jest już w innej grupie: dołączono do niego zamiast tworzyć duplikat" });
+        continue;
+      }
       const outcome =
         op.op === "join" ? await applyJoin(ctx, op) : op.op === "done" ? await applyDone(ctx, op) : await applyOne(ctx, op, status, refIds);
       await ctx.client.query("release savepoint op");
@@ -390,7 +410,7 @@ async function applyOne(
 
   const merged = { ...(existing.data as Record<string, unknown>), ...(op.data as Record<string, unknown>) };
   const data = checkData(op.type, merged);
-  const currentEvent = op.type === "bring_item" ? ((existing.data as { event: string | null }).event ?? null) : null;
+  const currentEvent = op.type === "bring_item" || op.type === "payment" ? ((existing.data as { event?: string | null }).event ?? null) : null;
   const eventId = op.eventRef === undefined ? currentEvent : eventIdOf(op.eventRef);
   // Only events move between "this group" and "whole kindergarten"; other items keep their group.
   const updatable = columns(op.type, data, groupId, eventId).filter(([name]) => op.type === "event" || name !== "group_id");
@@ -412,4 +432,48 @@ async function applyOne(
   if (audience.length > 0 && names(audience) !== names(existing.children)) diff.children = { from: existing.children, to: audience };
   if (Object.keys(diff).length) await recordChange(client, op.type, op.targetId, "update", diff, op.sourceMessageIds, op.rationale);
   return { id: op.targetId };
+}
+
+const normalTitle = (t: string) =>
+  t
+    .toLocaleLowerCase("pl-PL")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * An active event of another group on the same day with the same place or the same title (shared
+ * items): the model sometimes creates a duplicate instead of joining it.
+ */
+async function findSharedEvent(ctx: Ctx, op: Extract<ResolvedOperation, { op: "create" }>): Promise<string | null> {
+  const d = op.data as ItemData["event"];
+  if (d.whole_kindergarten || d.repeat) return null;
+  const { rows } = await ctx.client.query<{ id: string; title: string; location: string | null }>(
+    `select id, title, location from public.events
+      where status = 'active' and repeat_weekdays is null and family_id is null
+        and group_id is not null and group_id <> $1 and not ($1 = any(extra_group_ids))
+        and (starts_at at time zone 'Europe/Warsaw')::date = $2::date
+      order by created_at`,
+    [ctx.groupId, d.start.slice(0, 10)],
+  );
+  const title = normalTitle(d.title);
+  const place = d.location ? normalTitle(d.location) : null;
+  const hit = rows.find((r) => {
+    const other = normalTitle(r.title);
+    const samePlace = place && r.location && normalTitle(r.location) === place;
+    const sameTitle = other === title || (other.length > 10 && title.length > 10 && (other.includes(title) || title.includes(other)));
+    return samePlace || sameTitle;
+  });
+  return hit?.id ?? null;
+}
+
+/** The new message's drop-offs and plan for the day where the joined event has none (event-plan). */
+async function fillMissingPlan(ctx: Ctx, id: string, d: ItemData["event"]): Promise<void> {
+  await ctx.client.query(
+    `update public.events
+        set drop_offs = case when drop_offs = '[]'::jsonb then $2::jsonb else drop_offs end,
+            schedule = case when schedule = '[]'::jsonb then $3::jsonb else schedule end
+      where id = $1`,
+    [id, JSON.stringify(d.drop_offs ?? []), JSON.stringify(d.schedule ?? [])],
+  );
 }

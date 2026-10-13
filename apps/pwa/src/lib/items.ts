@@ -76,6 +76,8 @@ export interface BringItem extends Provenance {
   packed_at: string | null;
 }
 export interface Payment extends Provenance {
+  /** The event it pays for, e.g. a trip (event-plan). */
+  event_id?: string | null;
   description: string;
   amount_pln: number | string | null;
   due_date: string | null;
@@ -118,7 +120,7 @@ const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, sta
 const SHARED = `${PROVENANCE}, extra_group_ids`;
 export const EVENT_COLUMNS = `${SHARED}, child_ids, title, starts_at, ends_at, all_day, location, meeting_point, drop_offs, schedule, in_hours, repeat_weekdays, repeat_until`;
 export const BRING_COLUMNS = `${SHARED}, child_ids, event_id, description, due_date, packed_by, packed_at`;
-export const PAYMENT_COLUMNS = `${SHARED}, child_ids, description, amount_pln, due_date, paid_by, paid_at`;
+export const PAYMENT_COLUMNS = `${SHARED}, child_ids, event_id, description, amount_pln, due_date, paid_by, paid_at`;
 export const ACTION_COLUMNS = `${SHARED}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution, kind`;
 export const CLOSURE_COLUMNS = `${PROVENANCE}, date_from, date_to, reason`;
 
@@ -296,12 +298,13 @@ export async function deleteEvent(db: Db, id: string): Promise<void> {
 }
 
 export async function fetchEvent(db: Db, id: string) {
-  const [event, bring, groups] = await Promise.all([
+  const [event, bring, payments, groups] = await Promise.all([
     run<EventItem | null>(db.from("events").select(EVENT_COLUMNS).eq("id", id).maybeSingle()),
     run<BringItem[]>(db.from(ITEM_TABLES.bring_item).select(BRING_COLUMNS).eq("event_id", id).eq("status", "active").order("due_date")),
+    run<Payment[]>(db.from(ITEM_TABLES.payment).select(PAYMENT_COLUMNS).eq("event_id", id).eq("status", "active").order("due_date")),
     fetchGroupNames(db),
   ]);
-  return { event, bring, groups };
+  return { event, bring, payments, groups };
 }
 
 export interface ContextMessage {

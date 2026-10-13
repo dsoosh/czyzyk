@@ -18,7 +18,9 @@ interface LlmCall {
   error: string | null;
   usage: { input_tokens?: number; output_tokens?: number } | null;
   /** What the worker applied from the answer (extraction only). */
-  outcome: { created?: number; updated?: number; cancelled?: number; needsReview?: number; rejected?: { index: number; reason: string }[] } | null;
+  outcome: { created?: number; updated?: number; cancelled?: number; needsReview?: number; rejected?: { index: number; reason: string }[];
+    notes?: { index: number; reason: string }[];
+  } | null;
   duration_ms: number | null;
   created_at: string;
 }
@@ -135,6 +137,7 @@ function outcomeText(o: NonNullable<LlmCall["outcome"]>): string {
     `utworzone: ${o.created ?? 0}, zmienione: ${o.updated ?? 0}, odwołane: ${o.cancelled ?? 0}, do przejrzenia: ${o.needsReview ?? 0}`,
   ];
   for (const r of o.rejected ?? []) lines.push(`odrzucona operacja ${r.index + 1}: ${r.reason}`);
+  for (const n of o.notes ?? []) lines.push(`operacja ${n.index + 1}: ${n.reason}`);
   return lines.join("\n");
 }
 

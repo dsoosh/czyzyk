@@ -130,7 +130,7 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
 
       const callId = await log({ response: { operations: result.operations }, usage: result.usage });
 
-      const { accepted, rejected } = resolveOperations(result.operations, prompt.aliases);
+      const { accepted, rejected, warnings } = resolveOperations(result.operations, prompt.aliases);
       await client.query("begin");
       try {
         const summary = await applyOperations({ client, groupId, threshold: deps.confidenceThreshold }, accepted);
@@ -155,6 +155,7 @@ export async function runGroupExtraction(deps: ExtractionDeps, groupId: string):
           cancelled: summary.cancelled,
           needsReview: summary.needsReview,
           rejected: summary.rejected,
+          notes: [...warnings, ...summary.joined].sort((a, b) => a.index - b.index),
         });
         deps.logger.info(
           {

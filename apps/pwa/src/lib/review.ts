@@ -141,7 +141,12 @@ export function parseForm(
     }
   }
 
-  const schema = kind === "bring_item" ? itemDataSchemas.bring_item.omit({ event: true }) : itemDataSchemas[kind];
+  const schema =
+    kind === "bring_item"
+      ? itemDataSchemas.bring_item.omit({ event: true })
+      : kind === "payment"
+        ? itemDataSchemas.payment.omit({ event: true })
+        : itemDataSchemas[kind];
   const parsed = schema.safeParse(data);
   if (!parsed.success) {
     for (const issue of parsed.error.issues) {

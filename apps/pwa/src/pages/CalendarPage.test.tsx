@@ -155,10 +155,16 @@ describe("Szczegóły wydarzenia", () => {
         { time: "12:30", end: null, label: "powrót do Bazy" },
       ],
     });
-    renderAt("/kalendarz/wydarzenie/e9", { tables: { ...tables, events: [trip] } });
+    renderAt("/kalendarz/wydarzenie/e9", {
+      tables: { ...tables, events: [trip], payments: [f.payment({ id: "p9", description: "Wycieczka", amount_pln: 80, event_id: "e9" }), f.payment()] },
+    });
     const where = await screen.findByRole("list", { name: "Gdzie przyprowadzić" });
     expect(where).toHaveTextContent("🏡Bazaod 8:30 do 8:45");
     expect(screen.queryByText("Zbiórka")).not.toBeInTheDocument();
+    const fees = screen.getByRole("region", { name: "Płatności" });
+    expect(within(fees).getByText("Wycieczka")).toBeInTheDocument();
+    expect(within(fees).getByText("80 zł")).toBeInTheDocument();
+    expect(within(fees).queryByText("teatrzyk")).not.toBeInTheDocument();
     const plan = screen.getByRole("region", { name: "Plan dnia" });
     expect(within(plan).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
       "wyjazd busem spod Bazy9:00",

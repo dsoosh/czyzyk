@@ -97,6 +97,7 @@ export const paymentDataSchema = z
     description: z.string().trim().min(1).max(200),
     amount_pln: z.number().nonnegative().nullable(),
     due_date: localDate.nullable(),
+    event: itemRef.nullable().optional().describe("Alias wydarzenia (E…) lub ref tworzonego wydarzenia (nowe…), którego dotyczy płatność (np. koszt wycieczki), albo null"),
   })
   .strict();
 
@@ -257,7 +258,25 @@ export type ParsedOperation =
     };
 
 /** Validates one operation, including type-specific data (partial for updates). */
-export function parseOperation(input: unknown): { ok: true; value: ParsedOperation } | { ok: false; error: string } {
+/**
+ * Validates one operation. Fields the item type does not have (e.g. "event" on a payment) are left
+ * out and reported in `ignored` instead of losing the whole operation.
+ */
+export function parseOperation(input: unknown): { ok: true; value: ParsedOperation; ignored?: string[] } | { ok: false; error: string } {
+  const first = parseOperationStrict(input);
+  if (first.ok || !input || typeof input !== "object") return first;
+  const data = (input as { data?: unknown }).data;
+  const type = (input as { type?: unknown }).type;
+  if (!data || typeof data !== "object" || typeof type !== "string" || !(type in itemDataSchemas)) return first;
+  const known = Object.keys((itemDataSchemas[type as ItemType] as z.ZodObject<z.ZodRawShape>).shape);
+  const ignored = Object.keys(data).filter((k) => !known.includes(k));
+  if (ignored.length === 0) return first;
+  const kept = Object.fromEntries(Object.entries(data).filter(([k]) => known.includes(k)));
+  const second = parseOperationStrict({ ...(input as object), data: kept });
+  return second.ok ? { ...second, ignored } : first;
+}
+
+function parseOperationStrict(input: unknown): { ok: true; value: ParsedOperation } | { ok: false; error: string } {
   const raw = rawOperationSchema.safeParse(input);
   if (!raw.success) return { ok: false, error: formatIssues(raw.error) };
   const o = raw.data;
