@@ -23,6 +23,16 @@ describe("format", () => {
     expect(eventLabel({ title: "Wycieczka", all_day: false, time: "08:00", location: "ZOO", meeting_point: "dworzec PKP" })).toBe(
       "Wycieczka 08:00 (ZOO; zbiórka: dworzec PKP)",
     );
+    expect(
+      eventLabel({
+        title: "Muzeum",
+        all_day: false,
+        time: "09:00",
+        location: null,
+        meeting_point: "Baza",
+        drop_offs: [{ place: "Baza", from: "08:30", until: "08:45" }],
+      }),
+    ).toBe("Muzeum 09:00 (przyprowadzenie: Baza od 8:30 do 8:45)");
   });
 
   it("skraca długie treści", () => {

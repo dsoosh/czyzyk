@@ -141,6 +141,38 @@ describe("Szczegóły wydarzenia", () => {
     expect(screen.queryByRole("button", { name: "Usuń wydarzenie" })).not.toBeInTheDocument();
   });
 
+  it("przyprowadzenie i plan dnia jako poziomy timeline", async () => {
+    const trip = f.event({
+      id: "e9",
+      title: "Wycieczka do muzeum",
+      starts_at: "2026-10-13T07:00:00.000Z",
+      all_day: false,
+      meeting_point: "Baza",
+      drop_offs: [{ place: "Baza", from: "08:30", until: "08:45" }],
+      schedule: [
+        { time: "09:00", end: null, label: "wyjazd busem spod Bazy" },
+        { time: "10:30", end: "12:00", label: "lekcja w muzeum" },
+        { time: "12:30", end: null, label: "powrót do Bazy" },
+      ],
+    });
+    renderAt("/kalendarz/wydarzenie/e9", { tables: { ...tables, events: [trip] } });
+    const where = await screen.findByRole("list", { name: "Gdzie przyprowadzić" });
+    expect(where).toHaveTextContent("Baza od 8:30 do 8:45");
+    expect(screen.queryByText("Zbiórka")).not.toBeInTheDocument();
+    const plan = screen.getByRole("region", { name: "Plan dnia" });
+    expect(within(plan).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "wyjazd busem spod Bazy9:00",
+      "lekcja w muzeum10:30–12:00",
+      "powrót do Bazy12:30",
+    ]);
+  });
+
+  it("kalendarz pokazuje, gdzie przyprowadzić dziecko", async () => {
+    const trip = f.event({ id: "e9", title: "Wycieczka", drop_offs: [{ place: "Witosa 6", from: null, until: "09:00" }, { place: "dworzec", from: null, until: "09:20" }] });
+    renderAt("/kalendarz", { tables: { ...tables, events: [trip] } });
+    expect(await screen.findByText("przyprowadzenie: Witosa 6 do 9:00 albo dworzec do 9:20")).toBeInTheDocument();
+  });
+
   it("miejsce wydarzenia z linkiem do mapy", async () => {
     renderAt("/kalendarz/wydarzenie/e2", { tables });
     expect(await screen.findByRole("heading", { name: "Zebranie" })).toBeInTheDocument();

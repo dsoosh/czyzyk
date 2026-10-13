@@ -1,6 +1,6 @@
 import type pg from "pg";
 import type { Logger } from "pino";
-import { eventLabel, paymentLabel, truncate } from "./format.js";
+import { eventLabel, paymentLabel, truncate, type DropOff } from "./format.js";
 import { sendToUsers, type DeliverySummary, type PushSender } from "./send.js";
 
 export interface DigestDeps {
@@ -23,8 +23,8 @@ export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string, 
         order by date_from limit 1`,
       [tomorrow, familyId],
     ),
-    db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null }>(
-      `select e.title, e.all_day, e.location, e.meeting_point, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
+    db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null; drop_offs: DropOff[] }>(
+      `select e.title, e.all_day, e.location, e.meeting_point, e.drop_offs, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
         where e.status = 'active' and public.family_sees_item($2, e.group_id, e.extra_group_ids, e.audience, e.child_ids, e.family_id)
         order by o.starts_at, e.title`,
@@ -116,8 +116,8 @@ export async function buildMorning(db: Pick<pg.Pool, "query">, today: string, fa
         order by date_from limit 1`,
       [today, familyId],
     ),
-    db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null }>(
-      `select e.title, e.all_day, e.location, e.meeting_point, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
+    db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null; drop_offs: DropOff[] }>(
+      `select e.title, e.all_day, e.location, e.meeting_point, e.drop_offs, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
         where e.status = 'active' and public.family_sees_item($2, e.group_id, e.extra_group_ids, e.audience, e.child_ids, e.family_id)
         order by o.starts_at, e.title`,

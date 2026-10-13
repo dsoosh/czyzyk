@@ -5,7 +5,7 @@ import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLin
 import { childrenOf } from "../lib/children";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
 import { eventKey, repeatLabel } from "../lib/recurrence";
-import { fetchToday, formatAmount, itemGroupsLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
+import { fetchToday, formatAmount, dropOffLabel, itemGroupsLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
 import { doneLabel } from "../lib/tracking";
 import { useLoader, useOnForeground } from "../lib/useLoader";
 import { FamilyInvites } from "./FamilyInvites";
@@ -128,7 +128,11 @@ export function TodayPage() {
                   <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
                   {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
                   {e.location && <span>📍 {e.location}</span>}
-                  {e.meeting_point && <span>zbiórka: {e.meeting_point}</span>}
+                  {e.drop_offs?.length ? (
+                <span>przyprowadzenie: {e.drop_offs.map(dropOffLabel).join(" albo ")}</span>
+              ) : (
+                e.meeting_point && <span>zbiórka: {e.meeting_point}</span>
+              )}
                   <ChildTag kids={childrenOf(data.children, e)} all={data.children} />
                   <span>{itemGroupsLabel(data.groups, e)}</span>
                   <SourceLink kind="event" id={e.id} />

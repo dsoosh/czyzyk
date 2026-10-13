@@ -26,9 +26,36 @@ export function truncate(text: string, max = 180): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** "Wycieczka 08:00 (ZOO; zbiórka: dworzec PKP)": an event in a digest, with its places when known (event-location). */
-export function eventLabel(e: { title: string; all_day: boolean; time: string; location: string | null; meeting_point?: string | null }): string {
+export interface DropOff {
+  place: string;
+  from: string | null;
+  until: string | null;
+}
+
+/** "Baza od 8:30 do 8:45" (event-plan). */
+export function dropOffLabel(d: DropOff): string {
+  const hour = (t: string) => t.replace(/^0(\d)/, "$1");
+  return [d.place, d.from ? `od ${hour(d.from)}` : null, d.until ? `do ${hour(d.until)}` : null].filter(Boolean).join(" ");
+}
+
+/**
+ * "Wycieczka 08:00 (ZOO; zbiórka: dworzec PKP)": an event in a digest, with its places when known
+ * (event-location); where to bring the child replaces the meeting point when known (event-plan).
+ */
+export function eventLabel(e: {
+  title: string;
+  all_day: boolean;
+  time: string;
+  location: string | null;
+  meeting_point?: string | null;
+  drop_offs?: DropOff[] | null;
+}): string {
   const label = e.all_day ? e.title : `${e.title} ${e.time}`;
-  const places = [e.location, e.meeting_point ? `zbiórka: ${e.meeting_point}` : null].filter(Boolean);
+  const bring = e.drop_offs?.length
+    ? `przyprowadzenie: ${e.drop_offs.map(dropOffLabel).join(" albo ")}`
+    : e.meeting_point
+      ? `zbiórka: ${e.meeting_point}`
+      : null;
+  const places = [e.location, bring].filter(Boolean);
   return places.length ? `${label} (${places.join("; ")})` : label;
 }

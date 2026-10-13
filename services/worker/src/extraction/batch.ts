@@ -114,7 +114,10 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
       'meeting_point', t.meeting_point,
       'whole_kindergarten', t.group_id is null,
       'repeat', case when t.repeat_weekdays is null then null
-                     else jsonb_build_object('weekdays', to_jsonb(t.repeat_weekdays), 'until', to_char(t.repeat_until, 'YYYY-MM-DD')) end) as data,
+                     else jsonb_build_object('weekdays', to_jsonb(t.repeat_weekdays), 'until', to_char(t.repeat_until, 'YYYY-MM-DD')) end)
+      -- The plan for the day only when known (event-plan): no empty lists in every event of the prompt.
+      || case when t.drop_offs = '[]'::jsonb then '{}'::jsonb else jsonb_build_object('drop_offs', t.drop_offs) end
+      || case when t.schedule = '[]'::jsonb then '{}'::jsonb else jsonb_build_object('schedule', t.schedule) end as data,
       t.audience as children,
       t.group_id
     from public.events t`,
