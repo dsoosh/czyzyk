@@ -1,3 +1,4 @@
+import { DropOffs } from "../components/PlaceTag";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
@@ -12,7 +13,7 @@ import {
   warsawDay,
   warsawTime,
 } from "../lib/dates";
-import { fetchCalendar, groupLabel, dropOffLabel, itemGroupsLabel, type CalendarData, type Closure, type EventItem } from "../lib/items";
+import { fetchCalendar, groupLabel, itemGroupsLabel, type CalendarData, type Closure, type EventItem } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
 import { eventKey, repeatLabel } from "../lib/recurrence";
 import { closureSpans, eventSpans, rangeLabel, type Span } from "../lib/spans";
@@ -84,7 +85,7 @@ function DayItems({ entries, groups, ranges = true }: { entries: DayEntries; gro
               {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
               {e.location && <span>📍 {e.location}</span>}
               {e.drop_offs?.length ? (
-                <span>przyprowadzenie: {e.drop_offs.map(dropOffLabel).join(" albo ")}</span>
+                <DropOffs items={e.drop_offs} />
               ) : (
                 e.meeting_point && <span>zbiórka: {e.meeting_point}</span>
               )}
@@ -126,7 +127,30 @@ function ListView({ today }: { today: string }) {
           </section>
         );
       })}
+      <RoutineClasses events={data.routine} groups={data.groups} />
     </div>
+  );
+}
+
+/** Routine classes during kindergarten hours (English, Spanish): kept out of the days, listed apart. */
+function RoutineClasses({ events, groups }: { events: EventItem[]; groups: Map<string, string> }) {
+  if (events.length === 0) return null;
+  return (
+    <details className="rounded-2xl bg-white p-4 shadow-sm">
+      <summary className="cursor-pointer font-semibold text-ink">Stałe zajęcia w przedszkolu ({events.length})</summary>
+      <ul aria-label="Stałe zajęcia w przedszkolu" className="mt-2 space-y-1 text-sm">
+        {events.map((e) => (
+          <li key={e.id}>
+            <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-semibold hover:underline">
+              {e.title}
+            </Link>{" "}
+            <span className="text-muted">
+              {[repeatLabel(e), e.all_day ? null : warsawTime(e.starts_at), itemGroupsLabel(groups, e)].filter(Boolean).join(" · ")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

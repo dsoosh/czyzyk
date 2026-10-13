@@ -51,6 +51,7 @@ function columns(type: ItemType, data: ItemData[ItemType], groupId: string, even
         ["meeting_point", "$", d.meeting_point ?? null],
         ["drop_offs", "$::jsonb", JSON.stringify(d.drop_offs ?? [])],
         ["schedule", "$::jsonb", JSON.stringify(d.schedule ?? [])],
+        ["in_hours", "$::boolean", d.in_hours ?? false],
         ["repeat_weekdays", "$::smallint[]", d.repeat ? [...new Set(d.repeat.weekdays)].sort() : null],
         ["repeat_until", "$::date", d.repeat?.until ?? null],
       ];
@@ -79,6 +80,7 @@ function columns(type: ItemType, data: ItemData[ItemType], groupId: string, even
         ["group_id", "$", groupId],
         ["question", "$", d.question],
         ["due_date", "$::date", d.due_date],
+        ["kind", "$", d.kind ?? null],
         // Absent in an update: the stored suggestions stay (action-suggestions).
         ...(d.suggestions ? [["suggested_actions", "$::jsonb", JSON.stringify(d.suggestions)] as [string, string, unknown]] : []),
       ];

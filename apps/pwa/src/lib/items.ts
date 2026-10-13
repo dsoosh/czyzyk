@@ -60,6 +60,8 @@ export interface EventItem extends Provenance {
   drop_offs?: DropOff[];
   /** The plan for the day (event-plan). */
   schedule?: ScheduleStep[];
+  /** A routine class during kindergarten hours (English, Spanish): not in the calendar or lists. */
+  in_hours?: boolean;
   /** Recurring events (recurring-events): ISO weekdays, 1 = Monday; null for one-off events. */
   repeat_weekdays?: number[] | null;
   repeat_until?: string | null;
@@ -89,7 +91,14 @@ export interface ActionRequired extends Provenance {
   suggested_actions: ActionSuggestion[];
   /** Label of the action that closed the item ("Tak, zapisujemy"), if any. */
   resolution: string | null;
+  /** A sign-up for a class or a survey (event-plan); null for other actions. */
+  kind?: "signup" | "survey" | null;
 }
+
+export const ACTION_KIND_LABELS = { signup: "Zapisy", survey: "Ankieta" } as const;
+
+/** Routine classes during kindergarten hours stay out of the calendar and lists. */
+const notRoutine = (e: EventItem) => !e.in_hours;
 export interface Closure extends Provenance {
   date_from: string;
   date_to: string;
@@ -107,10 +116,10 @@ export interface Group {
 const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, status";
 /** Items a group can join (events, bring items, payments, actions); closures have no extra groups. */
 const SHARED = `${PROVENANCE}, extra_group_ids`;
-export const EVENT_COLUMNS = `${SHARED}, child_ids, title, starts_at, ends_at, all_day, location, meeting_point, drop_offs, schedule, repeat_weekdays, repeat_until`;
+export const EVENT_COLUMNS = `${SHARED}, child_ids, title, starts_at, ends_at, all_day, location, meeting_point, drop_offs, schedule, in_hours, repeat_weekdays, repeat_until`;
 export const BRING_COLUMNS = `${SHARED}, child_ids, event_id, description, due_date, packed_by, packed_at`;
 export const PAYMENT_COLUMNS = `${SHARED}, child_ids, description, amount_pln, due_date, paid_by, paid_at`;
-export const ACTION_COLUMNS = `${SHARED}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution`;
+export const ACTION_COLUMNS = `${SHARED}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution, kind`;
 export const CLOSURE_COLUMNS = `${PROVENANCE}, date_from, date_to, reason`;
 
 export async function run<T>(query: PromiseLike<{ data: unknown; error: { message: string } | null }>): Promise<T> {
@@ -210,7 +219,7 @@ export async function fetchToday(db: Db, today: string): Promise<TodayData> {
   return {
     bringToday: bring.filter((b) => b.due_date === today),
     bringWeek: bring.filter((b) => b.due_date !== today),
-    events: withOccurrences(oneOff, recurring, closures, today, addDays(today, 7)),
+    events: withOccurrences(oneOff.filter(notRoutine), recurring.filter(notRoutine), closures, today, addDays(today, 7)),
     payments,
     actions,
     closures,
@@ -224,6 +233,8 @@ export interface CalendarData {
   events: EventItem[];
   closures: Closure[];
   groups: Map<string, string>;
+  /** Routine classes during kindergarten hours (shown apart, collapsed). */
+  routine: EventItem[];
 }
 
 /** Active events and closures between two days (inclusive). */
@@ -256,8 +267,13 @@ export async function fetchCalendar(db: Db, fromDay: string, toDay: string): Pro
     ),
     fetchGroupNames(db),
   ]);
-  const current = oneOff.filter((e) => lastDay(e) >= fromDay);
-  return { events: withOccurrences(current, recurring, closures, fromDay, toDay), closures, groups };
+  const current = oneOff.filter((e) => lastDay(e) >= fromDay && notRoutine(e));
+  return {
+    events: withOccurrences(current, recurring.filter(notRoutine), closures, fromDay, toDay),
+    closures,
+    groups,
+    routine: recurring.filter((e) => !notRoutine(e)),
+  };
 }
 
 /** Active recurring events that start by `toDay` (lib/recurrence expands and trims them). */

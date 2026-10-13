@@ -5,7 +5,8 @@ import { EventHistory } from "../components/EventHistory";
 import { EventTimeline } from "../components/EventTimeline";
 import { LoadError, Loading, SourceLink } from "../components/ui";
 import { longDayLabel, warsawDay, warsawTime } from "../lib/dates";
-import { deleteEvent, dropOffLabel, fetchEvent, itemGroupsLabel } from "../lib/items";
+import { deleteEvent, fetchEvent, itemGroupsLabel } from "../lib/items";
+import { DropOffTag } from "../components/PlaceTag";
 import { useLoader } from "../lib/useLoader";
 import { repeatLabel } from "../lib/recurrence";
 
@@ -54,10 +55,10 @@ export function EventPage() {
           <>
             <dt className="text-slate-500">Przyprowadzenie</dt>
             <dd>
-              <ul aria-label="Gdzie przyprowadzić" className="space-y-1">
+              <ul aria-label="Gdzie przyprowadzić" className="space-y-1.5">
                 {event.drop_offs!.map((d, i) => (
                   <li key={i}>
-                    {dropOffLabel(d)}{" "}
+                    <DropOffTag dropOff={d} />{" "}
                     <a href={mapUrl(d.place)} target="_blank" rel="noreferrer" className="text-sm text-brand-700 underline">
                       Mapa
                     </a>

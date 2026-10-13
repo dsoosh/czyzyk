@@ -157,7 +157,7 @@ describe("Szczegóły wydarzenia", () => {
     });
     renderAt("/kalendarz/wydarzenie/e9", { tables: { ...tables, events: [trip] } });
     const where = await screen.findByRole("list", { name: "Gdzie przyprowadzić" });
-    expect(where).toHaveTextContent("Baza od 8:30 do 8:45");
+    expect(where).toHaveTextContent("🏡Bazaod 8:30 do 8:45");
     expect(screen.queryByText("Zbiórka")).not.toBeInTheDocument();
     const plan = screen.getByRole("region", { name: "Plan dnia" });
     expect(within(plan).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
@@ -169,8 +169,14 @@ describe("Szczegóły wydarzenia", () => {
 
   it("kalendarz pokazuje, gdzie przyprowadzić dziecko", async () => {
     const trip = f.event({ id: "e9", title: "Wycieczka", drop_offs: [{ place: "Witosa 6", from: null, until: "09:00" }, { place: "dworzec", from: null, until: "09:20" }] });
-    renderAt("/kalendarz", { tables: { ...tables, events: [trip] } });
-    expect(await screen.findByText("przyprowadzenie: Witosa 6 do 9:00 albo dworzec do 9:20")).toBeInTheDocument();
+    renderAt("/kalendarz", { tables: { ...tables, events: [trip, f.event({ id: "e8", title: "Hiszpański", in_hours: true, repeat_weekdays: [3], repeat_until: null })] } });
+    const where = await screen.findByLabelText("Gdzie przyprowadzić");
+    expect(where).toHaveTextContent("🏫Witosado 9:00albo🚉Dworzecdo 9:20");
+    expect(within(where).getByTitle("Witosa 6")).toBeInTheDocument();
+    // Routine classes during kindergarten hours: only in the collapsed list at the bottom.
+    const routine = screen.getByRole("list", { name: "Stałe zajęcia w przedszkolu" });
+    expect(within(routine).getByText("Hiszpański")).toBeInTheDocument();
+    expect(screen.getAllByText("Hiszpański")).toHaveLength(1);
   });
 
   it("miejsce wydarzenia z linkiem do mapy", async () => {
