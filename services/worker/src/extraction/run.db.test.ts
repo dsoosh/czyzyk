@@ -203,6 +203,45 @@ describe("runGroupExtraction", () => {
     expect((await db.client.query("select kind from action_required")).rows).toEqual([{ kind: "survey" }]);
   });
 
+  it("ta sama wycieczka już jest w innej grupie: create zamienia się w join i uzupełnia plan dnia", async () => {
+    const { rows: g } = await db.client.query("insert into wa_groups (wa_name, tracked) values ('Wilki', true) returning id");
+    const { rows: ev } = await db.client.query(
+      `insert into events (group_id, title, starts_at, ends_at, all_day, location)
+       values ($1, 'Wycieczka do Centrum Historii Zajezdnia (bez Ogórka)', '2026-10-14T06:00:00Z', '2026-10-14T11:30:00Z', false, 'Centrum Historii Zajezdnia, Wrocław') returning id`,
+      [g[0].id],
+    );
+    await addMessage("14.10 wycieczka do Centrum Historii Zajezdnia, zbiórka do 9:00 na Witosa 6", "2026-10-07T10:00:00Z");
+    const schedule = [{ time: "09:30", end: null, label: "wyjazd" }];
+    const { model } = scripted((p) => [
+      op({
+        op: "create",
+        type: "event",
+        ref: "nowe1",
+        data: {
+          title: "Wycieczka do Centrum Historii Zajezdnia",
+          start: "2026-10-14T08:00",
+          end: "2026-10-14T13:30",
+          all_day: false,
+          location: "Centrum Historii Zajezdnia, Wrocław",
+          whole_kindergarten: false,
+          schedule,
+        },
+        source_messages: [lastAlias(p)],
+      }),
+      op({ op: "create", type: "bring_item", ref: "nowe2", data: { description: "leki", due_date: "2026-10-14", event: "nowe1" }, source_messages: [lastAlias(p)] }),
+      // The trip's fee points at the trip (event-plan).
+      op({ op: "create", type: "payment", ref: "nowe3", data: { description: "Wycieczka", amount_pln: 60, due_date: "2026-10-14", event: "nowe1" }, source_messages: [lastAlias(p)] }),
+    ]);
+    const summary = await runGroupExtraction(deps(model), groupId);
+    expect(summary).toMatchObject({ created: 2, updated: 1, rejected: [] });
+    const { rows: events } = await db.client.query("select id, extra_group_ids, schedule from events");
+    expect(events).toEqual([{ id: ev[0].id, extra_group_ids: [groupId], schedule }]);
+    expect((await db.client.query("select event_id from bring_items")).rows).toEqual([{ event_id: ev[0].id }]);
+    expect((await db.client.query("select event_id from payments")).rows).toEqual([{ event_id: ev[0].id }]);
+    const { rows: calls } = await db.client.query("select outcome from llm_calls");
+    expect(calls[0].outcome.notes.map((n: { index: number }) => n.index)).toEqual([0]);
+  });
+
   it("odwołanie ustawia status cancelled", async () => {
     await db.client.query(
       "insert into events (group_id, title, starts_at, all_day) values ($1, 'Teatrzyk', '2026-10-13T22:00:00Z', true)",

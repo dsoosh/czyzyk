@@ -92,3 +92,33 @@ describe("extractionToolInputSchema", () => {
     expect((schema.properties as Record<string, { type: string }>).operations.type).toBe("array");
   });
 });
+
+describe("pola spoza kontraktu typu", () => {
+  it("pole, którego typ nie ma (miejsce przy płatności), jest pomijane, a operacja zostaje", () => {
+    const r = parseOperation({
+      op: "update",
+      type: "payment",
+      target: "E4",
+      data: { location: "Baza", amount_pln: 60 },
+      children: [],
+      rationale: "r",
+      confidence: 0.9,
+      source_messages: ["W4"],
+    });
+    expect(r).toMatchObject({ ok: true, ignored: ["location"], value: { op: "update", data: { amount_pln: 60 } } });
+  });
+
+  it("aktualizacja tylko z nieznanym polem dalej jest odrzucana jako pusta", () => {
+    const r = parseOperation({
+      op: "update",
+      type: "payment",
+      target: "E4",
+      data: { location: "Baza" },
+      children: [],
+      rationale: "r",
+      confidence: 0.9,
+      source_messages: ["W4"],
+    });
+    expect(r.ok).toBe(false);
+  });
+});

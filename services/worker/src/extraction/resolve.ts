@@ -53,13 +53,19 @@ export interface Rejection {
  * prompt (unknown W…/E… aliases, wrong item type, undefined refs) is rejected,
  * so the model can only touch what it was shown.
  */
-export function resolveOperations(raw: unknown[], aliases: Aliases): { accepted: ResolvedOperation[]; rejected: Rejection[] } {
+export function resolveOperations(
+  raw: unknown[],
+  aliases: Aliases,
+): { accepted: ResolvedOperation[]; rejected: Rejection[]; warnings: Rejection[] } {
   const accepted: ResolvedOperation[] = [];
   const rejected: Rejection[] = [];
+  /** Fields left out of an otherwise valid operation. */
+  const warnings: Rejection[] = [];
 
   const parsed: { index: number; op: ParsedOperation }[] = [];
   raw.forEach((input, index) => {
     const result = parseOperation(input);
+    if (result.ok && result.ignored) warnings.push({ index, reason: `pominięto nieznane pola: ${result.ignored.join(", ")}` });
     if (result.ok) parsed.push({ index, op: result.value });
     else rejected.push({ index, reason: result.error });
   });
@@ -83,7 +89,7 @@ export function resolveOperations(raw: unknown[], aliases: Aliases): { accepted:
     const common = { index, type: op.type, sourceMessageIds: [...new Set(sourceMessageIds)], confidence: op.confidence, rationale: op.rationale };
 
     let eventRef: EventRef | undefined;
-    if ((op.op === "create" || op.op === "update") && op.type === "bring_item" && "event" in op.data) {
+    if ((op.op === "create" || op.op === "update") && (op.type === "bring_item" || op.type === "payment") && "event" in op.data) {
       const ref = (op.data as { event?: string | null }).event;
       if (ref == null) eventRef = null;
       else if (ref.startsWith("E")) {
@@ -145,5 +151,5 @@ export function resolveOperations(raw: unknown[], aliases: Aliases): { accepted:
   }
 
   rejected.sort((a, b) => a.index - b.index);
-  return { accepted, rejected };
+  return { accepted, rejected, warnings };
 }

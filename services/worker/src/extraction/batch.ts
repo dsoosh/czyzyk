@@ -132,7 +132,9 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
   payment: `select t.id, t.status, jsonb_build_object(
       'description', t.description,
       'amount_pln', t.amount_pln::float8,
-      'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data,
+      'due_date', to_char(t.due_date, 'YYYY-MM-DD'))
+      -- The event it pays for, only when linked (event-plan).
+      || case when t.event_id is null then '{}'::jsonb else jsonb_build_object('event', t.event_id) end as data,
       t.audience as children,
       t.group_id
     from public.payments t`,

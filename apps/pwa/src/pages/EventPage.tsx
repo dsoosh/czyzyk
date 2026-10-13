@@ -4,8 +4,8 @@ import { useAuth, useProfile } from "../auth/AuthProvider";
 import { EventHistory } from "../components/EventHistory";
 import { EventTimeline } from "../components/EventTimeline";
 import { LoadError, Loading, SourceLink } from "../components/ui";
-import { longDayLabel, warsawDay, warsawTime } from "../lib/dates";
-import { deleteEvent, fetchEvent, itemGroupsLabel } from "../lib/items";
+import { longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
+import { deleteEvent, fetchEvent, formatAmount, itemGroupsLabel } from "../lib/items";
 import { DropOffTag } from "../components/PlaceTag";
 import { useLoader } from "../lib/useLoader";
 import { repeatLabel } from "../lib/recurrence";
@@ -22,7 +22,7 @@ export function EventPage() {
   const { data, error, loading, reload } = useLoader(() => fetchEvent(client, id), [client, id]);
   if (error) return <LoadError message={error} onRetry={reload} />;
   if (!data) return loading ? <Loading /> : null;
-  const { event, bring, groups } = data;
+  const { event, bring, payments, groups } = data;
   if (!event) return <p className="text-slate-600">Nie znaleziono wydarzenia.</p>;
 
   const day = warsawDay(event.starts_at);
@@ -98,6 +98,25 @@ export function EventPage() {
           </ul>
         )}
       </section>
+      {payments.length > 0 && (
+        <section aria-label="Płatności" className="space-y-2">
+          <h2 className="font-display text-2xl font-bold text-ink">Płatności</h2>
+          <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-sm">
+            {payments.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 p-4">
+                <span className="min-w-0 flex-1">
+                  {p.description}
+                  <span className="block text-sm text-slate-500">
+                    {[p.due_date ? `do ${shortDate(p.due_date)}` : null, p.paid_at ? "zapłacone" : null].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+                {p.amount_pln != null && <span className="font-bold whitespace-nowrap">{formatAmount(p.amount_pln)}</span>}
+                <SourceLink kind="payment" id={p.id} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <EventHistory eventId={event.id} />
       <SourceLink kind="event" id={event.id} />
       {isAdmin && <DeleteEvent id={event.id} title={event.title} />}
