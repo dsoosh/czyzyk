@@ -26,7 +26,7 @@ export async function buildDigest(db: Pick<pg.Pool, "query">, tomorrow: string, 
     db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null; drop_offs: DropOff[] }>(
       `select e.title, e.all_day, e.location, e.meeting_point, e.drop_offs, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
-        where e.status = 'active' and public.family_sees_item($2, e.group_id, e.extra_group_ids, e.audience, e.child_ids, e.family_id)
+        where e.status = 'active' and not e.in_hours and public.family_sees_item($2, e.group_id, e.extra_group_ids, e.audience, e.child_ids, e.family_id)
         order by o.starts_at, e.title`,
       [tomorrow, familyId],
     ),
@@ -119,7 +119,7 @@ export async function buildMorning(db: Pick<pg.Pool, "query">, today: string, fa
     db.query<{ title: string; all_day: boolean; time: string; location: string | null; meeting_point: string | null; drop_offs: DropOff[] }>(
       `select e.title, e.all_day, e.location, e.meeting_point, e.drop_offs, to_char(o.starts_at at time zone 'Europe/Warsaw', 'HH24:MI') as time
          from public.event_occurrences($1::date, $1::date) o join public.events e on e.id = o.id
-        where e.status = 'active' and public.family_sees_item($2, e.group_id, e.extra_group_ids, e.audience, e.child_ids, e.family_id)
+        where e.status = 'active' and not e.in_hours and public.family_sees_item($2, e.group_id, e.extra_group_ids, e.audience, e.child_ids, e.family_id)
         order by o.starts_at, e.title`,
       [today, familyId],
     ),

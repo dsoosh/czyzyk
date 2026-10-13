@@ -28,7 +28,7 @@ const FEED_SQL = `
     from public.event_occurrences((now() at time zone 'Europe/Warsaw')::date - $1::int, (now() at time zone 'Europe/Warsaw')::date + 365) o
     join public.events e on e.id = o.id
     left join public.wa_groups g on g.id = e.group_id
-   where e.status = 'active'
+   where e.status = 'active' and not e.in_hours
      and coalesce(o.ends_at, o.starts_at) >= now() - make_interval(days => $1)
   union all
   select c.id::text, c.updated_at, coalesce('Przedszkole nieczynne: ' || c.reason, 'Przedszkole nieczynne'), null, true,

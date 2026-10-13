@@ -139,7 +139,7 @@ describe("imię dziecka przy elementach", () => {
         bring_items: [f.bring({ child_ids: ["c2"] }), f.bring({ id: "b2", description: "kapcie", child_ids: [] })],
       },
     });
-    const bring = await screen.findByRole("region", { name: "W najbliższych dniach" });
+    const bring = await screen.findByRole("region", { name: "Jutro" });
     expect(within(bring).getByLabelText("Dziecko: Antek")).toBeInTheDocument();
     expect(within(bring).getByLabelText("Dziecko: Zosia")).toBeInTheDocument();
     // Each child in its own colour; a child without one gets the first free colour.

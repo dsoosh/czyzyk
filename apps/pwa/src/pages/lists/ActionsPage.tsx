@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth, useProfile } from "../../auth/AuthProvider";
+import { KindTag } from "../../components/KindTag";
 import { ResolveButton } from "../../components/ResolveButton";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../../components/ui";
 import { childrenOf } from "../../lib/children";
@@ -32,6 +33,7 @@ export function ActionsPage() {
         <div className="flex flex-1 flex-col gap-1">
           <span className={a.resolved_at ? "text-slate-400" : "font-medium"}>{a.question}</span>
           <Meta>
+            {a.kind && <KindTag kind={a.kind} />}
             {a.due_date && (
               <span className={!a.resolved_at && a.due_date < addDays(today, 2) ? "font-semibold text-red-700" : ""}>
                 do {dayLabel(a.due_date, today)}

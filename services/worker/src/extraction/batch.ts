@@ -117,7 +117,8 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
                      else jsonb_build_object('weekdays', to_jsonb(t.repeat_weekdays), 'until', to_char(t.repeat_until, 'YYYY-MM-DD')) end)
       -- The plan for the day only when known (event-plan): no empty lists in every event of the prompt.
       || case when t.drop_offs = '[]'::jsonb then '{}'::jsonb else jsonb_build_object('drop_offs', t.drop_offs) end
-      || case when t.schedule = '[]'::jsonb then '{}'::jsonb else jsonb_build_object('schedule', t.schedule) end as data,
+      || case when t.schedule = '[]'::jsonb then '{}'::jsonb else jsonb_build_object('schedule', t.schedule) end
+      || case when t.in_hours then jsonb_build_object('in_hours', true) else '{}'::jsonb end as data,
       t.audience as children,
       t.group_id
     from public.events t`,
@@ -137,7 +138,8 @@ export const ITEM_DATA_SQL: Record<ItemType, string> = {
     from public.payments t`,
   action_required: `select t.id, t.status, jsonb_build_object(
       'question', t.question,
-      'due_date', to_char(t.due_date, 'YYYY-MM-DD')) as data,
+      'due_date', to_char(t.due_date, 'YYYY-MM-DD'),
+      'kind', t.kind) as data,
       t.audience as children,
       t.group_id
     from public.action_required t`,

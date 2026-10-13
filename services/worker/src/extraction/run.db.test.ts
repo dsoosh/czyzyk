@@ -186,6 +186,23 @@ describe("runGroupExtraction", () => {
     expect(rows).toEqual([{ drop_offs: dropOffs, schedule }]);
   });
 
+  it("stałe zajęcia w przedszkolu (in_hours) i prośba o zapisy (kind) są zapisane", async () => {
+    await addMessage("Od poniedziałku angielski co wtorek o 10:00. Zapisy na filcowanie 20.10 w ankiecie.", "2026-10-07T10:00:00Z");
+    const { model } = scripted((p) => [
+      op({
+        op: "create",
+        type: "event",
+        ref: "nowe1",
+        data: { title: "Angielski", start: "2026-10-13T10:00", end: null, all_day: false, location: null, whole_kindergarten: false, in_hours: true, repeat: { weekdays: [2], until: null } },
+        source_messages: [lastAlias(p)],
+      }),
+      op({ op: "create", type: "action_required", ref: "nowe2", data: { question: "Zapisz dziecko na filcowanie 20.10", due_date: null, kind: "survey" }, source_messages: [lastAlias(p)] }),
+    ]);
+    await runGroupExtraction(deps(model), groupId);
+    expect((await db.client.query("select title, in_hours from events")).rows).toEqual([{ title: "Angielski", in_hours: true }]);
+    expect((await db.client.query("select kind from action_required")).rows).toEqual([{ kind: "survey" }]);
+  });
+
   it("odwołanie ustawia status cancelled", async () => {
     await db.client.query(
       "insert into events (group_id, title, starts_at, all_day) values ($1, 'Teatrzyk', '2026-10-13T22:00:00Z', true)",

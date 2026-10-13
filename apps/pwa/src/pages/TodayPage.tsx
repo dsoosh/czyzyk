@@ -1,16 +1,19 @@
 import { Link } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
+import { KindTag } from "../components/KindTag";
 import { ResolveButton } from "../components/ResolveButton";
 import { ChildTag, DoneToggle, LoadError, Loading, Meta, Row, Section, SourceLink } from "../components/ui";
 import { childrenOf } from "../lib/children";
 import { addDays, dayLabel, longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
 import { eventKey, repeatLabel } from "../lib/recurrence";
-import { fetchToday, formatAmount, dropOffLabel, itemGroupsLabel, type BringItem, type Closure, type TodayData } from "../lib/items";
+import { fetchToday, formatAmount, itemGroupsLabel, type BringItem, type Closure, type EventItem, type TodayData } from "../lib/items";
+import { lastDay } from "../lib/spans";
+import { DropOffs } from "../components/PlaceTag";
 import { doneLabel } from "../lib/tracking";
 import { useLoader, useOnForeground } from "../lib/useLoader";
 import { FamilyInvites } from "./FamilyInvites";
 import { useMarkDone } from "../lib/useMarkDone";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 function closureBanner(c: Closure, today: string): string {
   const reason = c.reason ? ` (${c.reason})` : "";
@@ -73,6 +76,7 @@ export function TodayPage() {
 
   if (error) return <LoadError message={error} onRetry={reload} />;
   if (!data) return loading ? <Loading /> : null;
+  const tomorrow = addDays(today, 1);
 
   return (
     <div className="space-y-6">
@@ -107,39 +111,22 @@ export function TodayPage() {
 
       {/* Phone: one column; desktop: the sections in a two-column grid. */}
       <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-8 lg:gap-y-8 lg:space-y-0">
-        <Section title="Na dziś przynieść" empty="Na dziś nic do przyniesienia" stripe="earth">
-          {bringRows(data.bringToday, { data, today, me, mark })}
-        </Section>
+        <DaySection title="Dzisiaj" day={today} {...{ data, today, me, mark }} />
+        <DaySection title="Jutro" day={tomorrow} {...{ data, today, me, mark }} />
 
         <Section title="W najbliższych dniach" empty="W najbliższych dniach nic do przyniesienia" stripe="earth">
-          {bringRows(data.bringWeek, { data, today, me, mark, withDay: true })}
+          {bringRows(
+            data.bringWeek.filter((b) => b.due_date !== tomorrow),
+            { data, today, me, mark, withDay: true },
+          )}
         </Section>
 
-        <Section title="Wydarzenia" empty="Brak wydarzeń w najbliższym tygodniu" stripe="sun">
-          {data.events.map((e) => {
-            const day = warsawDay(e.starts_at);
-            return (
-              <Row key={eventKey(e)}>
-                <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-semibold hover:underline">
-                  {e.title}
-                </Link>
-                <Meta>
-                  <span className="font-semibold text-ink">{dayLabel(day, today)}</span>
-                  <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
-                  {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
-                  {e.location && <span>📍 {e.location}</span>}
-                  {e.drop_offs?.length ? (
-                <span>przyprowadzenie: {e.drop_offs.map(dropOffLabel).join(" albo ")}</span>
-              ) : (
-                e.meeting_point && <span>zbiórka: {e.meeting_point}</span>
-              )}
-                  <ChildTag kids={childrenOf(data.children, e)} all={data.children} />
-                  <span>{itemGroupsLabel(data.groups, e)}</span>
-                  <SourceLink kind="event" id={e.id} />
-                </Meta>
-              </Row>
-            );
-          })}
+        <Section title="Wydarzenia" empty="Brak dalszych wydarzeń w tym tygodniu" stripe="sun">
+          {data.events
+            .filter((e) => warsawDay(e.starts_at) > tomorrow)
+            .map((e) => (
+              <EventRow key={eventKey(e)} e={e} data={data} today={today} withDay />
+            ))}
         </Section>
 
         <Section title="Płatności" empty="Brak płatności z bliskim terminem" stripe="water">
@@ -179,6 +166,7 @@ export function TodayPage() {
             <Row key={a.id}>
               <span className="font-semibold">{a.question}</span>
               <Meta>
+                {a.kind && <KindTag kind={a.kind} />}
                 {a.due_date && (
                   <span className={a.due_date < addDays(today, 2) ? "font-semibold text-red-700" : ""}>
                     do {dayLabel(a.due_date, today)}
@@ -215,3 +203,88 @@ function AddChildHint() {
     </section>
   );
 }
+
+/** One event in a list: time, title, place and where to bring the child. */
+function EventRow({ e, data, today, withDay = false }: { e: EventItem; data: TodayData; today: string; withDay?: boolean }) {
+  const day = warsawDay(e.starts_at);
+  return (
+    <Row>
+      <Link to={`/kalendarz/wydarzenie/${e.id}`} className="font-semibold hover:underline">
+        {e.title}
+      </Link>
+      <Meta>
+        {withDay && <span className="font-semibold text-ink">{dayLabel(day, today)}</span>}
+        <span>{e.all_day ? "cały dzień" : warsawTime(e.starts_at)}</span>
+        {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
+        {e.location && <span>📍 {e.location}</span>}
+        {e.drop_offs?.length ? <DropOffs items={e.drop_offs} /> : e.meeting_point && <span>zbiórka: {e.meeting_point}</span>}
+        <ChildTag kids={childrenOf(data.children, e)} all={data.children} />
+        <span>{itemGroupsLabel(data.groups, e)}</span>
+        <SourceLink kind="event" id={e.id} />
+      </Meta>
+    </Row>
+  );
+}
+
+/**
+ * The whole day at a glance (today-view): closures, where to take the child, events and what to
+ * bring; subsections without anything are left out.
+ */
+function DaySection({
+  title,
+  day,
+  data,
+  today,
+  me,
+  mark,
+}: {
+  title: string;
+  day: string;
+  data: TodayData;
+  today: string;
+  me: string;
+  mark: ReturnType<typeof useMarkDone>;
+}) {
+  const events = data.events.filter((e) => warsawDay(e.starts_at) <= day && day <= lastDay(e));
+  const bring = [...data.bringToday, ...data.bringWeek].filter((b) => b.due_date === day);
+  const closed = data.closures.filter((c) => c.date_from <= day && day <= c.date_to);
+  const dropOffs = events.filter((e) => e.drop_offs?.length);
+  const quiet = events.length === 0 && bring.length === 0 && closed.length === 0;
+  const sub = (label: string, children: ReactNode) => (
+    <div className="space-y-1">
+      <h3 className="pt-3 text-[12px] font-bold tracking-wider text-muted uppercase">{label}</h3>
+      <ul className="divide-y divide-ink/10">{children}</ul>
+    </div>
+  );
+  return (
+    <section aria-label={title} className="space-y-2.5">
+      <div className="flex items-center gap-2.5">
+        <span aria-hidden="true" className="h-2.5 w-7 shrink-0 rounded-full bg-sun" />
+        <h2 className="flex-1 text-[13px] font-bold tracking-wider text-ink uppercase">
+          {title} <span className="font-semibold text-muted normal-case">· {longDayLabel(day)}</span>
+        </h2>
+      </div>
+      <div className="rounded-[28px] bg-card px-5 pb-2 shadow-sm">
+        {closed.map((c) => (
+          <p key={c.id} role="status" className="pt-3 font-semibold text-ink">
+            Przedszkole nieczynne{c.reason ? ` (${c.reason})` : ""}
+          </p>
+        ))}
+        {dropOffs.length > 0 &&
+          sub(
+            "Gdzie zawieźć",
+            dropOffs.map((e) => (
+              <Row key={eventKey(e)}>
+                <DropOffs items={e.drop_offs!} />
+                <span className="text-[13px] text-muted">{e.title}</span>
+              </Row>
+            )),
+          )}
+        {events.length > 0 && sub("Wydarzenia", events.map((e) => <EventRow key={eventKey(e)} e={e} data={data} today={today} />))}
+        {bring.length > 0 && sub("Co przynieść", bringRows(bring, { data, today, me, mark }))}
+        {quiet && <p className="py-4 text-muted">Zwykły dzień w przedszkolu</p>}
+      </div>
+    </section>
+  );
+}
+

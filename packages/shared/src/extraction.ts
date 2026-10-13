@@ -64,6 +64,10 @@ export const eventDataSchema = z
       .optional()
       .describe("Plan godzinowy wydarzenia (kolejne punkty po godzinach), gdy wiadomość go podaje; pomiń, gdy brak planu"),
     whole_kindergarten: z.boolean().describe("true, gdy dotyczy całego przedszkola, a nie tylko tej grupy"),
+    in_hours: z
+      .boolean()
+      .optional()
+      .describe("true dla stałych zajęć w czasie pobytu w przedszkolu, które nie wymagają nic od rodziców (np. angielski, hiszpański, rytmika); inaczej pomiń"),
     repeat: z
       .object({
         weekdays: z
@@ -122,6 +126,11 @@ export const actionRequiredDataSchema = z
   .object({
     question: z.string().trim().min(1).max(300).describe("Na co rodzice muszą odpowiedzieć lub co załatwić"),
     due_date: localDate.nullable(),
+    kind: z
+      .enum(["signup", "survey"])
+      .nullable()
+      .optional()
+      .describe("signup – trzeba zapisać dziecko (np. na filcowanie); survey – odpowiedź przez ankietę lub formularz; inaczej null"),
     // Optional, not defaulted: an update without it keeps the stored suggestions.
     suggestions: z
       .array(actionSuggestionSchema)

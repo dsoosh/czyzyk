@@ -12,19 +12,27 @@ afterEach(() => vi.useRealTimers());
 const section = (name: string) => screen.getByRole("region", { name });
 
 describe("Dziś i jutro", () => {
-  it("jutro bal: rzecz w „W najbliższych dniach” z etykietą „jutro”, wydarzenie z etykietą „jutro”", async () => {
-    renderAt("/", { tables: { wa_groups: f.groups, events: [f.event({ location: "Teatr Lalka" })], bring_items: [f.bring()] } });
+  it("jutro bal: „Jutro” pokazuje wydarzenie, gdzie zawieźć dziecko i co przynieść; „Dzisiaj” to zwykły dzień", async () => {
+    renderAt("/", {
+      tables: {
+        wa_groups: f.groups,
+        events: [f.event({ location: "Teatr Lalka", drop_offs: [{ place: "Baza", from: "08:30", until: "08:45" }] })],
+        bring_items: [f.bring()],
+      },
+    });
     await screen.findByRole("heading", { name: "Dziś i jutro" });
-    const week = section("W najbliższych dniach");
-    expect(within(week).getByText("przebranie")).toBeInTheDocument();
-    expect(within(week).getByText("jutro")).toBeInTheDocument();
-    expect(within(section("Na dziś przynieść")).getByText("Na dziś nic do przyniesienia")).toBeInTheDocument();
-    const events = section("Wydarzenia");
-    expect(within(events).getByText("Bal")).toBeInTheDocument();
-    expect(within(events).getByText("jutro")).toBeInTheDocument();
-    expect(within(events).getByText("Motylki")).toBeInTheDocument();
-    expect(within(events).getByText("📍 Teatr Lalka")).toBeInTheDocument();
-    expect(within(events).getByRole("link", { name: "skąd to wiem" })).toHaveAttribute("href", "/zrodlo/event/e1");
+    expect(section("Dzisiaj")).toHaveTextContent("Zwykły dzień w przedszkolu");
+    const tomorrow = section("Jutro");
+    expect(tomorrow).toHaveTextContent("Piątek 9.10");
+    expect(within(tomorrow).getByRole("link", { name: "Bal" })).toHaveAttribute("href", "/kalendarz/wydarzenie/e1");
+    expect(within(tomorrow).getByText("📍 Teatr Lalka")).toBeInTheDocument();
+    expect(within(tomorrow).getByText("przebranie")).toBeInTheDocument();
+    const where = within(tomorrow).getAllByLabelText("Gdzie przyprowadzić")[0]!;
+    expect(where).toHaveTextContent("🏡Bazaod 8:30 do 8:45");
+    expect(within(tomorrow).getAllByRole("link", { name: "skąd to wiem" }).map((a) => a.getAttribute("href"))).toContain("/zrodlo/event/e1");
+    // Tomorrow is not repeated further down.
+    expect(within(section("W najbliższych dniach")).queryByText("przebranie")).not.toBeInTheDocument();
+    expect(within(section("Wydarzenia")).queryByText("Bal")).not.toBeInTheDocument();
   });
 
   it("stałe zajęcia: każde wystąpienie w najbliższym tygodniu z opisem „co …”", async () => {
@@ -36,12 +44,15 @@ describe("Dziś i jutro", () => {
       repeat_weekdays: [2, 5],
       repeat_until: null,
     });
-    renderAt("/", { tables: { wa_groups: f.groups, events: [basen] } });
+    renderAt("/", { tables: { wa_groups: f.groups, events: [basen, f.event({ id: "e8", title: "Angielski", repeat_weekdays: [4], repeat_until: null, in_hours: true, starts_at: "2026-10-01T08:00:00.000Z", all_day: false })] } });
     const events = await screen.findByRole("region", { name: "Wydarzenia" });
-    // Friday 9.10 and Tuesday 13.10 within the week from Thursday 8.10.
-    expect(within(events).getAllByText("Basen")).toHaveLength(2);
-    expect(within(events).getAllByText("co wt, pt")).toHaveLength(2);
-    expect(within(events).getByText("jutro")).toBeInTheDocument();
+    // Friday 9.10 is tomorrow; Tuesday 13.10 further in the week from Thursday 8.10.
+    expect(within(section("Jutro")).getByText("Basen")).toBeInTheDocument();
+    expect(within(events).getAllByText("Basen")).toHaveLength(1);
+    expect(within(events).getByText("co wt, pt")).toBeInTheDocument();
+    expect(within(events).getByText("wt 13.10")).toBeInTheDocument();
+    // Routine classes during kindergarten hours stay out of the home screen.
+    expect(screen.queryByText("Angielski")).not.toBeInTheDocument();
   });
 
   it("ukrywa elementy needs_review i odwołane", async () => {
@@ -61,13 +72,14 @@ describe("Dziś i jutro", () => {
 
   it("pokazuje puste stany wszystkich sekcji", async () => {
     renderAt("/", { tables: { wa_groups: f.groups } });
-    expect(await screen.findByText("Na dziś nic do przyniesienia")).toBeInTheDocument();
-    expect(screen.getByText("W najbliższych dniach nic do przyniesienia")).toBeInTheDocument();
-    expect(screen.getByText("Brak wydarzeń w najbliższym tygodniu")).toBeInTheDocument();
+    expect(await screen.findByText("W najbliższych dniach nic do przyniesienia")).toBeInTheDocument();
+    expect(section("Dzisiaj")).toHaveTextContent("Zwykły dzień w przedszkolu");
+    expect(section("Jutro")).toHaveTextContent("Zwykły dzień w przedszkolu");
+    expect(screen.getByText("Brak dalszych wydarzeń w tym tygodniu")).toBeInTheDocument();
     expect(screen.getByText("Nic nie czeka na odpowiedź")).toBeInTheDocument();
   });
 
-  it("rzeczy: dziś osobno, tydzień od jutra po dacie, bez dalszych terminów", async () => {
+  it("rzeczy: dziś i jutro w swoich dniach, dalej po dacie, bez dalszych terminów", async () => {
     renderAt("/", {
       tables: {
         wa_groups: f.groups,
@@ -81,17 +93,15 @@ describe("Dziś i jutro", () => {
         ],
       },
     });
-    const today = await screen.findByRole("region", { name: "Na dziś przynieść" });
+    const today = await screen.findByRole("region", { name: "Dzisiaj" });
     expect(within(today).getByText("kanapki")).toBeInTheDocument();
     expect(within(today).queryByText("przebranie")).not.toBeInTheDocument();
+    expect(within(section("Jutro")).getByText("przebranie")).toBeInTheDocument();
     const week = section("W najbliższych dniach");
-    expect(within(week).getByText("przebranie").compareDocumentPosition(within(week).getByText("kalosze"))).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
     expect(within(week).getByText("kalosze").compareDocumentPosition(within(week).getByText("kasztany"))).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(within(week).getAllByRole("checkbox")).toHaveLength(3);
+    expect(within(week).getAllByRole("checkbox")).toHaveLength(2);
     expect(within(week).getByText("czw 15.10")).toBeInTheDocument();
     expect(screen.queryByText("dynia")).not.toBeInTheDocument();
     expect(screen.queryByText("zeszłotygodniowe")).not.toBeInTheDocument();
@@ -135,9 +145,8 @@ describe("Dziś i jutro", () => {
     vi.setSystemTime(new Date("2026-10-09T07:00:00+02:00"));
     await act(async () => document.dispatchEvent(new Event("visibilitychange")));
     // Packed in the morning: yesterday's "tomorrow" is now today's list.
-    expect(await within(section("Na dziś przynieść")).findByText("przebranie")).toBeInTheDocument();
-    expect(within(section("W najbliższych dniach")).getByText("kalosze")).toBeInTheDocument();
-    expect(within(section("W najbliższych dniach")).getByText("jutro")).toBeInTheDocument();
+    expect(await within(section("Dzisiaj")).findByText("przebranie")).toBeInTheDocument();
+    expect(within(section("Jutro")).getByText("kalosze")).toBeInTheDocument();
     expect(from.mock.calls.length).toBeGreaterThan(calls);
   });
 });
@@ -148,7 +157,7 @@ describe("Checklista rzeczy do przyniesienia", () => {
     const box = await screen.findByRole("checkbox", { name: "przebranie" });
     await act(async () => fireEvent.click(box));
     expect(rpc).toHaveBeenCalledWith("mark_packed", { p_id: "b1", p_done: true });
-    const list = section("W najbliższych dniach");
+    const list = section("Jutro");
     expect(await within(list).findByText("spakowane przez Ciebie, 16:00")).toBeInTheDocument();
     expect(within(list).getByText("przebranie")).toHaveClass("line-through");
   });
