@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useAuth, useProfile } from "../auth/AuthProvider";
 import { EventHistory } from "../components/EventHistory";
+import { EventTimeline } from "../components/EventTimeline";
 import { LoadError, Loading, SourceLink } from "../components/ui";
 import { longDayLabel, warsawDay, warsawTime } from "../lib/dates";
-import { deleteEvent, fetchEvent, itemGroupsLabel } from "../lib/items";
+import { deleteEvent, dropOffLabel, fetchEvent, itemGroupsLabel } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
 import { repeatLabel } from "../lib/recurrence";
 
@@ -49,7 +50,24 @@ export function EventPage() {
             </dd>
           </>
         )}
-        {event.meeting_point && (
+        {(event.drop_offs ?? []).length > 0 && (
+          <>
+            <dt className="text-slate-500">Przyprowadzenie</dt>
+            <dd>
+              <ul aria-label="Gdzie przyprowadzić" className="space-y-1">
+                {event.drop_offs!.map((d, i) => (
+                  <li key={i}>
+                    {dropOffLabel(d)}{" "}
+                    <a href={mapUrl(d.place)} target="_blank" rel="noreferrer" className="text-sm text-brand-700 underline">
+                      Mapa
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </>
+        )}
+        {event.meeting_point && !(event.drop_offs ?? []).length && (
           <>
             <dt className="text-slate-500">Zbiórka</dt>
             <dd>
@@ -63,6 +81,7 @@ export function EventPage() {
         <dt className="text-slate-500">Grupa</dt>
         <dd>{itemGroupsLabel(groups, event)}</dd>
       </dl>
+      {(event.schedule ?? []).length > 0 && <EventTimeline steps={event.schedule!} />}
       <section aria-label="Do przyniesienia" className="space-y-2">
         <h2 className="font-display text-2xl font-bold text-ink">Do przyniesienia</h2>
         {bring.length === 0 ? (

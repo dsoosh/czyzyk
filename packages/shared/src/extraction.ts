@@ -14,6 +14,25 @@ export const FACT_CATEGORIES = ["godziny", "kontakt", "osoba", "inne"] as const;
 const localDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 const localDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2})?$/, "YYYY-MM-DD lub YYYY-MM-DDTHH:mm");
 const itemRef = z.string().regex(/^(E\d+|nowe\d+)$/);
+const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
+
+/** Where and until when a child can be brought on the day of an event (event-plan). */
+export const dropOffSchema = z
+  .object({
+    place: z.string().trim().min(1).max(120).describe("Miejsce, np. „Baza”, „Witosa 6”, „biblioteka na dworcu”"),
+    from: clock.nullable().describe("Od której można przyprowadzić (HH:MM) albo null"),
+    until: clock.nullable().describe("Najpóźniej do której (HH:MM) albo null"),
+  })
+  .strict();
+
+/** One point of an event's plan for the day (event-plan). */
+export const scheduleStepSchema = z
+  .object({
+    time: clock.describe("Godzina rozpoczęcia punktu planu (HH:MM)"),
+    end: clock.nullable().optional().describe("Godzina końca punktu albo null"),
+    label: z.string().trim().min(1).max(120).describe("Krótko, co się dzieje, np. „wyjazd busem spod Bazy”"),
+  })
+  .strict();
 
 export const eventDataSchema = z
   .object({
@@ -34,6 +53,16 @@ export const eventDataSchema = z
       .nullable()
       .optional()
       .describe("Miejsce zbiórki lub odbioru dzieci, gdy inne niż przedszkole, np. „dworzec PKP”, „Baza”; inaczej null"),
+    drop_offs: z
+      .array(dropOffSchema)
+      .max(4)
+      .optional()
+      .describe("Gdzie i do której można przyprowadzić dziecko w dniu wydarzenia (jedno lub kilka miejsc); pomiń, gdy wiadomość tego nie mówi"),
+    schedule: z
+      .array(scheduleStepSchema)
+      .max(12)
+      .optional()
+      .describe("Plan godzinowy wydarzenia (kolejne punkty po godzinach), gdy wiadomość go podaje; pomiń, gdy brak planu"),
     whole_kindergarten: z.boolean().describe("true, gdy dotyczy całego przedszkola, a nie tylko tej grupy"),
     repeat: z
       .object({

@@ -49,6 +49,8 @@ function columns(type: ItemType, data: ItemData[ItemType], groupId: string, even
         ["ends_at", "ends", d.end],
         ["location", "$", d.location],
         ["meeting_point", "$", d.meeting_point ?? null],
+        ["drop_offs", "$::jsonb", JSON.stringify(d.drop_offs ?? [])],
+        ["schedule", "$::jsonb", JSON.stringify(d.schedule ?? [])],
         ["repeat_weekdays", "$::smallint[]", d.repeat ? [...new Set(d.repeat.weekdays)].sort() : null],
         ["repeat_until", "$::date", d.repeat?.until ?? null],
       ];

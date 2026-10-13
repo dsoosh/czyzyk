@@ -12,7 +12,7 @@ import {
   warsawDay,
   warsawTime,
 } from "../lib/dates";
-import { fetchCalendar, groupLabel, itemGroupsLabel, type CalendarData, type Closure, type EventItem } from "../lib/items";
+import { fetchCalendar, groupLabel, dropOffLabel, itemGroupsLabel, type CalendarData, type Closure, type EventItem } from "../lib/items";
 import { useLoader } from "../lib/useLoader";
 import { eventKey, repeatLabel } from "../lib/recurrence";
 import { closureSpans, eventSpans, rangeLabel, type Span } from "../lib/spans";
@@ -83,7 +83,11 @@ function DayItems({ entries, groups, ranges = true }: { entries: DayEntries; gro
               {e.all_day ? s.from === s.to && <span>cały dzień</span> : <span>{warsawTime(e.starts_at)}</span>}
               {repeatLabel(e) && <span>{repeatLabel(e)}</span>}
               {e.location && <span>📍 {e.location}</span>}
-              {e.meeting_point && <span>zbiórka: {e.meeting_point}</span>}
+              {e.drop_offs?.length ? (
+                <span>przyprowadzenie: {e.drop_offs.map(dropOffLabel).join(" albo ")}</span>
+              ) : (
+                e.meeting_point && <span>zbiórka: {e.meeting_point}</span>
+              )}
               <span>{itemGroupsLabel(groups, e)}</span>
               <SourceLink kind="event" id={e.id} />
             </Meta>

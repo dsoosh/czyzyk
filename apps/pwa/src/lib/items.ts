@@ -30,6 +30,24 @@ interface Provenance {
   extra_group_ids?: string[];
 }
 
+export interface DropOff {
+  place: string;
+  from: string | null;
+  until: string | null;
+}
+
+export interface ScheduleStep {
+  time: string;
+  end?: string | null;
+  label: string;
+}
+
+/** "Baza od 8:30 do 8:45", "biblioteka na dworcu do 9:20" (event-plan). */
+export function dropOffLabel(d: DropOff): string {
+  const hour = (t: string) => t.replace(/^0(\d)/, "$1");
+  return [d.place, d.from ? `od ${hour(d.from)}` : null, d.until ? `do ${hour(d.until)}` : null].filter(Boolean).join(" ");
+}
+
 export interface EventItem extends Provenance {
   title: string;
   starts_at: string;
@@ -38,6 +56,10 @@ export interface EventItem extends Provenance {
   location: string | null;
   /** Where children are brought or picked up, when not the kindergarten (event-location). */
   meeting_point?: string | null;
+  /** Where and until when a child can be brought (event-plan). */
+  drop_offs?: DropOff[];
+  /** The plan for the day (event-plan). */
+  schedule?: ScheduleStep[];
   /** Recurring events (recurring-events): ISO weekdays, 1 = Monday; null for one-off events. */
   repeat_weekdays?: number[] | null;
   repeat_until?: string | null;
@@ -85,7 +107,7 @@ export interface Group {
 const PROVENANCE = "id, group_id, source_message_ids, confidence, rationale, status";
 /** Items a group can join (events, bring items, payments, actions); closures have no extra groups. */
 const SHARED = `${PROVENANCE}, extra_group_ids`;
-export const EVENT_COLUMNS = `${SHARED}, child_ids, title, starts_at, ends_at, all_day, location, meeting_point, repeat_weekdays, repeat_until`;
+export const EVENT_COLUMNS = `${SHARED}, child_ids, title, starts_at, ends_at, all_day, location, meeting_point, drop_offs, schedule, repeat_weekdays, repeat_until`;
 export const BRING_COLUMNS = `${SHARED}, child_ids, event_id, description, due_date, packed_by, packed_at`;
 export const PAYMENT_COLUMNS = `${SHARED}, child_ids, description, amount_pln, due_date, paid_by, paid_at`;
 export const ACTION_COLUMNS = `${SHARED}, child_ids, question, due_date, resolved_by, resolved_at, suggested_actions, resolution`;

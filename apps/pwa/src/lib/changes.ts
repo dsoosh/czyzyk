@@ -1,5 +1,5 @@
 import { shortDate } from "./dates";
-import { formatAmount, type ItemChange } from "./items";
+import { dropOffLabel, formatAmount, type DropOff, type ItemChange, type ScheduleStep } from "./items";
 
 /** How the family reads the fields of an item change (item-history). */
 export const FIELD_LABELS: Record<string, string> = {
@@ -9,6 +9,8 @@ export const FIELD_LABELS: Record<string, string> = {
   all_day: "Cały dzień",
   location: "Miejsce",
   meeting_point: "Zbiórka",
+  drop_offs: "Przyprowadzenie",
+  schedule: "Plan dnia",
   whole_kindergarten: "Całe przedszkole",
   description: "Opis",
   due_date: "Termin",
@@ -29,6 +31,10 @@ export const OP_LABELS: Record<ItemChange["op"], string> = { create: "Utworzono"
 export function formatValue(field: string, value: unknown): string {
   if (value == null || value === "") return "—";
   if (typeof value === "boolean") return value ? "tak" : "nie";
+  if (field === "drop_offs" && Array.isArray(value)) return value.length ? (value as DropOff[]).map(dropOffLabel).join("; ") : "—";
+  if (field === "schedule" && Array.isArray(value)) {
+    return value.length ? (value as ScheduleStep[]).map((s) => `${s.time}${s.end ? `–${s.end}` : ""} ${s.label}`).join("; ") : "—";
+  }
   if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
   if (field === "amount_pln") return formatAmount(value as number);
   if (typeof value === "string") {

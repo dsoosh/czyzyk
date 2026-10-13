@@ -97,11 +97,13 @@ interface EventRow {
   all_day: boolean;
   location: string | null;
   meeting_point: string | null;
+  drop_offs: { place: string; from: string | null; until: string | null }[];
+  schedule: { time: string; end?: string | null; label: string }[];
   repeat_weekdays: number[] | null;
 }
 
 const EVENT_SELECT = `
-  select id, group_id, child_ids, title, all_day, location, meeting_point, repeat_weekdays,
+  select id, group_id, child_ids, title, all_day, location, meeting_point, drop_offs, schedule, repeat_weekdays,
          to_char(starts_at at time zone '${TZ}', 'YYYY-MM-DD') as start_day,
          to_char(starts_at at time zone '${TZ}', 'HH24:MI') as start_time,
          to_char(ends_at at time zone '${TZ}', 'YYYY-MM-DD') as end_day,
@@ -110,7 +112,7 @@ const EVENT_SELECT = `
 
 /** Each occurrence between $1 and $2 (recurring events repeat, closure days skipped). */
 const OCCURRENCE_SELECT = `
-  select e.id, e.group_id, e.child_ids, e.title, e.all_day, e.location, e.meeting_point, e.repeat_weekdays,
+  select e.id, e.group_id, e.child_ids, e.title, e.all_day, e.location, e.meeting_point, e.drop_offs, e.schedule, e.repeat_weekdays,
          to_char(o.starts_at at time zone '${TZ}', 'YYYY-MM-DD') as start_day,
          to_char(o.starts_at at time zone '${TZ}', 'HH24:MI') as start_time,
          to_char(o.ends_at at time zone '${TZ}', 'YYYY-MM-DD') as end_day,
@@ -130,7 +132,11 @@ function eventLine(e: EventRow, names: Names): string {
     if (e.end_day) when += e.end_day === e.start_day ? `–${e.end_time}` : ` – ${dayWithWeekday(e.end_day)} ${e.end_time}`;
   }
   if (e.repeat_weekdays?.length) when += ` (stałe zajęcia: co ${e.repeat_weekdays.map((d) => WEEKDAYS[d]).join(", ")})`;
-  return `- Wydarzenie: ${e.title}; ${when}${e.location ? `; miejsce: ${e.location}` : ""}${e.meeting_point ? `; zbiórka: ${e.meeting_point}` : ""}; ${groupOf(names, e.group_id)}${childOf(names, e)}`;
+  const dropOffs = (e.drop_offs ?? [])
+    .map((d) => [d.place, d.from ? `od ${d.from}` : null, d.until ? `do ${d.until}` : null].filter(Boolean).join(" "))
+    .join(" albo ");
+  const plan = (e.schedule ?? []).map((s) => `${s.time}${s.end ? `–${s.end}` : ""} ${s.label}`).join(", ");
+  return `- Wydarzenie: ${e.title}; ${when}${e.location ? `; miejsce: ${e.location}` : ""}${e.meeting_point ? `; zbiórka: ${e.meeting_point}` : ""}${dropOffs ? `; przyprowadzenie: ${dropOffs}` : ""}${plan ? `; plan dnia: ${plan}` : ""}; ${groupOf(names, e.group_id)}${childOf(names, e)}`;
 }
 
 interface BringRow {

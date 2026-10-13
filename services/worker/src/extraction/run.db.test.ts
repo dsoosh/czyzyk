@@ -158,6 +158,34 @@ describe("runGroupExtraction", () => {
     expect(history[0].changes).toEqual({ meeting_point: { from: null, to: "dworzec PKP" } });
   });
 
+  it("przyprowadzenie i plan dnia: zapisane przy wydarzeniu, widoczne w kontekście, zachowane przy zmianie terminu", async () => {
+    await addMessage("Wycieczka 13.10: od 8:30 w Bazie, na busa do 8:45, 9:00 wyjazd, 10:30-12:00 lekcja", "2026-10-07T10:00:00Z");
+    const dropOffs = [{ place: "Baza", from: "08:30", until: "08:45" }];
+    const schedule = [
+      { time: "09:00", end: null, label: "wyjazd busem spod Bazy" },
+      { time: "10:30", end: "12:00", label: "lekcja w muzeum" },
+    ];
+    const { model } = scripted((p) => [
+      op({
+        op: "create",
+        type: "event",
+        ref: "nowe1",
+        data: { title: "Wycieczka do muzeum", start: "2026-10-13T09:00", end: null, all_day: false, location: "Muzeum", whole_kindergarten: false, drop_offs: dropOffs, schedule },
+        source_messages: [lastAlias(p)],
+      }),
+    ]);
+    await runGroupExtraction(deps(model), groupId);
+    await addMessage("Wyjazd przesunięty na 14.10", "2026-10-07T11:00:00Z");
+    const second = scripted((p) => {
+      const alias = [...p.aliases.items].find(([, v]) => v.type === "event")![0];
+      return [op({ op: "update", type: "event", target: alias, data: { start: "2026-10-14T09:00" }, source_messages: [lastAlias(p)] })];
+    });
+    await runGroupExtraction(deps(second.model), groupId);
+    expect(second.prompts[0]!.user).toContain('"drop_offs":[{"from":"08:30","place":"Baza","until":"08:45"}]');
+    const { rows } = await db.client.query("select drop_offs, schedule from events");
+    expect(rows).toEqual([{ drop_offs: dropOffs, schedule }]);
+  });
+
   it("odwołanie ustawia status cancelled", async () => {
     await db.client.query(
       "insert into events (group_id, title, starts_at, all_day) values ($1, 'Teatrzyk', '2026-10-13T22:00:00Z', true)",
