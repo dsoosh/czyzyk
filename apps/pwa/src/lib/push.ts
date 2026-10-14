@@ -6,6 +6,10 @@ export interface PushSettings {
   alert_closures: boolean;
   alert_actions: boolean;
   alert_payments: boolean;
+  /** New, changed and cancelled events (change-alerts). */
+  alert_events: boolean;
+  /** New things to bring (change-alerts). */
+  alert_bring_items: boolean;
   /** Morning plan for today (morning-push). */
   morning_enabled: boolean;
   morning_time: string;
@@ -19,6 +23,8 @@ export const DEFAULT_PUSH_SETTINGS: PushSettings = {
   alert_closures: true,
   alert_actions: true,
   alert_payments: true,
+  alert_events: true,
+  alert_bring_items: true,
   morning_enabled: true,
   morning_time: "06:45",
   reminders_enabled: true,

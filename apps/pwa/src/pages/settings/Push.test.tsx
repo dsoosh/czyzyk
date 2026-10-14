@@ -77,6 +77,8 @@ describe("Powiadomienia w ustawieniach", () => {
         alert_closures: true,
         alert_actions: false,
         alert_payments: true,
+        alert_events: true,
+        alert_bring_items: true,
         morning_enabled: true,
         morning_time: "06:45",
         reminders_enabled: true,
@@ -117,6 +119,9 @@ describe("Powiadomienia w ustawieniach", () => {
     // Settings saved before the morning push existed get its defaults.
     expect(within(section).getByLabelText("Godzina rano")).toHaveValue("06:45");
     expect(within(section).getByLabelText("Poranny skrót na dziś")).toBeChecked();
+    // Settings saved before change alerts existed get them on.
+    expect(within(section).getByLabelText("Alert: nowe, zmienione i odwołane wydarzenia")).toBeChecked();
+    expect(within(section).getByLabelText("Alert: nowa rzecz do przyniesienia")).toBeChecked();
   });
 
   it("poranny skrót o 7:15, bez przypomnień o terminach", async () => {
