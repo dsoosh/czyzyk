@@ -7,7 +7,7 @@ import type { ItemType } from "./extraction.js";
  */
 export const PUSH_ALERT_QUEUE = "push-alert";
 export const PUSH_ALERT_QUEUE_OPTIONS = {
-  // At most one queued job per item (singletonKey = type:id); push_alerts_sent makes delivery one-time.
+  // At most one queued job per item and change (singletonKey); push_alerts_sent makes delivery one-time.
   policy: "stately",
   retryLimit: 3,
   retryDelay: 60,
@@ -19,12 +19,16 @@ export const PUSH_ALERT_QUEUE_OPTIONS = {
 } as const;
 
 /** Item types that can trigger an immediate alert (the cron decides whether they qualify). */
-export const ALERT_ITEM_TYPES = ["closure", "action_required", "payment"] as const satisfies readonly ItemType[];
+export const ALERT_ITEM_TYPES = ["closure", "action_required", "payment", "event", "bring_item"] as const satisfies readonly ItemType[];
 export type AlertItemType = (typeof ALERT_ITEM_TYPES)[number];
 
 export interface PushAlertJob {
   type: AlertItemType;
   id: string;
+  /** What the extraction did to the item (change-alerts); missing in jobs queued before. */
+  change?: "created" | "updated" | "cancelled" | "touched";
+  /** item_changes.id of the change: a changed event alerts once per change. */
+  changeId?: string;
 }
 
 export function isAlertItemType(type: ItemType): type is AlertItemType {

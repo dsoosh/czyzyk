@@ -47,7 +47,7 @@ export function PushSettingsSection() {
     );
     void client
       .from("push_settings")
-      .select("digest_enabled, digest_time, alert_closures, alert_actions, alert_payments, morning_enabled, morning_time, reminders_enabled")
+      .select("digest_enabled, digest_time, alert_closures, alert_actions, alert_payments, alert_events, alert_bring_items, morning_enabled, morning_time, reminders_enabled")
       .maybeSingle()
       .then(({ data }) => {
         if (alive && data) {
@@ -122,7 +122,7 @@ export function PushSettingsSection() {
     <section id="powiadomienia" aria-label="Powiadomienia" className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
       <h2 className="font-display text-3xl font-bold text-ink">Powiadomienia</h2>
       <p className="text-sm text-slate-600">
-        Wieczorny skrót na jutro i natychmiastowe alerty: dzień wolny, nowa sprawa do załatwienia, płatność na jutro.
+        Wieczorny skrót na jutro i natychmiastowe alerty: nowe i zmienione wydarzenia, rzeczy do przyniesienia, sprawy do decyzji, dzień wolny, płatność na jutro.
       </p>
 
       {support === "unsupported" && <p className="text-sm text-slate-600">Ta przeglądarka nie obsługuje powiadomień push.</p>}
@@ -201,6 +201,14 @@ export function PushSettingsSection() {
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={settings.alert_payments} onChange={toggle("alert_payments")} />
             Alert: płatność na jutro
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={settings.alert_events} onChange={toggle("alert_events")} />
+            Alert: nowe, zmienione i odwołane wydarzenia
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={settings.alert_bring_items} onChange={toggle("alert_bring_items")} />
+            Alert: nowa rzecz do przyniesienia
           </label>
           <button type="submit" disabled={busy} className="rounded-lg bg-brand-700 px-4 py-2 font-semibold text-white disabled:opacity-50">
             Zapisz

@@ -13,8 +13,20 @@ export interface ApplySummary {
   rejected: Rejection[];
   /** Creates turned into a join of the same event in another group (shared-items). */
   joined: Rejection[];
-  /** Items created or updated as active (ids only); the worker turns some into push alerts. */
-  activeItems: { type: ItemType; id: string }[];
+  /**
+   * Items created, changed or cancelled (ids only), with the recorded change when there is one;
+   * the worker turns some into push alerts.
+   */
+  activeItems: ChangedItem[];
+}
+
+export interface ChangedItem {
+  type: ItemType;
+  id: string;
+  /** What happened; "updated" only when a field changed (item_changes), "touched" when nothing did. */
+  change: "created" | "updated" | "cancelled" | "touched";
+  /** item_changes.id of the change, when it was recorded. */
+  changeId?: string;
 }
 
 interface Ctx {
@@ -205,13 +217,13 @@ export async function applyOperations(ctx: Ctx, operations: ResolvedOperation[])
         summary.joined.push({ index: op.index, reason: "to samo wydarzenie jest już w innej grupie: dołączono do niego zamiast tworzyć duplikat" });
         continue;
       }
-      const outcome =
+      const outcome: { id: string; change?: ChangedItem["change"]; changeId?: string } | "proposed" =
         op.op === "join" ? await applyJoin(ctx, op) : op.op === "done" ? await applyDone(ctx, op) : await applyOne(ctx, op, status, refIds);
       await ctx.client.query("release savepoint op");
       // Joining adds a child to an item families already know about, done closes it for one
       // family: no new alert.
-      if (outcome !== "proposed" && status === "active" && op.op !== "join" && op.op !== "done") {
-        summary.activeItems.push({ type: op.type, id: outcome.id });
+      if (outcome !== "proposed" && outcome.change && (status === "active" || outcome.change === "cancelled")) {
+        summary.activeItems.push({ type: op.type, id: outcome.id, change: outcome.change, ...(outcome.changeId ? { changeId: outcome.changeId } : {}) });
       }
       if (outcome === "proposed" || status === "needs_review") summary.needsReview++;
       else if (op.op === "create") summary.created++;
@@ -272,12 +284,13 @@ async function recordChange(
   changes: unknown,
   sourceMessageIds: string[],
   rationale: string,
-) {
-  await client.query(
+): Promise<string> {
+  const { rows } = await client.query<{ id: string }>(
     `insert into public.item_changes (item_type, item_id, op, changes, source_message_ids, rationale)
-     values ($1, $2, $3, $4, $5::uuid[], $6)`,
+     values ($1, $2, $3, $4, $5::uuid[], $6) returning id`,
     [type, id, op, changes === null ? null : JSON.stringify(changes), sourceMessageIds, rationale],
   );
+  return rows[0]!.id;
 }
 
 /** Stores the change as pending_patch (same field names as extraction data) for the admin to accept or dismiss. */
@@ -339,7 +352,7 @@ async function applyOne(
   op: Exclude<ResolvedOperation, { op: "join" | "done" }>,
   status: Status,
   refIds: Map<string, string>,
-): Promise<{ id: string } | "proposed"> {
+): Promise<Omit<ChangedItem, "type"> | "proposed"> {
   const { client, groupId } = ctx;
   const table = TABLE[op.type];
   const meta = [op.sourceMessageIds, op.confidence, op.rationale, status] as const;
@@ -365,8 +378,8 @@ async function applyOne(
     );
     if (op.ref) refIds.set(op.ref, rows[0]!.id);
     const { suggestions: _s, ...recorded } = data as Record<string, unknown>;
-    await recordChange(client, op.type, rows[0]!.id, "create", recorded, op.sourceMessageIds, op.rationale);
-    return { id: rows[0]!.id };
+    const changeId = await recordChange(client, op.type, rows[0]!.id, "create", recorded, op.sourceMessageIds, op.rationale);
+    return { id: rows[0]!.id, change: "created", changeId };
   }
 
   const existing = await loadItem(client, op.type, op.targetId);
@@ -382,7 +395,7 @@ async function applyOne(
         op.targetId,
         JSON.stringify(suggestions ?? []),
       ]);
-      return { id: op.targetId };
+      return { id: op.targetId, change: "touched" };
     }
   }
 
@@ -404,8 +417,8 @@ async function applyOne(
         where id = $1`,
       [op.targetId, ...meta],
     );
-    await recordChange(client, op.type, op.targetId, "cancel", null, op.sourceMessageIds, op.rationale);
-    return { id: op.targetId };
+    const changeId = await recordChange(client, op.type, op.targetId, "cancel", null, op.sourceMessageIds, op.rationale);
+    return { id: op.targetId, change: "cancelled", changeId };
   }
 
   const merged = { ...(existing.data as Record<string, unknown>), ...(op.data as Record<string, unknown>) };
@@ -430,8 +443,9 @@ async function applyOne(
   const diff = diffData(existing.data as Record<string, unknown>, data as Record<string, unknown>);
   const names = (list: readonly string[]) => JSON.stringify(list.map((n) => n.toLocaleLowerCase("pl-PL")).sort());
   if (audience.length > 0 && names(audience) !== names(existing.children)) diff.children = { from: existing.children, to: audience };
-  if (Object.keys(diff).length) await recordChange(client, op.type, op.targetId, "update", diff, op.sourceMessageIds, op.rationale);
-  return { id: op.targetId };
+  if (!Object.keys(diff).length) return { id: op.targetId, change: "touched" };
+  const changeId = await recordChange(client, op.type, op.targetId, "update", diff, op.sourceMessageIds, op.rationale);
+  return { id: op.targetId, change: "updated", changeId };
 }
 
 const normalTitle = (t: string) =>

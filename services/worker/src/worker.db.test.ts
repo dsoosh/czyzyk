@@ -66,7 +66,7 @@ describe("startWorker", () => {
         ({ rows: jobs } = await db.client.query("select data from pgboss.job where name = 'push-alert'"));
       }
       const { rows: closures } = await db.client.query("select id from closures");
-      expect(jobs).toEqual([{ data: { type: "closure", id: closures[0].id } }]);
+      expect(jobs).toEqual([{ data: { type: "closure", id: closures[0].id, change: "created", changeId: expect.any(String) } }]);
     } finally {
       await worker.stop();
     }

@@ -47,7 +47,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await db.client.query(
-    "delete from item_done; delete from bring_items; delete from payments; delete from events; delete from closures; delete from action_required; delete from push_alerts_sent; delete from push_subscriptions; delete from push_settings",
+    "delete from item_done; delete from bring_items; delete from payments; delete from events; delete from closures; delete from action_required; delete from push_alerts_sent; delete from item_changes; delete from push_subscriptions; delete from push_settings",
   );
   for (const [uid, n] of [
     [olaId, 1],
@@ -268,6 +268,77 @@ describe("Alerty natychmiastowe", () => {
     await db.client.query("update closures set status = 'active' where id = $1", [rows[0].id]);
     await handleAlert({ db: pool, sender, logger }, { type: "closure", id: rows[0].id }, now);
     expect(sent).toHaveLength(2);
+  });
+});
+
+describe("Alerty o wydarzeniach i rzeczach do przyniesienia", () => {
+  const now = at("2026-10-07T18:00:00");
+  const alert = (sender: PushSender, job: Parameters<typeof handleAlert>[1]) => handleAlert({ db: pool, sender, logger }, job, now);
+  const change = async (id: string, op: "create" | "update" | "cancel", changes: unknown) =>
+    (
+      await db.client.query("insert into item_changes (item_type, item_id, op, changes) values ('event', $1, $2, $3) returning id", [
+        id,
+        op,
+        changes === null ? null : JSON.stringify(changes),
+      ])
+    ).rows[0].id as string;
+
+  it("nowe wydarzenie, każda zmiana i odwołanie dają osobny alert", async () => {
+    const { rows } = await db.client.query(
+      "insert into events (title, starts_at, location) values ('Wycieczka do muzeum', '2026-10-15T08:30:00+02:00', 'Muzeum') returning id",
+    );
+    const id = rows[0].id as string;
+    await db.client.query("update push_settings set alert_events = false where user_id = $1", [darekId]);
+    const { sender, sent } = fakeSender();
+    await alert(sender, { type: "event", id, change: "created" });
+    expect(await alert(sender, { type: "event", id, change: "created" })).toBe("skipped");
+    const first = await change(id, "update", { start: { from: "a", to: "b" }, drop_offs: { from: [], to: [] } });
+    await alert(sender, { type: "event", id, change: "updated", changeId: first });
+    expect(await alert(sender, { type: "event", id, change: "updated", changeId: first })).toBe("skipped");
+    const second = await change(id, "update", { location: { from: "a", to: "b" } });
+    await alert(sender, { type: "event", id, change: "updated", changeId: second });
+    await db.client.query("update events set status = 'cancelled' where id = $1", [id]);
+    await alert(sender, { type: "event", id, change: "cancelled", changeId: await change(id, "cancel", null) });
+    expect(sent.map((s) => [s.endpoint, s.payload.body])).toEqual([
+      ["https://push.example/1", "Nowe wydarzenie: Wycieczka do muzeum (15.10 8:30)"],
+      ["https://push.example/1", "Zmiana w wydarzeniu: Wycieczka do muzeum (15.10 8:30) (termin, przyprowadzenie)"],
+      ["https://push.example/1", "Zmiana w wydarzeniu: Wycieczka do muzeum (15.10 8:30) (miejsce)"],
+      ["https://push.example/1", "Odwołane: Wycieczka do muzeum (15.10 8:30)"],
+    ]);
+  });
+
+  it("bez alertu: wydarzenie bez zmiany, stałe zajęcia w godzinach, wydarzenie minione", async () => {
+    const { rows } = await db.client.query(
+      `insert into events (title, starts_at, all_day, in_hours) values
+         ('Rytmika', '2026-10-15T10:00:00+02:00', false, true),
+         ('Piknik', '2026-10-01T00:00:00+02:00', true, false),
+         ('Teatrzyk', '2026-10-20T00:00:00+02:00', true, false)
+       returning id`,
+    );
+    const { sender, sent } = fakeSender();
+    expect(await alert(sender, { type: "event", id: rows[0].id, change: "created" })).toBe("skipped");
+    expect(await alert(sender, { type: "event", id: rows[1].id, change: "created" })).toBe("skipped");
+    expect(await alert(sender, { type: "event", id: rows[2].id, change: "touched" })).toBe("skipped");
+    expect(await alert(sender, { type: "event", id: rows[2].id, change: "updated" })).toBe("skipped");
+    expect(sent).toHaveLength(0);
+    await alert(sender, { type: "event", id: rows[2].id, change: "created" });
+    expect(sent.map((s) => s.payload.body)).toEqual(["Nowe wydarzenie: Teatrzyk (20.10)", "Nowe wydarzenie: Teatrzyk (20.10)"]);
+  });
+
+  it("nowa rzecz do przyniesienia: raz, z terminem; minione i zmiany bez alertu", async () => {
+    const { rows } = await db.client.query(
+      `insert into bring_items (description, due_date) values ('strój na bal', '2026-10-10'), ('kalosze', '2026-10-01'), ('chusteczki', null)
+       returning id`,
+    );
+    await db.client.query("update push_settings set alert_bring_items = false where user_id = $1", [darekId]);
+    const { sender, sent } = fakeSender();
+    for (const r of rows) await alert(sender, { type: "bring_item", id: r.id, change: "created" });
+    expect(await alert(sender, { type: "bring_item", id: rows[0].id, change: "created" })).toBe("skipped");
+    expect(await alert(sender, { type: "bring_item", id: rows[2].id, change: "updated" })).toBe("skipped");
+    expect(sent.map((s) => [s.endpoint, s.payload.body])).toEqual([
+      ["https://push.example/1", "Do przyniesienia: strój na bal (na 10.10)"],
+      ["https://push.example/1", "Do przyniesienia: chusteczki"],
+    ]);
   });
 });
 

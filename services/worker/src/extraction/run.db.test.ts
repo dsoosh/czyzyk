@@ -297,16 +297,21 @@ describe("runGroupExtraction", () => {
         source_messages: [lastAlias(p)],
       }),
     ]);
-    await runGroupExtraction(deps(create.model), groupId);
-    const { rows } = await db.client.query("select op, changes from item_changes");
+    const created = await runGroupExtraction(deps(create.model), groupId);
+    const { rows } = await db.client.query("select id, op, changes from item_changes");
+    // The alert gets what happened and the recorded change (change-alerts).
+    const eventId = (await db.client.query("select id from events")).rows[0].id;
+    expect(created).toMatchObject({ activeItems: [{ type: "event", id: eventId, change: "created", changeId: rows[0].id }] });
+    for (const r of rows) delete r.id;
     expect(rows).toEqual([
       { op: "create", changes: { title: "Bal", start: "2026-10-09T10:00", end: null, all_day: false, location: null, whole_kindergarten: false } },
     ]);
 
     await addMessage("Przypominam o balu", "2026-10-07T11:00:00Z");
     const same = scripted((p) => [op({ op: "update", type: "event", target: "E1", data: { title: "Bal" }, source_messages: [lastAlias(p)] })]);
-    await runGroupExtraction(deps(same.model), groupId);
+    const touched = await runGroupExtraction(deps(same.model), groupId);
     expect((await db.client.query("select count(*)::int as n from item_changes")).rows[0].n).toBe(1);
+    expect(touched).toMatchObject({ activeItems: [{ type: "event", id: eventId, change: "touched" }] });
   });
 
   it("rozmowa bez treści organizacyjnej nie tworzy elementów, ale oznacza wiadomości", async () => {

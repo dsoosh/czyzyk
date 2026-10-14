@@ -162,7 +162,17 @@ describe("PUT /push/settings", () => {
       morning_enabled: true,
       morning_time: "06:45",
       reminders_enabled: true,
+      alert_events: true,
+      alert_bring_items: true,
     });
+  });
+
+  it("wyłącza alerty o wydarzeniach i rzeczach; starsza PWA bez tych pól ich nie zmienia", async () => {
+    const token = await jwt(olaId);
+    const base = { digest_enabled: true, digest_time: "19:00", alert_closures: true, alert_actions: true, alert_payments: true };
+    const res = await post("/push/settings", { ...base, alert_events: false, alert_bring_items: false }, token, "PUT");
+    expect(res.json()).toMatchObject({ alert_events: false, alert_bring_items: false });
+    expect((await post("/push/settings", base, token, "PUT")).json()).toMatchObject({ alert_events: false, alert_bring_items: false });
   });
 
   it("zmienia poranny skrót i przypomnienia; starsza PWA bez tych pól ich nie zmienia", async () => {

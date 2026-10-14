@@ -86,8 +86,8 @@ export async function startWorker(
     onActiveItems: async (items) => {
       for (const item of items) {
         if (!isAlertItemType(item.type)) continue;
-        const job: PushAlertJob = { type: item.type, id: item.id };
-        await boss.send(PUSH_ALERT_QUEUE, job, { singletonKey: `${item.type}:${item.id}` });
+        const job: PushAlertJob = { type: item.type, id: item.id, change: item.change, ...(item.changeId ? { changeId: item.changeId } : {}) };
+        await boss.send(PUSH_ALERT_QUEUE, job, { singletonKey: `${item.type}:${item.id}:${item.changeId ?? ""}` });
       }
     },
   };
