@@ -5,7 +5,7 @@ import { EventHistory } from "../components/EventHistory";
 import { EventTimeline } from "../components/EventTimeline";
 import { LoadError, Loading, SourceLink } from "../components/ui";
 import { longDayLabel, shortDate, warsawDay, warsawTime } from "../lib/dates";
-import { deleteEvent, fetchEvent, formatAmount, itemGroupsLabel } from "../lib/items";
+import { deleteEvent, eventPlanSteps, fetchEvent, formatAmount, itemGroupsLabel } from "../lib/items";
 import { DropOffTag } from "../components/PlaceTag";
 import { useLoader } from "../lib/useLoader";
 import { repeatLabel } from "../lib/recurrence";
@@ -26,6 +26,7 @@ export function EventPage() {
   if (!event) return <p className="text-slate-600">Nie znaleziono wydarzenia.</p>;
 
   const day = warsawDay(event.starts_at);
+  const plan = eventPlanSteps(event, warsawTime);
   const when = event.all_day
     ? `${longDayLabel(day)}, cały dzień`
     : `${longDayLabel(day)}, ${warsawTime(event.starts_at)}${event.ends_at ? `–${warsawTime(event.ends_at)}` : ""}`;
@@ -82,7 +83,7 @@ export function EventPage() {
         <dt className="text-slate-500">Grupa</dt>
         <dd>{itemGroupsLabel(groups, event)}</dd>
       </dl>
-      {(event.schedule ?? []).length > 0 && <EventTimeline steps={event.schedule!} />}
+      {plan.length > 0 && <EventTimeline steps={plan} />}
       <section aria-label="Do przyniesienia" className="space-y-2">
         <h2 className="font-display text-2xl font-bold text-ink">Do przyniesienia</h2>
         {bring.length === 0 ? (
