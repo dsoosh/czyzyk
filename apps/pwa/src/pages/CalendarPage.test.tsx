@@ -173,6 +173,30 @@ describe("Szczegóły wydarzenia", () => {
     ]);
   });
 
+  it("bez zapisanego planu dnia timeline powstaje z przyprowadzenia, początku i końca", async () => {
+    const trip = f.event({
+      id: "e9",
+      title: "Wycieczka na lotnisko",
+      starts_at: "2026-10-21T07:00:00.000Z",
+      ends_at: "2026-10-21T12:00:00.000Z",
+      all_day: false,
+      drop_offs: [{ place: "Baza", from: "08:20", until: "08:30" }],
+    });
+    renderAt("/kalendarz/wydarzenie/e9", { tables: { ...tables, events: [trip] } });
+    const plan = await screen.findByRole("region", { name: "Plan dnia" });
+    expect(within(plan).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "przyprowadzenie: Baza8:20–8:30",
+      "początek9:00",
+      "koniec14:00",
+    ]);
+  });
+
+  it("wydarzenie całodniowe bez planu nie ma timeline'u", async () => {
+    renderAt("/kalendarz/wydarzenie/e9", { tables: { ...tables, events: [f.event({ id: "e9", title: "Dzień kropki", all_day: true })] } });
+    await screen.findByRole("heading", { name: "Dzień kropki" });
+    expect(screen.queryByRole("region", { name: "Plan dnia" })).not.toBeInTheDocument();
+  });
+
   it("kalendarz pokazuje, gdzie przyprowadzić dziecko", async () => {
     const trip = f.event({ id: "e9", title: "Wycieczka", drop_offs: [{ place: "Witosa 6", from: null, until: "09:00" }, { place: "dworzec", from: null, until: "09:20" }] });
     renderAt("/kalendarz", { tables: { ...tables, events: [trip, f.event({ id: "e8", title: "Hiszpański", in_hours: true, repeat_weekdays: [3], repeat_until: null })] } });

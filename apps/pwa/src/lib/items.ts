@@ -48,6 +48,27 @@ export function dropOffLabel(d: DropOff): string {
   return [d.place, d.from ? `od ${hour(d.from)}` : null, d.until ? `do ${hour(d.until)}` : null].filter(Boolean).join(" ");
 }
 
+/**
+ * The plan for the day shown on the event page: the saved schedule, or, when the analysis gave
+ * none, one built from the drop-offs, start and end (at least two points, else empty).
+ */
+export function eventPlanSteps(
+  e: Pick<EventItem, "schedule" | "drop_offs" | "starts_at" | "ends_at" | "all_day">,
+  timeOf: (instant: string) => string,
+): ScheduleStep[] {
+  if (e.schedule?.length) return e.schedule;
+  const steps: ScheduleStep[] = [];
+  for (const d of e.drop_offs ?? []) {
+    const time = d.from ?? d.until;
+    if (time) steps.push({ time, end: d.from && d.until ? d.until : null, label: `przyprowadzenie: ${d.place}` });
+  }
+  if (!e.all_day) {
+    steps.push({ time: timeOf(e.starts_at), end: null, label: "początek" });
+    if (e.ends_at) steps.push({ time: timeOf(e.ends_at), end: null, label: "koniec" });
+  }
+  return steps.length >= 2 ? steps.sort((a, b) => a.time.localeCompare(b.time)) : [];
+}
+
 export interface EventItem extends Provenance {
   title: string;
   starts_at: string;
