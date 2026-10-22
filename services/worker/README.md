@@ -37,7 +37,7 @@ Wszystkie w [`.env.example`](.env.example). Wymagane: `DATABASE_URL`, `ANTHROPIC
 Zestaw 30 przykładowych wiadomości z oczekiwanym wynikiem: [`eval/cases.json`](eval/cases.json). Uruchamiaj przy każdej zmianie promptu lub modelu (koszt: ok. 30 wywołań modelu):
 
 ```bash
-ANTHROPIC_API_KEY=… EXTRACTION_MODEL=claude-haiku-4-5 npm run eval:extraction -w @czyzyk/worker
+ANTHROPIC_API_KEY=… EXTRACTION_MODEL=claude-haiku-5-5 npm run eval:extraction -w @czyzyk/worker
 npm run eval:extraction -w @czyzyk/worker -- --only bal-przebrania   # jeden przypadek
 ```
 
