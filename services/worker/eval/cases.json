@@ -813,6 +813,66 @@
       ],
       "expected": [],
       "noConfidentOps": true
+    },
+    {
+      "id": "tylko-dziewczynki",
+      "children": [
+        {
+          "name": "Wicek",
+          "aliases": [
+            "Wincenty"
+          ],
+          "group": "Motylki"
+        },
+        {
+          "name": "Elena",
+          "aliases": [
+            "Eleonora"
+          ],
+          "group": "Motylki"
+        }
+      ],
+      "messages": [
+        {
+          "author": "Pani Ania",
+          "sent_at": "2026-10-22T09:00:00+02:00",
+          "text": "Dzień dobry, Emilia pokazała dzieciom układ taneczny do piosenki ludowej Jabłoneczka. Bardzo się spodobało dzieciom, więc uczymy się tańca ludowego z pomocą Emilii. Dziewczynki potrzebują spódnicy, żeby ją przytrzymać, więc jest mile widziana."
+        }
+      ],
+      "expected": [
+        {
+          "op": "create",
+          "type": "bring_item",
+          "contains": {
+            "description": "spódnic"
+          },
+          "children": [
+            "Elena"
+          ]
+        }
+      ],
+      "maxExtra": 0
+    },
+    {
+      "id": "tylko-dziewczynki-sami-chlopcy",
+      "children": [
+        {
+          "name": "Wicek",
+          "aliases": [
+            "Wincenty"
+          ],
+          "group": "Motylki"
+        }
+      ],
+      "messages": [
+        {
+          "author": "Pani Ania",
+          "sent_at": "2026-10-22T09:00:00+02:00",
+          "text": "Dzień dobry, Emilia pokazała dzieciom układ taneczny do piosenki ludowej Jabłoneczka. Bardzo się spodobało dzieciom, więc uczymy się tańca ludowego z pomocą Emilii. Dziewczynki potrzebują spódnicy, żeby ją przytrzymać, więc jest mile widziana."
+        }
+      ],
+      "expected": [],
+      "maxExtra": 0
     }
   ]
 }
