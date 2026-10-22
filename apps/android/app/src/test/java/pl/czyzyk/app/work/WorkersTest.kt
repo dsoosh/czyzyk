@@ -15,10 +15,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import pl.czyzyk.app.AppState
 import pl.czyzyk.app.capture.CapturedMessage
+import pl.czyzyk.app.net.ConfigResult
 import pl.czyzyk.app.net.IngestApi
 import pl.czyzyk.app.net.IngestConfig
 import pl.czyzyk.app.net.SendResult
-import pl.czyzyk.app.net.UnauthorizedException
 import pl.czyzyk.app.pairing.Pairing
 import pl.czyzyk.app.pairing.SecureStore
 import pl.czyzyk.app.queue.MessageQueue
@@ -26,8 +26,7 @@ import pl.czyzyk.app.queue.MessageQueue
 /** Server double: answers each upload with the next scripted result. */
 private class FakeApi(var results: MutableList<SendResult> = mutableListOf()) : IngestApi {
     val sent = mutableListOf<CapturedMessage>()
-    var config: IngestConfig? = IngestConfig(setOf("Motylki"), 900)
-    var configUnauthorized = false
+    var config: ConfigResult = ConfigResult.Fetched(IngestConfig(setOf("Motylki"), 900))
     val reported = mutableListOf<Collection<String>>()
 
     override fun sendNotification(pairing: Pairing, message: CapturedMessage): SendResult {
@@ -35,10 +34,7 @@ private class FakeApi(var results: MutableList<SendResult> = mutableListOf()) : 
         return if (results.isEmpty()) SendResult.Delivered else results.removeAt(0)
     }
 
-    override fun fetchConfig(pairing: Pairing): IngestConfig? {
-        if (configUnauthorized) throw UnauthorizedException()
-        return config
-    }
+    override fun fetchConfig(pairing: Pairing): ConfigResult = config
 
     override fun sendDocument(pairing: Pairing, document: pl.czyzyk.app.photos.PendingDocument, imageBase64: String?): SendResult =
         SendResult.Delivered
@@ -107,6 +103,17 @@ class WorkersTest {
     }
 
     @Test
+    fun failedSendIsShownUntilTheNextDelivery() = runTest {
+        queue.enqueue(message("k1"))
+        api.results = mutableListOf(SendResult.Retry("http 500"))
+        assertEquals(ListenableWorker.Result.retry(), runSend())
+        assertEquals("http 500", state.lastError)
+
+        assertEquals(ListenableWorker.Result.success(), runSend())
+        assertNull(state.lastError)
+    }
+
+    @Test
     fun rateLimitRetriesLater() = runTest {
         queue.enqueue(message("k1"))
         api.results = mutableListOf(SendResult.Retry("http 429"))
@@ -172,8 +179,20 @@ class WorkersTest {
 
     @Test
     fun syncWithRevokedTokenDisconnects() = runTest {
-        api.configUnauthorized = true
+        api.config = ConfigResult.Unauthorized
         assertEquals(ListenableWorker.Result.failure(), runSync())
         assertEquals(SecureStore.State.REVOKED, store.state)
+    }
+
+    @Test
+    fun failedSyncRetriesAndIsShown() = runTest {
+        api.config = ConfigResult.Retry("UnknownHostException")
+        assertEquals(ListenableWorker.Result.retry(), runSync())
+        assertEquals("UnknownHostException", state.lastError)
+
+        api.config = ConfigResult.Fetched(IngestConfig(setOf("Motylki"), 900))
+        assertEquals(ListenableWorker.Result.success(), runSync())
+        assertNull(state.lastError)
+        assertEquals(setOf("Motylki"), state.trackedGroups)
     }
 }

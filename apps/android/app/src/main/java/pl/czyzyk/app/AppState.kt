@@ -114,6 +114,17 @@ class AppState(private val prefs: SharedPreferences) {
         get() = prefs.getLong(KEY_LAST_DELIVERED, 0)
         set(v) = prefs.edit().putLong(KEY_LAST_DELIVERED, v).apply()
 
+    /** Why the last contact with the server failed (status screen); null after a successful one. */
+    val lastError: String? get() = prefs.getString(KEY_LAST_ERROR, null)
+    val lastErrorAt: Long get() = prefs.getLong(KEY_LAST_ERROR_AT, 0)
+
+    fun recordError(reason: String, now: Long = System.currentTimeMillis()) =
+        prefs.edit().putString(KEY_LAST_ERROR, reason).putLong(KEY_LAST_ERROR_AT, now).apply()
+
+    fun clearError() {
+        if (prefs.contains(KEY_LAST_ERROR)) prefs.edit().remove(KEY_LAST_ERROR).remove(KEY_LAST_ERROR_AT).apply()
+    }
+
     companion object {
         const val DEFAULT_TTL_MILLIS = 15 * 60 * 1000L
         private const val KEY_PHOTOS = "photos_enabled"
@@ -131,6 +142,8 @@ class AppState(private val prefs: SharedPreferences) {
         private const val KEY_PENDING_REPORTS = "pending_group_reports"
         private const val KEY_ATTACHMENTS = "pending_attachments"
         private const val KEY_LAST_DELIVERED = "last_delivered_at"
+        private const val KEY_LAST_ERROR = "last_error"
+        private const val KEY_LAST_ERROR_AT = "last_error_at"
         private const val KEY_APP_URL = "app_url"
         private const val KEY_UPDATE_CHECKED = "update_checked_at"
         private const val KEY_UPDATE_CODE = "update_ready_code"

@@ -32,6 +32,7 @@ object Outbox {
                     SendResult.Delivered -> {
                         queue.remove(item.rowId)
                         state.lastDeliveredAt = System.currentTimeMillis()
+                        state.clearError()
                     }
                     is SendResult.Rejected -> queue.remove(item.rowId)
                     SendResult.Unauthorized -> {
@@ -40,6 +41,7 @@ object Outbox {
                     }
                     is SendResult.Retry -> {
                         queue.markAttempt(item.rowId)
+                        state.recordError(result.reason)
                         return DrainResult.RETRY
                     }
                 }
