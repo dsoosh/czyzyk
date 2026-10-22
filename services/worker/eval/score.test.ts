@@ -25,9 +25,9 @@ const createBring = {
 };
 
 describe("cases.json", () => {
-  it("has 33 uniquely named cases with messages", () => {
-    expect(cases).toHaveLength(33);
-    expect(new Set(cases.map((c) => c.id)).size).toBe(33);
+  it("has 35 uniquely named cases with messages", () => {
+    expect(cases).toHaveLength(35);
+    expect(new Set(cases.map((c) => c.id)).size).toBe(35);
     for (const c of cases) expect(c.messages.length).toBeGreaterThan(0);
   });
 });
