@@ -16,21 +16,30 @@ import java.util.concurrent.TimeUnit
 object Work {
     private val network = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
-    fun enqueueSend(context: Context) {
+    // APPEND_OR_REPLACE: a send already running finishes, and new messages get a follow-up run.
+    fun enqueueSend(context: Context, policy: ExistingWorkPolicy = ExistingWorkPolicy.APPEND_OR_REPLACE) {
         val request = OneTimeWorkRequestBuilder<SendWorker>()
             .setConstraints(network)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        // APPEND_OR_REPLACE: a send already running finishes, and new messages get a follow-up run.
-        WorkManager.getInstance(context).enqueueUniqueWork("send", ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+        WorkManager.getInstance(context).enqueueUniqueWork("send", policy, request)
     }
 
-    fun enqueueSync(context: Context) {
+    fun enqueueSync(context: Context, policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP) {
         val request = OneTimeWorkRequestBuilder<SyncWorker>()
             .setConstraints(network)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork("sync", ExistingWorkPolicy.KEEP, request)
+        WorkManager.getInstance(context).enqueueUniqueWork("sync", policy, request)
+    }
+
+    /**
+     * "Odśwież teraz": runs the sync and the send right away. REPLACE drops a run waiting in
+     * backoff (up to 5 hours after a long server outage), which KEEP and APPEND would wait for.
+     */
+    fun refreshNow(context: Context) {
+        enqueueSync(context, ExistingWorkPolicy.REPLACE)
+        enqueueSend(context, ExistingWorkPolicy.REPLACE)
     }
 
     /**

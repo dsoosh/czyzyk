@@ -5,6 +5,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import pl.czyzyk.app.capture.CapturedMessage
 import pl.czyzyk.app.pairing.Pairing
@@ -30,16 +31,22 @@ sealed interface SendResult {
 
 data class IngestConfig(val trackedGroups: Set<String>, val ttlSeconds: Long)
 
+/** Outcome of reading the device config (tracked groups). */
+sealed interface ConfigResult {
+    data class Fetched(val config: IngestConfig) : ConfigResult
+    /** 401 – the device token was revoked. */
+    data object Unauthorized : ConfigResult
+    /** Non-2xx status, unreadable answer or network error – try again later. */
+    data class Retry(val reason: String) : ConfigResult
+}
+
 interface IngestApi {
     fun sendNotification(pairing: Pairing, message: CapturedMessage): SendResult
-    /** Returns null when the request failed; throws [UnauthorizedException] on 401. */
-    fun fetchConfig(pairing: Pairing): IngestConfig?
+    fun fetchConfig(pairing: Pairing): ConfigResult
     fun reportGroups(pairing: Pairing, names: Collection<String>): SendResult
     /** A screened document for a delivered message; [imageBase64] only for screening IMAGE. 404 (message not there yet) → Retry. */
     fun sendDocument(pairing: Pairing, document: PendingDocument, imageBase64: String?): SendResult
 }
-
-class UnauthorizedException : IOException("device token rejected")
 
 class HttpIngestApi(
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -100,21 +107,27 @@ class HttpIngestApi(
     override fun reportGroups(pairing: Pairing, names: Collection<String>): SendResult =
         post(pairing, "/ingest/seen-groups", JSONObject().put("names", JSONArray(names.toList())))
 
-    override fun fetchConfig(pairing: Pairing): IngestConfig? = try {
+    override fun fetchConfig(pairing: Pairing): ConfigResult = try {
         client.newCall(request(pairing, "/ingest/config").get().build()).execute().use { r ->
-            if (r.code == 401) throw UnauthorizedException()
-            if (!r.isSuccessful) return null
-            val body = JSONObject(r.body?.string() ?: return null)
-            val groups = body.getJSONArray("tracked_groups")
-            IngestConfig(
-                trackedGroups = (0 until groups.length()).map { groups.getString(it) }.toSet(),
-                ttlSeconds = body.optLong("config_ttl_seconds", 900),
-            )
+            when {
+                r.code == 401 -> ConfigResult.Unauthorized
+                !r.isSuccessful -> ConfigResult.Retry("http ${r.code}")
+                else -> {
+                    val body = JSONObject(r.body?.string().orEmpty())
+                    val groups = body.getJSONArray("tracked_groups")
+                    ConfigResult.Fetched(
+                        IngestConfig(
+                            trackedGroups = (0 until groups.length()).map { groups.getString(it) }.toSet(),
+                            ttlSeconds = body.optLong("config_ttl_seconds", 900),
+                        ),
+                    )
+                }
+            }
         }
-    } catch (e: UnauthorizedException) {
-        throw e
     } catch (e: IOException) {
-        null
+        ConfigResult.Retry(e.javaClass.simpleName)
+    } catch (e: JSONException) {
+        ConfigResult.Retry("invalid response")
     }
 }
 

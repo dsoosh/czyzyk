@@ -60,6 +60,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import pl.czyzyk.app.net.failureLabel
 import pl.czyzyk.app.pairing.PairingLink
 import pl.czyzyk.app.pairing.SecureStore
 import pl.czyzyk.app.capture.ListenerWatchdog
@@ -517,6 +518,9 @@ private data class Status(
     val queueSize: Int,
     val pendingAttachments: Int,
     val lastDeliveredAt: Long,
+    /** Why the last contact with the server failed, null after a successful one. */
+    val lastError: String?,
+    val lastErrorAt: Long,
     val trackedGroups: Int,
     val syncInterval: SyncInterval,
     val trackedFetchedAt: Long,
@@ -546,6 +550,8 @@ private fun readStatus(context: Context): Status {
         queueSize = Deps.queue(context).size(),
         pendingAttachments = state.pendingAttachments,
         lastDeliveredAt = state.lastDeliveredAt,
+        lastError = state.lastError,
+        lastErrorAt = state.lastErrorAt,
         trackedGroups = state.trackedGroups.size,
         syncInterval = state.syncInterval,
         trackedFetchedAt = state.trackedFetchedAt,
@@ -726,6 +732,9 @@ private fun QueueCard(status: Status) {
             Text("Wiadomości w kolejce: ${status.queueSize}")
             Text("Zaległe załączniki: ${status.pendingAttachments}")
             Text("Ostatnia wysyłka: " + formatTime(status.lastDeliveredAt))
+            status.lastError?.let {
+                Text("Ostatni błąd: ${failureLabel(it)} (${formatTime(status.lastErrorAt)})", color = Bad)
+            }
         }
     }
 }
@@ -818,8 +827,8 @@ private fun SyncCard(status: Status, onChanged: () -> Unit) {
             Text("Ostatnie odświeżenie: " + formatTime(status.trackedFetchedAt))
             OutlinedButton(
                 onClick = {
-                    Work.enqueueSync(context)
-                    Toast.makeText(context, "Odświeżam listę grup", Toast.LENGTH_SHORT).show()
+                    Work.refreshNow(context)
+                    Toast.makeText(context, "Odświeżam listę grup i wysyłam kolejkę", Toast.LENGTH_SHORT).show()
                 },
                 enabled = status.pairing == SecureStore.State.PAIRED,
             ) { Text("Odśwież teraz") }
