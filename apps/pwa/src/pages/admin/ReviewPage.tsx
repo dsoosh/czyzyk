@@ -242,6 +242,10 @@ export function ReviewPage() {
   return (
     <div className="space-y-4">
       <h1 className="font-display text-4xl font-bold text-ink">Do przejrzenia</h1>
+      <p className="text-sm text-slate-600">
+        Analiza nie była pewna tych spraw albo chce zmienić coś, co już poprawiłeś. Zatwierdź, popraw albo odrzuć – licznik przy
+        „Admin” pokazuje, ile ich czeka.
+      </p>
       {data.items.length === 0 ? (
         <p className="rounded-2xl bg-white p-4 text-slate-500 shadow-sm">Nic nie czeka na przegląd</p>
       ) : (

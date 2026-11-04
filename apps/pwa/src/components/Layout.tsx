@@ -10,6 +10,8 @@ import { Logo } from "./Logo";
 export interface LayoutContext {
   /** Re-reads the review queue size shown on the Admin tab. */
   refreshReviewCount: () => void;
+  /** Items waiting in Admin → Przegląd. */
+  reviewCount: number;
 }
 
 export const useLayoutContext = () => useOutletContext<LayoutContext>();
@@ -65,12 +67,18 @@ const sideTabClass = ({ isActive }: { isActive: boolean }) =>
 const roundButton =
   "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink transition-colors hover:bg-ink/5 active:bg-ink/10";
 
-function ReviewBadge({ pending }: { pending: number }) {
+/** "3 do przejrzenia w Przeglądzie": what the counter on Admin and on the Przegląd tab means. */
+export function reviewLabel(pending: number): string {
+  return `${pending} do przejrzenia w Przeglądzie`;
+}
+
+export function ReviewBadge({ pending, className = "absolute -top-2 -right-3" }: { pending: number; className?: string }) {
   if (pending <= 0) return null;
   return (
     <span
-      aria-label={`${pending} do przejrzenia`}
-      className="absolute -top-2 -right-3 min-w-5 rounded-full bg-clay px-1 text-center text-xs leading-5 text-white"
+      aria-label={reviewLabel(pending)}
+      title={reviewLabel(pending)}
+      className={`${className} min-w-5 rounded-full bg-clay px-1 text-center text-xs leading-5 text-white`}
     >
       {pending}
     </span>
@@ -102,7 +110,9 @@ export function Layout() {
   const wide = useMediaQuery(WIDE_SCREEN);
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
   const connect = androidBridge() != null;
-  const outlet = <Outlet context={{ refreshReviewCount: reviewCount.reload } satisfies LayoutContext} />;
+  const outlet = <Outlet context={{ refreshReviewCount: reviewCount.reload, reviewCount: pending } satisfies LayoutContext} />;
+  // With items waiting, Admin opens the review queue they are in.
+  const target = (t: Tab) => (t === ADMIN_TAB && pending > 0 ? "/admin/przeglad" : t.to);
   const accountButtons = (
     <>
       <button type="button" onClick={() => void signOut()} aria-label="Wyloguj" title="Wyloguj" className={roundButton}>
@@ -124,7 +134,7 @@ export function Layout() {
           </div>
           <nav aria-label="Nawigacja" className="flex flex-col gap-1 rounded-[28px] bg-ink p-2 shadow-lg">
             {tabs.map((t) => (
-              <NavLink key={t.to} to={t.to} end={t.end} className={sideTabClass}>
+              <NavLink key={t.to} to={target(t)} end={t.end} className={sideTabClass}>
                 <span className="relative">
                   <Icon name={t.icon} />
                   {t === ADMIN_TAB && <ReviewBadge pending={pending} />}
@@ -154,7 +164,7 @@ export function Layout() {
         className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] mx-auto flex max-w-[calc(32rem-2rem)] gap-1 rounded-full bg-ink p-1.5 shadow-lg"
       >
         {tabs.map((t) => (
-          <NavLink key={t.to} to={t.to} end={t.end} className={tabClass}>
+          <NavLink key={t.to} to={target(t)} end={t.end} className={tabClass}>
             <span className="relative">
               <Icon name={t.icon} />
               {t === ADMIN_TAB && <ReviewBadge pending={pending} />}

@@ -40,7 +40,13 @@ describe("Kolejka przeglądu", () => {
   it("licznik na zakładce Admin i element z typem, danymi, pewnością i uzasadnieniem", async () => {
     renderQueue([queuePayment]);
     const card = await screen.findByRole("listitem", { name: /Płatność/ });
-    expect(screen.getByRole("link", { name: /Admin/ })).toHaveTextContent("1");
+    // The counter says what it counts, Admin leads to the queue, and the Przegląd tab shows it too.
+    const admin = screen.getByRole("link", { name: /Admin/ });
+    expect(admin).toHaveTextContent("1");
+    expect(admin).toHaveAttribute("href", "/admin/przeglad");
+    expect(within(admin).getByTitle("1 do przejrzenia w Przeglądzie")).toBeInTheDocument();
+    const adminNav = screen.getByRole("navigation", { name: "Panel admina" });
+    expect(within(adminNav).getByRole("link", { name: /Przegląd/ })).toHaveTextContent("1");
     expect(within(card).getByText("basen")).toBeInTheDocument();
     expect(within(card).getByText("12 zł")).toBeInTheDocument();
     expect(within(card).getByText("pewność niska (50%)")).toBeInTheDocument();
@@ -55,6 +61,7 @@ describe("Kolejka przeglądu", () => {
     expect(rpc).toHaveBeenCalledWith("review_item", { p_kind: "payment", p_id: "p1", p_action: "approve", p_patch: null });
     expect(await screen.findByText("Nic nie czeka na przegląd")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Admin/ })).not.toHaveTextContent(/\d/);
+    expect(screen.getByRole("link", { name: /Admin/ })).toHaveAttribute("href", "/admin");
   });
 
   it("odrzucenie wywołuje review_item reject", async () => {
