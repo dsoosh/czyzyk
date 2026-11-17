@@ -95,3 +95,31 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   const registration = await navigator.serviceWorker.getRegistration();
   return (await registration?.pushManager.getSubscription()) ?? null;
 }
+
+/** The browser's answer to the notification permission prompt, or null without the Notification API. */
+export function notificationPermission(): NotificationPermission | null {
+  return typeof Notification === "undefined" ? null : Notification.permission;
+}
+
+const BANNER_DISMISSED_KEY = "czyzyk.pushBanner.dismissedAt";
+export const BANNER_DISMISS_DAYS = 30;
+
+/** "Nie teraz" on the push banner hides it on this device for 30 days. */
+export function isPushBannerDismissed(now: Date = new Date()): boolean {
+  try {
+    const raw = localStorage.getItem(BANNER_DISMISSED_KEY);
+    if (!raw) return false;
+    const at = Date.parse(raw);
+    return Number.isFinite(at) && now.getTime() - at < BANNER_DISMISS_DAYS * 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
+export function dismissPushBanner(now: Date = new Date()): void {
+  try {
+    localStorage.setItem(BANNER_DISMISSED_KEY, now.toISOString());
+  } catch {
+    // Storage blocked: the banner stays hidden until the next reload.
+  }
+}

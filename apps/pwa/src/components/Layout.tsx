@@ -6,6 +6,7 @@ import { useLoader, useOnForeground } from "../lib/useLoader";
 import { useMediaQuery, WIDE_SCREEN } from "../lib/useMediaQuery";
 import { AssistantPanel } from "./AssistantPanel";
 import { Logo } from "./Logo";
+import { PushBanner } from "./PushBanner";
 
 export interface LayoutContext {
   /** Re-reads the review queue size shown on the Admin tab. */
@@ -110,7 +111,12 @@ export function Layout() {
   const wide = useMediaQuery(WIDE_SCREEN);
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
   const connect = androidBridge() != null;
-  const outlet = <Outlet context={{ refreshReviewCount: reviewCount.reload, reviewCount: pending } satisfies LayoutContext} />;
+  const outlet = (
+    <>
+      <PushBanner />
+      <Outlet context={{ refreshReviewCount: reviewCount.reload, reviewCount: pending } satisfies LayoutContext} />
+    </>
+  );
   // With items waiting, Admin opens the review queue they are in.
   const target = (t: Tab) => (t === ADMIN_TAB && pending > 0 ? "/admin/przeglad" : t.to);
   const accountButtons = (
